@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Bumped by hand, reported on every sync; the parent's page displays it and
 # nothing branches on it.
-MONITOR_VERSION = "0.5.0"
+MONITOR_VERSION = "0.6.0"
 
 # A child is a windows account, and everything kept for them sits in a directory
 # of that name: `DATA_DIR/<child>/`, hidden from them, and `SHARED_DIR/<child>/`,
