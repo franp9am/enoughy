@@ -4,14 +4,11 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
-* Auto-update. The startup task runs a thin launcher that never changes: it
-  fetches the manifest from `releases/latest/download/`, verifies its Ed25519
-  signature (key baked in, verify vendored), downloads the zip, checks every
-  hash, replaces the files and writes the version marker last. Any failure is
-  logged and the monitor starts anyway. Never downgrades; rollback is a new
-  tag. `UPDATE_MODE` file next to the launcher, `manual` where the machine
-  does not sync. Migrations live in the monitor's start; the updater only
-  copies files.
+* Auto-update is built (`launcher.ps1`, `release.ps1`, the installer wiring)
+  but no release exists yet. Left: `gh` on the release machine, the first
+  release, one reinstall on each machine installed before it, and the README
+  and `bootstrap.ps1`, which still describe the old task. Migrations live in
+  the monitor's start; the launcher only copies files.
 * Per-weekday override for the allowed hours, like `DAILY_LIMIT_OVERRIDES` does
   for the limit, e.g. later on Friday and Saturday.
 * Send recent `event_log` lines (or at least the last caught exception) with each
@@ -26,11 +23,10 @@ Ordered by importance within each section.
   say what it returns. The installer's file list in `install.ps1` must name the
   new module.
 * Several children on one machine. The per-child layout is there since 0.5.
-  Left: the child's name inside the redeem code and its signature, so a code
-  redeems for one child only; the installer adding a child next to the ones
-  there (one widget task each, the monitor task kept); `icacls` locking each
-  child's shared folder to that account. The pre-0.5 layout move goes once no
-  such machine remains.
+  Left: the installer adding a child next to the ones there (one widget task
+  each, the monitor task kept); `icacls` locking each child's shared folder to
+  that account. The pre-0.5 layout move goes once no such machine remains.
+* Install and uninstall exe, no powershell, certificate, test easy install
 
 ## Server-side
 
@@ -52,8 +48,8 @@ Ordered by importance within each section.
   `$Ref` in `bootstrap.ps1`, then the tag. Let the tag be the only source:
   `bootstrap.ps1` asks the GitHub API for the latest release instead of carrying
   a pin, and the monitor reads its version from a file written at release time.
-  The same release step writes the manifest of file hashes and signs it, for
-  auto-update.
+  `release.ps1` already zips, signs and uploads; it refuses a tag that config.py
+  does not agree with until then.
 * Simplify installation: family, parent and child creation in the DB and the
   corresponding logins, with less effort from the maintainer.
 
@@ -69,3 +65,6 @@ Ordered by importance within each section.
 * Full client rewrite in C# with a signed exe installer; the monitor becomes
   a Windows service then.
 * The parent's page warns when a machine has not reported for a day.
+* Restricted internet, instead of shutdown when the quota ends or as a second
+  mode: a firewall rule scoped to the child's account that allows a whitelist
+  and nothing else. Maybe Wikipedia alone, maybe limited ChatGPT or Claude.
