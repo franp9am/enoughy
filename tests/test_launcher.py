@@ -167,3 +167,38 @@ def test_manual_mode_never_fetches(machine, server, keys):
     result = run_launcher(machine, server["url"])
     assert result["started"] == "old"
     assert not result["staged"]
+
+
+def test_the_monitor_starts_even_when_the_log_cannot_be_written(machine, server, keys):
+    monitor_dir = machine / "ScreenTime"
+    (monitor_dir / "update").mkdir()  # staged but empty, so the install fails and wants to log
+    log = monitor_dir / "data" / "crash.log"
+    log.write_text("")
+    log.chmod(0o444)
+    result = run_launcher(machine, server["url"])
+    assert result["started"] == "old"
+
+
+def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machine, server, keys):
+    make_release(server["dir"], "0.6.0", keys["pfx"])
+    staged = machine / "ScreenTime" / "update" / "monitor"
+    staged.mkdir(parents=True)
+    (staged / "VERSION").write_text("0.4.0")
+    with open(staged / "held.py", "w"):  # an open handle, as a virus scanner would have
+        result = run_launcher(machine, server["url"])
+    assert result["started"] == "old"
+    assert "launcher" in result["log"]
+    result = run_launcher(machine, server["url"])  # the handle is gone: staged now, installed a boot later
+    result = run_launcher(machine, server["url"])
+    assert result["version"] == "0.6.0"
+
+
+def test_a_half_unpacked_release_is_never_installed_and_does_not_block_the_next(machine, server, keys):
+    make_release(server["dir"], "0.6.0", keys["pfx"])
+    half = machine / "ScreenTime" / "update.new" / "monitor"  # the power went while unpacking
+    half.mkdir(parents=True)
+    (half / "VERSION").write_text("0.9.0")
+    result = run_launcher(machine, server["url"])
+    assert result["version"] == "0.5.0"
+    result = run_launcher(machine, server["url"])
+    assert result["version"] == "0.6.0"

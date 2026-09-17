@@ -18,8 +18,9 @@ $SharedDir  = Join-Path (Split-Path $MonitorDir) "ScreenTimeShared"
 $python     = Join-Path (Split-Path $MonitorDir) "ScreenTimePython\python.exe"
 $Staged     = "$MonitorDir\update"   # inside the locked folder, so only the launcher writes there
 
+# The catches below call it, so it must not throw: nothing would catch that.
 function Log($message) {
-    Add-Content "$MonitorDir\data\crash.log" "--- $(Get-Date -Format s) launcher: $message"
+    try { Add-Content "$MonitorDir\data\crash.log" "--- $(Get-Date -Format s) launcher: $message" } catch { }
 }
 
 function Install-Staged {
@@ -28,7 +29,7 @@ function Install-Staged {
     if (Test-Path "$MonitorDir\VERSION") { $current = [version](Get-Content "$MonitorDir\VERSION") }
     if ($new -le $current) { return }   # never downgrades: a rollback is a new tag
     # VERSION last: while the old one stands the copy is not done, and the next
-    # boot redoes it.
+    # boot redoes it from the staged folder, which only Fetch removes.
     Copy-Item "$Staged\shared\*" $SharedDir -Recurse -Force
     Copy-Item "$Staged\monitor\*" $MonitorDir -Recurse -Force -Exclude VERSION
     Remove-Item "$MonitorDir\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue   # stale bytecode must not outlive its source
@@ -50,14 +51,18 @@ function Fetch {
     $genuine = $key.VerifyData([IO.File]::ReadAllBytes($zip), [IO.File]::ReadAllBytes("$zip.sig"),
         [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
     if (-not $genuine) { throw "the downloaded zip does not match its signature" }
-    Expand-Archive -LiteralPath $zip -DestinationPath $Staged
+    # Unpacked under another name and renamed last, so a staged folder is always
+    # whole, whenever the power goes.
+    $unpacked = "$Staged.new"
+    if (Test-Path $unpacked) { Remove-Item -LiteralPath $unpacked -Recurse -Force }
+    Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
+    if (Test-Path $Staged) { Remove-Item -LiteralPath $Staged -Recurse -Force }
+    Rename-Item -LiteralPath $unpacked -NewName (Split-Path $Staged -Leaf)
     Remove-Item $zip, "$zip.sig"
 }
 
-if (Test-Path $Staged) {
-    try { Install-Staged } catch { Log $_ }
-    Remove-Item -LiteralPath $Staged -Recurse -Force   # used or not, a boot later it would be stale
-}
+# Nothing before the monitor's start may end the script.
+try { if (Test-Path $Staged) { Install-Staged } } catch { Log $_ }
 $monitor = Start-Process $python "`"$MonitorDir\monitor.py`"" -WorkingDirectory $MonitorDir -NoNewWindow -PassThru
 if ((Get-Content "$MonitorDir\UPDATE_MODE" -ErrorAction SilentlyContinue) -ne "manual") {
     try { Fetch } catch { Log $_ }
