@@ -4,11 +4,6 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
-* Auto-update is built (`launcher.ps1`, `release.ps1`, the installer wiring)
-  but no release exists yet. Left: `gh` on the release machine, the first
-  release, one reinstall on each machine installed before it, and the README
-  and `bootstrap.ps1`, which still describe the old task. Migrations live in
-  the monitor's start; the launcher only copies files.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into
@@ -57,7 +52,6 @@ Ordered by importance within each section.
 
 * Full client rewrite in C# with a signed exe installer; the monitor becomes
   a Windows service then.
-* The parent's page warns when a machine has not reported for a day.
 * Restricted internet, instead of shutdown when the quota ends or as a second
   mode: a firewall rule scoped to the child's account that allows a whitelist
   and nothing else. Maybe Wikipedia alone, maybe limited ChatGPT or Claude.
