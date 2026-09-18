@@ -2,7 +2,10 @@
 # commit v<VERSION> and publish both as a GitHub release, which a fresh install
 # runs from and every launcher updates from.
 #
-#   .\release.ps1 "What changed, in a sentence for the parent." [-KeyFile ...]
+#   powershell -ExecutionPolicy Bypass -File .\release.ps1 "What changed, in a sentence for the parent." [-KeyFile ...]
+#
+# The bypass is for a window whose policy refuses scripts; the install .cmd
+# files do the same for parents.
 #
 # Needs the private key (release_key.cer is its public half) and a logged-in gh.
 # Lose the key and no installed machine updates without a visit.
