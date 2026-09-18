@@ -80,30 +80,36 @@ The installer does **not** do these, and without them the setup is bypassable:
 ## Settings
 
 The six settings the monitor obeys live in `data/<child>/settings.json`, next to the
-monitor where the child cannot read them: `DAILY_LIMIT_SECONDS`, `DAILY_LIMIT_OVERRIDES` (a
-different limit on some weekdays), `CARRYOVER` (unused time rolls over to the next day),
-`MAX_CARRYOVER_SECONDS`, `EARLIEST_HOUR_INCLUDED` and `LATEST_HOUR_INCLUDED`. Example:
+monitor where the child cannot read them: `DAILY_LIMIT_SECONDS`, `CARRYOVER` (unused time
+rolls over to the next day), `MAX_CARRYOVER_SECONDS`, `ALLOWED_HOURS`, and a different
+limit or hours on some weekdays in `DAILY_LIMIT_OVERRIDES` and `ALLOWED_HOURS_OVERRIDES`.
+Example:
 
 ```json
 {
   "DAILY_LIMIT_SECONDS": 3600,
   "CARRYOVER": true,
   "MAX_CARRYOVER_SECONDS": 18000,
-  "EARLIEST_HOUR_INCLUDED": 6,
-  "LATEST_HOUR_INCLUDED": 20,
-  "DAILY_LIMIT_OVERRIDES": {"mon": 1800, "sat": 7200}
+  "ALLOWED_HOURS": [6, 21],
+  "DAILY_LIMIT_OVERRIDES": {"mon": 1800, "sat": 7200},
+  "ALLOWED_HOURS_OVERRIDES": {"fri": [6, 23], "sat": [8, 23]}
 }
 ```
 
-One hour a day, but half an hour on Mondays and two on Saturdays, usable between 6:00
-and 20:59 -- the night starts at 21:00 and ends at 6:00 -- with unused time carried over,
-but never more than five hours of it. A `MAX_CARRYOVER_SECONDS` of `null` carries
-everything over, with no cap. Five minutes before the night the child sees a message;
-for the time running out there is none, the widget turns red instead.
+One hour a day, but half an hour on Mondays and two on Saturdays, usable from 6:00 until
+21:00 -- the night starts at 21:00 and ends at 6:00 -- except until 23:00 on Fridays and
+Saturdays, when it also starts later; with unused time carried over, but never more than
+five hours of it. A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, with no
+cap. Five minutes before the night the child sees a message; for the time running out
+there is none, the widget turns red instead.
 
-`DAILY_LIMIT_OVERRIDES` takes the days `mon` to `sun`, each with its limit in seconds;
-`{}` means every day is the same. Only the limit changes, the hours are the same every
-day. When the machine was off for some days, carryover credits each of them its own limit.
+`ALLOWED_HOURS` names two moments, when the day starts and when the night starts: `[6, 21]`
+allows 6:00 up to 21:00, and at 21:00 the machine shuts down. The second number is the
+hour of the shutdown, not the last hour allowed -- `[6, 22]` keeps the machine up until
+22:00 -- and `[0, 24]` is no night at all. The two overrides take the days `mon` to `sun`,
+each with its own limit in seconds or its own `[day starts, night starts]`; `{}` means
+every day is the same. When the machine was off for some days, carryover credits each of
+them its own limit.
 
 Edit that file, or let the parent's server set them. Delete it and
 the monitor falls back to the defaults in `settings.py`, writing the file again at its

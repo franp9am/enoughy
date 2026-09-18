@@ -79,10 +79,17 @@ def compute_carryover_sec(today: datetime.date, settings, data_dir: Path) -> int
     return carryover if cap is None else min(carryover, cap)
 
 
+def allowed_hours(date: datetime.date, settings) -> list:
+    """The day's own `[day starts, night starts]` when its weekday has one, else
+    the general one."""
+    weekday = WEEKDAY_NAMES[date.weekday()]
+    return settings["ALLOWED_HOURS_OVERRIDES"].get(weekday, settings["ALLOWED_HOURS"])
+
+
 def is_night_time(now, settings):
-    return not (
-        settings["EARLIEST_HOUR_INCLUDED"] <= now.hour <= settings["LATEST_HOUR_INCLUDED"]
-    )
+    day_starts, night_starts = allowed_hours(now.date(), settings)
+    # [6, 21]: 20:59 is still day, 21:00 is night
+    return not day_starts <= now.hour < night_starts
 
 
 def load_data(datafile):

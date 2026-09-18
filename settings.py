@@ -9,6 +9,26 @@ from pathlib import Path
 WEEKDAY_NAMES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # in date.weekday() order
 DAILY_LIMIT_RANGE = range(24 * 60 * 60 + 1)
 
+
+def is_int_in(value, allowed: range) -> bool:
+    # bool is an int subclass: without the exclusion, True would pass as 1
+    return isinstance(value, int) and not isinstance(value, bool) and value in allowed
+
+
+def is_hours_window(value) -> bool:
+    """A window is two moments, `[day_starts, night_starts]`: [6, 21] allows
+    6:00 up to 21:00, and at 21:00 sharp the night begins -- the second number
+    is the shutdown hour, not the last allowed one. Both are hours from 0 to 24,
+    at least an hour apart, since an empty window would shut the machine down
+    before a correction could arrive."""
+    return (
+        isinstance(value, list)
+        and len(value) == 2
+        and all(is_int_in(hour, range(25)) for hour in value)
+        and value[0] < value[1]
+    )
+
+
 # Read these through settings_in_force(), never directly: the child's settings file
 # holds what is in force, and these are only what a child starts with and falls back to.
 SETTINGS = {
@@ -25,18 +45,20 @@ SETTINGS = {
         "allowed": range(sys.maxsize),  # any non-negative int; a day can use at most its limit anyway
         "nullable": True,  # null is no cap; the default stays a number so a report types the field
     },
-    "EARLIEST_HOUR_INCLUDED": {
-        "default": 6,
-        "allowed": range(24)
-    },
-    "LATEST_HOUR_INCLUDED": {
-        "default": 20,
-        "allowed": range(24)
+    "ALLOWED_HOURS": {
+        # [day starts, night starts]: usable from 6:00, the night begins at 21:00
+        "default": [6, 21],
+        "allowed": is_hours_window,
     },
     "DAILY_LIMIT_OVERRIDES": {
         # a weekday named here gets its own limit, e.g. {"mon": 1800}
         "default": {},
         "allowed": {"keys": WEEKDAY_NAMES, "values": DAILY_LIMIT_RANGE},
+    },
+    "ALLOWED_HOURS_OVERRIDES": {
+        # a weekday named here gets its own window, e.g. {"fri": [6, 23]}: Friday's night begins at 23:00
+        "default": {},
+        "allowed": {"keys": WEEKDAY_NAMES, "values": is_hours_window},
     },
 }
 
@@ -45,29 +67,29 @@ def default_settings() -> dict:
     return {name: setting["default"] for name, setting in SETTINGS.items()}
 
 
-def is_int_in(value, allowed: range) -> bool:
-    # bool is an int subclass: without the exclusion, True would pass as 1
-    return isinstance(value, int) and not isinstance(value, bool) and value in allowed
+def allowed_by(spec, value) -> bool:
+    if isinstance(spec, range):
+        return is_int_in(value, spec)
+    elif isinstance(spec, tuple):
+        return type(value) is type(spec[0]) and value in spec
+    elif isinstance(spec, dict):
+        # a dict with keys from "keys", each value allowed by the "values" spec; empty is fine
+        return isinstance(value, dict) and all(
+            key in spec["keys"] and allowed_by(spec["values"], item)
+            for key, item in value.items()
+        )
+    elif callable(spec):
+        return spec(value)
+    else:
+        # an "allowed" spec this function doesn't handle is a bug in SETTINGS;
+        # dropping the value keeps the monitor ticking
+        return False
 
 
 def value_allowed(name: str, value) -> bool:
     if value is None:
         return SETTINGS[name].get("nullable", False)
-    allowed = SETTINGS[name]["allowed"]
-    if isinstance(allowed, range):
-        return is_int_in(value, allowed)
-    elif isinstance(allowed, tuple):
-        return type(value) is type(allowed[0]) and value in allowed
-    elif isinstance(allowed, dict):
-        # a dict with keys from "keys" and int values in the "values" range; empty is fine
-        return isinstance(value, dict) and all(
-            key in allowed["keys"] and is_int_in(item, allowed["values"])
-            for key, item in value.items()
-        )
-    else:
-        # an "allowed" spec this function doesn't handle is a bug in SETTINGS;
-        # dropping the value keeps the monitor ticking
-        return False
+    return allowed_by(SETTINGS[name]["allowed"], value)
 
 
 def validated_settings(stored: dict, fallback=None) -> dict:
@@ -83,11 +105,18 @@ def validated_settings(stored: dict, fallback=None) -> dict:
     if any(name not in SETTINGS or not value_allowed(name, value)
            for name, value in stored.items()):
         return dict(fallback)
-    settings = {name: stored.get(name, fallback[name]) for name in SETTINGS}
-    # an unusable window would shut the machine down before a correction could arrive
-    if settings["EARLIEST_HOUR_INCLUDED"] > settings["LATEST_HOUR_INCLUDED"]:
-        return dict(fallback)
-    return settings
+    return {name: stored.get(name, fallback[name]) for name in SETTINGS}
+
+
+def upgraded(stored: dict) -> dict:
+    """A file written before 0.7 has the window as two hours, the last one
+    included. Goes once no such machine remains, like the layout move in
+    install.ps1; anything else in the old names is left for validation to reject."""
+    old = stored.get("EARLIEST_HOUR_INCLUDED"), stored.get("LATEST_HOUR_INCLUDED")
+    if all(is_int_in(hour, range(24)) for hour in old):
+        stored = {name: value for name, value in stored.items() if not name.endswith("_HOUR_INCLUDED")}
+        stored["ALLOWED_HOURS"] = [old[0], old[1] + 1]  # the night began when the last included hour ended
+    return stored
 
 
 def stored_settings(settings_file: Path) -> dict:
@@ -95,7 +124,7 @@ def stored_settings(settings_file: Path) -> dict:
         stored = json.loads(settings_file.read_text(encoding="utf-8"))
     except Exception:  # whatever the file holds, the monitor's tick must go on
         return {}
-    return stored if isinstance(stored, dict) else {}
+    return upgraded(stored) if isinstance(stored, dict) else {}
 
 
 def settings_in_force(settings_file: Path) -> dict:

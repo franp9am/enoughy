@@ -211,15 +211,21 @@ def wanted_settings(connection: sqlite3.Connection, child_id: int) -> sqlite3.Ro
 
 def settings_in_words(settings: dict) -> str:
     """The settings the child reports, on one line."""
-    # the last allowed hour is included in full, so the machine goes down when it ends
-    until = settings["LATEST_HOUR_INCLUDED"] + 1
     # non-breaking space so a wrap never splits a value from the word it belongs to
     limit = f"{compact_duration(settings['DAILY_LIMIT_SECONDS'])}/d"
     # .get: a monitor older than the setting does not report it. The days are
     # not spelled out here: the settings page shows the dict as the child sent it.
     if settings.get("DAILY_LIMIT_OVERRIDES"):
         limit = f"{limit}\u00a0+overrides"
-    parts = [limit, f"{settings['EARLIEST_HOUR_INCLUDED']}-{until}"]
+    hours = settings.get("ALLOWED_HOURS")  # [day starts, night starts]
+    if hours is None:
+        # before 0.7 the window came as two hours, the last one included in
+        # full; goes once every machine installed before 0.7 is reinstalled
+        hours = (settings["EARLIEST_HOUR_INCLUDED"], settings["LATEST_HOUR_INCLUDED"] + 1)
+    window = f"{hours[0]}-{hours[1]}"
+    if settings.get("ALLOWED_HOURS_OVERRIDES"):
+        window = f"{window}\u00a0+overrides"
+    parts = [limit, window]
     # only what is in effect is named, so carryover that is off says nothing
     cap = settings["MAX_CARRYOVER_SECONDS"]
     if settings["CARRYOVER"]:

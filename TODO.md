@@ -9,8 +9,6 @@ Ordered by importance within each section.
   release, one reinstall on each machine installed before it, and the README
   and `bootstrap.ps1`, which still describe the old task. Migrations live in
   the monitor's start; the launcher only copies files.
-* Per-weekday override for the allowed hours, like `DAILY_LIMIT_OVERRIDES` does
-  for the limit, e.g. later on Friday and Saturday.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into

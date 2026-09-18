@@ -27,9 +27,9 @@ SETTINGS = {  # what the settings file holds in every scenario, whatever the def
     "DAILY_LIMIT_SECONDS": HOUR,
     "CARRYOVER": True,
     "MAX_CARRYOVER_SECONDS": 5 * HOUR,
-    "EARLIEST_HOUR_INCLUDED": 6,
-    "LATEST_HOUR_INCLUDED": NIGHT_HOUR - 1,
+    "ALLOWED_HOURS": [6, NIGHT_HOUR],
     "DAILY_LIMIT_OVERRIDES": {},
+    "ALLOWED_HOURS_OVERRIDES": {},
 }
 KID = "kid"
 SECRET = b"\x01\x02\x03\x04"
@@ -180,15 +180,20 @@ def test_the_child_is_warned_five_minutes_before_night_once(machine, files):
 
 
 def test_no_warning_when_night_never_comes(machine, files):
-    write_settings_file(
-        {**SETTINGS, "EARLIEST_HOUR_INCLUDED": 0, "LATEST_HOUR_INCLUDED": 23}, files["settings"]
-    )
+    write_settings_file({**SETTINGS, "ALLOWED_HOURS": [0, 24]}, files["settings"])
     tick(at(23, 55))
     assert machine.notifications == []
 
 
 def test_the_warning_looks_across_midnight(machine, files):
-    write_settings_file({**SETTINGS, "LATEST_HOUR_INCLUDED": 23}, files["settings"])
+    write_settings_file({**SETTINGS, "ALLOWED_HOURS": [6, 24]}, files["settings"])
+    tick(at(23, 55))
+    assert machine.notifications == ["5 minutes to night"]
+
+
+def test_the_warning_looks_across_midnight_into_the_next_weekday(machine, files):
+    # Monday runs to midnight, and Tuesday's own window does not start until 6
+    write_settings_file({**SETTINGS, "ALLOWED_HOURS_OVERRIDES": {"mon": [6, 24]}}, files["settings"])
     tick(at(23, 55))
     assert machine.notifications == ["5 minutes to night"]
 
@@ -290,9 +295,7 @@ def test_a_machine_left_on_overnight_opens_the_new_day_at_midnight(machine, file
 
 
 def test_a_logged_in_child_starts_the_new_day_at_midnight(machine, files):
-    write_settings_file(
-        {**SETTINGS, "EARLIEST_HOUR_INCLUDED": 0, "LATEST_HOUR_INCLUDED": 23}, files["settings"]
-    )
+    write_settings_file({**SETTINGS, "ALLOWED_HOURS": [0, 24]}, files["settings"])
     write_day(files, spent=HOUR // 2, last_tick="2026-09-14 23:58:00")
 
     tick(at(23, 59))
@@ -380,12 +383,12 @@ def test_an_earlier_night_from_the_server_lags_one_tick(machine, files, sync):
     write_day(files, spent=HOUR // 2)
     sync.answer = SyncAnswer(
         pending_grants=[],
-        settings_change=SettingsChange(id=8, settings={"LATEST_HOUR_INCLUDED": 17}),
+        settings_change=SettingsChange(id=8, settings={"ALLOWED_HOURS": [6, 18]}),
     )
 
     tick(at(18, 30))  # night is checked before the sync, with the hours known so far
     assert machine.shutdowns == []
-    assert settings_in_force(files["settings"])["LATEST_HOUR_INCLUDED"] == 17
+    assert settings_in_force(files["settings"])["ALLOWED_HOURS"] == [6, 18]
 
     tick(at(18, 31))
     assert machine.shutdowns == [NIGHT_SHUTDOWN_DELAY_SECONDS]
