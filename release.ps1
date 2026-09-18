@@ -35,7 +35,8 @@ Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\
 Copy-Item "$src\remaining_time_widget.py" "$stage\files\shared"
 Set-Content "$stage\files\monitor\VERSION" $version -NoNewline
 
-# .NET rather than Compress-Archive, which writes backslashes into entry names.
+# .NET rather than Compress-Archive. Both write backslashes into entry names under
+# Windows PowerShell; Expand-Archive, which the launcher uses, reads them as folders.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = "$stage\enoughy.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory("$stage\files", $zip)
@@ -49,6 +50,6 @@ git tag $Tag
 if ($LASTEXITCODE -ne 0) { throw "Could not tag; does $Tag exist already?" }
 git push origin $Tag
 if ($LASTEXITCODE -ne 0) { throw "Could not push the tag." }
-gh release create $Tag $zip "$zip.sig" --title $Tag --notes ""
+gh release create $Tag $zip "$zip.sig" --title $Tag --notes=""   # --notes "" would lose the empty string: PowerShell 5.1 drops it before gh sees it
 if ($LASTEXITCODE -ne 0) { throw "gh release create failed; the tag is pushed, delete it before retrying." }
 Write-Host "Released $Tag."
