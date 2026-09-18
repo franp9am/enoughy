@@ -175,7 +175,7 @@ $pythonw = Join-Path $PythonDir pythonw.exe   # windowless twin, for the widget
 # Monitor folder: copy the files, then lock it to SYSTEM + Administrators only.
 # That lock is what stops the child reading data\<child>\secret.txt and forging codes.
 New-Item -ItemType Directory -Force $childDataDir | Out-Null
-Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\launcher.ps1", "$src\release_key.cer" $MonitorDir -Force
+Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py", "$src\launcher.ps1", "$src\release_key.cer" $MonitorDir -Force
 # The launcher's two files: the installed version, and whether it fetches
 # releases at boot. To stop that on a machine, edit UPDATE_MODE to `manual`; a
 # reinstall keeps it.

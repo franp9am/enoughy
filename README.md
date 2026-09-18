@@ -12,7 +12,9 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
   machine down when the limit is used up or the allowed hours end. A tick only counts,
   and a shutdown only happens, while the child is logged in with the screen unlocked;
   a locked machine is left alone until somebody unlocks it.
-* `config.py` -- every setting, next to the monitor in a folder the child cannot read.
+* `config.py` -- what is fixed at install: paths, intervals, the version. `settings.py` --
+  what the parent changes: the settings' schema, their validation, the settings file.
+  Both next to the monitor in a folder the child cannot read.
   A child is a Windows account, and what the monitor keeps for them is under
   `data\<account>\` there, with what the child may touch under
   `C:\ProgramData\ScreenTimeShared\<account>\`. One child per install for now; the
@@ -104,14 +106,14 @@ for the time running out there is none, the widget turns red instead.
 day. When the machine was off for some days, carryover credits each of them its own limit.
 
 Edit that file, or let the parent's server set them. Delete it and
-the monitor falls back to the defaults in `config.py`, writing the file again at its
+the monitor falls back to the defaults in `settings.py`, writing the file again at its
 next start.
 
-`config.py` holds the rest -- paths, the check interval, the shutdown grace periods -- and,
-in its `SETTINGS` dict, the `default` and `allowed` values for the six above. Those
-defaults seed `settings.json` on a machine that has none and stand in for any value in it
-that is missing or out of range, so a mangled file cannot leave the machine unrestricted.
-Read settings through `get_config()`, never straight from `SETTINGS`.
+`settings.py` holds, in its `SETTINGS` dict, the `default` and `allowed` values for the six
+above. Those defaults seed `settings.json` on a machine that has none and stand in for any
+value in it that is missing or out of range, so a mangled file cannot leave the machine
+unrestricted. Read settings through `settings_in_force()`, never straight from `SETTINGS`.
+`config.py` holds the rest -- paths, the check interval, the shutdown grace periods.
 
 ## Extra time
 

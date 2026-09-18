@@ -7,11 +7,11 @@ import json
 
 import pytest
 
-import config
 import monitor
 import os_tooling
 import remote_sync
 from remote_sync import Grant, SettingsChange, SyncAnswer
+from settings import default_settings, write_settings_file
 
 NOW = datetime.datetime(2026, 9, 14, 8, 0, 0)  # Monday morning
 HOUR = 60 * 60
@@ -54,7 +54,7 @@ def day_data(spent=1200, carryover=300, granted=0):
 
 
 def settings(**overrides):
-    return {**config.default_settings(), **overrides}
+    return {**default_settings(), **overrides}
 
 
 def run(files, data=None, in_force=None):
@@ -202,7 +202,7 @@ def test_an_acceptable_settings_change_is_taken_and_written(files, sync):
 
 def test_an_unacceptable_settings_change_is_refused_and_reported(files, sync):
     in_force = settings(DAILY_LIMIT_SECONDS=2 * HOUR)
-    config.write_settings_file(in_force, files["settings"])
+    write_settings_file(in_force, files["settings"])
     wanted = settings(EARLIEST_HOUR_INCLUDED=24)  # no such hour
     sync.answer = SyncAnswer(pending_grants=[], settings_change=SettingsChange(id=13, settings=wanted))
 
@@ -218,7 +218,7 @@ def test_a_partial_change_is_filled_from_the_file_and_counts_as_taken(files, syn
     # only when the monitor gained a setting while the change was in flight;
     # "taken" is judged on the settings the change does name
     in_force = settings(DAILY_LIMIT_SECONDS=2 * HOUR)
-    config.write_settings_file(in_force, files["settings"])
+    write_settings_file(in_force, files["settings"])
     sync.answer = SyncAnswer(
         pending_grants=[], settings_change=SettingsChange(id=14, settings={"CARRYOVER": False})
     )

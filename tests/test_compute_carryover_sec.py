@@ -12,7 +12,7 @@ HOUR = 60 * 60
 
 def settings(**overrides):
     """The settings the function reads, pinned here so that a changed default in
-    config.py cannot move the numbers below."""
+    settings.py cannot move the numbers below."""
     return {
         "DAILY_LIMIT_SECONDS": HOUR,
         "MAX_CARRYOVER_SECONDS": 5 * HOUR,

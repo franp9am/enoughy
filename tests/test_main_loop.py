@@ -9,7 +9,6 @@ import random
 
 import pytest
 
-import config
 import monitor
 import os_tooling
 import remote_sync
@@ -20,6 +19,7 @@ from config import (
     SIGNATURE_CHARS,
 )
 from remote_sync import Grant, SettingsChange, SyncAnswer
+from settings import settings_in_force, write_settings_file
 
 HOUR = 60 * 60
 NIGHT_HOUR = 21  # the first hour outside the allowed window below
@@ -82,7 +82,7 @@ def files(tmp_path, monkeypatch):
         "applied_grants": data_dir / "applied_grants.json",
         "outcome": data_dir / "settings_change_outcome.json",
     }
-    config.write_settings_file(SETTINGS, paths["settings"])
+    write_settings_file(SETTINGS, paths["settings"])
     return paths
 
 
@@ -180,7 +180,7 @@ def test_the_child_is_warned_five_minutes_before_night_once(machine, files):
 
 
 def test_no_warning_when_night_never_comes(machine, files):
-    config.write_settings_file(
+    write_settings_file(
         {**SETTINGS, "EARLIEST_HOUR_INCLUDED": 0, "LATEST_HOUR_INCLUDED": 23}, files["settings"]
     )
     tick(at(23, 55))
@@ -188,7 +188,7 @@ def test_no_warning_when_night_never_comes(machine, files):
 
 
 def test_the_warning_looks_across_midnight(machine, files):
-    config.write_settings_file({**SETTINGS, "LATEST_HOUR_INCLUDED": 23}, files["settings"])
+    write_settings_file({**SETTINGS, "LATEST_HOUR_INCLUDED": 23}, files["settings"])
     tick(at(23, 55))
     assert machine.notifications == ["5 minutes to night"]
 
@@ -290,7 +290,7 @@ def test_a_machine_left_on_overnight_opens_the_new_day_at_midnight(machine, file
 
 
 def test_a_logged_in_child_starts_the_new_day_at_midnight(machine, files):
-    config.write_settings_file(
+    write_settings_file(
         {**SETTINGS, "EARLIEST_HOUR_INCLUDED": 0, "LATEST_HOUR_INCLUDED": 23}, files["settings"]
     )
     write_day(files, spent=HOUR // 2, last_tick="2026-09-14 23:58:00")
@@ -371,7 +371,7 @@ def test_a_lower_limit_from_the_server_orders_the_shutdown(machine, files, sync)
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]
-    assert config.get_config(files["settings"])["DAILY_LIMIT_SECONDS"] == HOUR // 4
+    assert settings_in_force(files["settings"])["DAILY_LIMIT_SECONDS"] == HOUR // 4
     assert remaining_shown(files) == 0
 
 
@@ -385,7 +385,7 @@ def test_an_earlier_night_from_the_server_lags_one_tick(machine, files, sync):
 
     tick(at(18, 30))  # night is checked before the sync, with the hours known so far
     assert machine.shutdowns == []
-    assert config.get_config(files["settings"])["LATEST_HOUR_INCLUDED"] == 17
+    assert settings_in_force(files["settings"])["LATEST_HOUR_INCLUDED"] == 17
 
     tick(at(18, 31))
     assert machine.shutdowns == [NIGHT_SHUTDOWN_DELAY_SECONDS]

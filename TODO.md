@@ -17,11 +17,6 @@ Ordered by importance within each section.
   a new date and a fresh daily limit.
 * The same atomic write (temp file + `os.replace`) is copied all over; it wants
   one shared home.
-* Split `config.py` into config and settings. Config is what is fixed at install:
-  paths, intervals, the version, the update mode. Settings are what the parent
-  changes from the server: schema, validation, the file, `get_config` renamed to
-  say what it returns. The installer's file list in `install.ps1` must name the
-  new module.
 * Several children on one machine. The per-child layout is there since 0.5.
   Left: the installer adding a child next to the ones there (one widget task
   each, the monitor task kept); `icacls` locking each child's shared folder to

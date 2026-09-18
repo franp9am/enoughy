@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-import config
+import settings
 
 HOUR = 60 * 60
 
@@ -19,7 +19,7 @@ IN_FORCE = {
 
 
 def validated(change):
-    return config.validated_settings(change, IN_FORCE)
+    return settings.validated_settings(change, IN_FORCE)
 
 
 def test_a_full_valid_change_is_taken_as_is():
@@ -32,8 +32,8 @@ def test_a_partial_change_is_filled_from_what_is_in_force_not_the_defaults():
 
 
 def test_without_a_fallback_the_defaults_fill_the_gaps():
-    assert config.validated_settings({"CARRYOVER": False}) == {
-        **config.default_settings(),
+    assert settings.validated_settings({"CARRYOVER": False}) == {
+        **settings.default_settings(),
         "CARRYOVER": False,
     }
 
@@ -101,34 +101,34 @@ def settings_file(tmp_path):
 
 
 def test_without_a_file_the_defaults_are_in_force(settings_file):
-    assert config.get_config(settings_file) == config.default_settings()
+    assert settings.settings_in_force(settings_file) == settings.default_settings()
 
 
 def test_the_file_is_read_with_the_defaults_for_anything_it_lacks(settings_file):
     settings_file.write_text(json.dumps({"DAILY_LIMIT_SECONDS": 2 * HOUR}), encoding="utf-8")
-    assert config.get_config(settings_file) == {**config.default_settings(), "DAILY_LIMIT_SECONDS": 2 * HOUR}
+    assert settings.settings_in_force(settings_file) == {**settings.default_settings(), "DAILY_LIMIT_SECONDS": 2 * HOUR}
 
 
 def test_an_unusable_file_means_the_defaults_not_a_crash(settings_file):
     for content in ("{not json", "[1, 2]", "", '{"DAILY_LIMIT_SECONDS": -1}'):
         settings_file.write_text(content, encoding="utf-8")
-        assert config.get_config(settings_file) == config.default_settings()
+        assert settings.settings_in_force(settings_file) == settings.default_settings()
 
 
 def test_ensure_writes_the_defaults_once_and_never_overwrites(settings_file):
-    config.ensure_settings_file(settings_file)
-    assert json.loads(settings_file.read_text(encoding="utf-8")) == config.default_settings()
+    settings.ensure_settings_file(settings_file)
+    assert json.loads(settings_file.read_text(encoding="utf-8")) == settings.default_settings()
     settings_file.write_text(json.dumps(IN_FORCE), encoding="utf-8")
-    config.ensure_settings_file(settings_file)
-    assert config.get_config(settings_file) == IN_FORCE
+    settings.ensure_settings_file(settings_file)
+    assert settings.settings_in_force(settings_file) == IN_FORCE
 
 
 def test_save_writes_what_is_taken_and_keeps_the_file_on_refusal(settings_file):
-    config.write_settings_file(IN_FORCE, settings_file)
-    taken = config.save_settings({"DAILY_LIMIT_SECONDS": HOUR}, settings_file)
+    settings.write_settings_file(IN_FORCE, settings_file)
+    taken = settings.save_settings({"DAILY_LIMIT_SECONDS": HOUR}, settings_file)
     assert taken == {**IN_FORCE, "DAILY_LIMIT_SECONDS": HOUR}
-    assert config.get_config(settings_file) == taken
-    refused = config.save_settings({"DAILY_LIMIT_SECONDS": -1}, settings_file)
+    assert settings.settings_in_force(settings_file) == taken
+    refused = settings.save_settings({"DAILY_LIMIT_SECONDS": -1}, settings_file)
     assert refused == taken
-    assert config.get_config(settings_file) == taken
+    assert settings.settings_in_force(settings_file) == taken
     assert not settings_file.with_suffix(".tmp").exists()

@@ -8,7 +8,6 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-import config
 import os_tooling
 import remote_sync
 from config import (
@@ -24,6 +23,7 @@ from config import (
     SIGNATURE_CHARS,
     STARTUP_DELAY_SECONDS,
 )
+from settings import WEEKDAY_NAMES, ensure_settings_file, save_settings, settings_in_force
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -142,7 +142,7 @@ def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path) 
 
 def daily_limit_seconds(date: datetime.date, settings) -> int:
     """The day's own limit when its weekday has one, else the general one."""
-    weekday = config.WEEKDAY_NAMES[date.weekday()]
+    weekday = WEEKDAY_NAMES[date.weekday()]
     return settings["DAILY_LIMIT_OVERRIDES"].get(weekday, settings["DAILY_LIMIT_SECONDS"])
 
 
@@ -325,7 +325,7 @@ def sync_with_server(data, datafile, now, settings, child: str) -> dict:
         os_tooling.notify(f"extra time {grant.seconds}", child)
     change = answer.settings_change
     if change is not None:
-        in_force = config.save_settings(change.settings, data_dir / "settings.json")
+        in_force = save_settings(change.settings, data_dir / "settings.json")
         taken = all(in_force.get(name) == value for name, value in change.settings.items())
         verdict = "taken" if taken else "refused"
         data["event_log"].append(f"server settings {verdict} {change.settings} {now_str}")
@@ -378,9 +378,9 @@ def startup(now, child: str):
     the machine was off counts from the first tick, and a first number for
     the widget."""
     settings_file = DATA_DIR / child / "settings.json"
-    config.ensure_settings_file(settings_file)
+    ensure_settings_file(settings_file)
     datafile = get_datafile(now, DATA_DIR / child)
-    settings = config.get_config(settings_file)
+    settings = settings_in_force(settings_file)
     data = ensure_datafile(datafile, now, settings)
     if os_tooling.user_logged_in(child):
         settings = sync_with_server(data, datafile, now, settings, child)
@@ -411,7 +411,7 @@ def tick(now, child: str, secret: bytes):
     data_dir, shared_dir = DATA_DIR / child, SHARED_DIR / child
     remaining_time_file = shared_dir / "remaining_time.txt"  # read by the widget
     datafile = get_datafile(now, data_dir)
-    settings = config.get_config(data_dir / "settings.json")
+    settings = settings_in_force(data_dir / "settings.json")
     data = ensure_datafile(datafile, now, settings)
 
     if not os_tooling.user_logged_in(child):

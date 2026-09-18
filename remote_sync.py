@@ -39,7 +39,7 @@ class Grant:
 @dataclass
 class SettingsChange:
     id: int
-    settings: dict  # every setting the server wants in force, by config.SETTINGS name
+    settings: dict  # every setting the server wants in force, by settings.SETTINGS name
 
 
 @dataclass

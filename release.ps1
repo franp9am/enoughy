@@ -31,7 +31,7 @@ $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSA
 $stage = Join-Path $env:TEMP "enoughy-release"
 if (Test-Path $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 New-Item -ItemType Directory "$stage\files\monitor", "$stage\files\shared" | Out-Null
-Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py" "$stage\files\monitor"
+Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py" "$stage\files\monitor"
 Copy-Item "$src\remaining_time_widget.py" "$stage\files\shared"
 Set-Content "$stage\files\monitor\VERSION" $version -NoNewline
 
