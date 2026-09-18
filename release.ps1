@@ -7,6 +7,7 @@
 # logged-in gh. Lose the key and no installed machine updates without a visit.
 param(
     [Parameter(Mandatory)][string]$Tag,
+    [Parameter(Mandatory)][string]$Notes,   # the tag's message and the release's notes, shown on GitHub
     [string]$KeyFile = (Join-Path $HOME ".enoughy\release_key.pfx")
 )
 $ErrorActionPreference = "Stop"
@@ -45,11 +46,12 @@ $zip = "$stage\enoughy.zip"
 $signature = $key.SignData([IO.File]::ReadAllBytes($zip), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
 [IO.File]::WriteAllBytes("$zip.sig", $signature)
 
-# A tag is never moved; a fix is a new tag.
-git tag $Tag
+# A tag is never moved; a fix is a new tag. Annotated, so the notes live in git
+# and the release shows them rather than the last commit's message.
+git tag -a $Tag -m $Notes
 if ($LASTEXITCODE -ne 0) { throw "Could not tag; does $Tag exist already?" }
 git push origin $Tag
 if ($LASTEXITCODE -ne 0) { throw "Could not push the tag." }
-gh release create $Tag $zip "$zip.sig" --title $Tag --notes=""   # --notes "" would lose the empty string: PowerShell 5.1 drops it before gh sees it
+gh release create $Tag $zip "$zip.sig" --title $Tag --notes-from-tag
 if ($LASTEXITCODE -ne 0) { throw "gh release create failed; the tag is pushed, delete it before retrying." }
 Write-Host "Released $Tag."
