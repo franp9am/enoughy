@@ -175,6 +175,21 @@ def test_manual_mode_never_fetches(machine, server, keys):
     assert not result["staged"]
 
 
+def test_manual_mode_still_installs_what_is_already_staged(machine, server, keys):
+    """Switching to manual stops the download, not the copy: the release staged
+    at the last auto boot still lands, and no later one follows it."""
+    make_release(server["dir"], "0.6.0", keys["pfx"])
+    run_launcher(machine, server["url"])   # auto: staged, not yet installed
+    (machine / "ScreenTime" / "UPDATE_MODE").write_text("manual")
+    result = run_launcher(machine, server["url"])
+    assert result["version"] == "0.6.0"
+    assert "updated 0.5.0 to 0.6.0" in result["log"]
+    make_release(server["dir"], "0.7.0", keys["pfx"])
+    result = run_launcher(machine, server["url"])
+    result = run_launcher(machine, server["url"])
+    assert result["version"] == "0.6.0"   # 0.7.0 was never fetched
+
+
 def test_the_monitor_starts_even_when_the_log_cannot_be_written(machine, server, keys):
     monitor_dir = machine / "ScreenTime"
     (monitor_dir / "update").mkdir()  # staged but empty, so the install fails and wants to log
