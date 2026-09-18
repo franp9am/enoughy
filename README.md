@@ -12,7 +12,7 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
   machine down when the limit is used up or the allowed hours end. A tick only counts,
   and a shutdown only happens, while the child is logged in with the screen unlocked;
   a locked machine is left alone until somebody unlocks it.
-* `config.py` -- what is fixed at install: paths, intervals, the version. `settings.py` --
+* `config.py` -- what is fixed at install: paths, intervals, the version (read from `VERSION`). `settings.py` --
   what the parent changes: the settings' schema, their validation, the settings file.
   Both next to the monitor in a folder the child cannot read.
   A child is a Windows account, and what the monitor keeps for them is under
@@ -32,7 +32,7 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
    irm https://raw.githubusercontent.com/franp9am/enoughy/main/bootstrap.ps1 | iex
    ```
 
-   This fetches the pinned release into a temp folder and starts the installer, which
+   This fetches the latest release, one zip, into a temp folder and starts the installer, which
    re-launches itself as admin and asks which local account is the child's, optionally
    for the child token and URL of the parent's server, and where the "Extra time"
    shortcut goes, probably `C:\Users\<child>\Desktop`.
@@ -56,7 +56,7 @@ menu) and paste:
 irm https://raw.githubusercontent.com/franp9am/enoughy/main/uninstall.ps1 | iex
 ```
 
-Prefer to see the files first? Download the zip of a release, extract it, and double-click
+Prefer to see the files first? Download `enoughy.zip` from a release, extract it, and double-click
 `install.cmd` or `uninstall.cmd` (the latter takes `-KeepData` to keep the usage history).
 The `.cmd` files only hand the matching `.ps1` to PowerShell with `-ExecutionPolicy Bypass`,
 which is what lets them run on a machine whose default policy refuses scripts; they change
@@ -67,8 +67,8 @@ a child folder under `data\`, which only the installer creates. Run the installe
 over an install older than 0.5 it moves the child's files from `data\` itself into that
 folder.
 
-Releasing: tag the commit, push the tag, then set `$Ref` in `bootstrap.ps1` to it. The
-URLs above point at `main`, so they stay the same across releases.
+Releasing is in `RELEASING.md`. The URLs above point at `main`, so they stay the same
+across releases.
 
 ### Safety
 

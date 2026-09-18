@@ -1,7 +1,9 @@
 """Fixed at install: paths, intervals, the version. Settings are in settings.py."""
 from pathlib import Path
 
-MONITOR_VERSION = "0.6.0"  # bumped by hand; shown on the parent's page, nothing branches on it
+# The one place the version is written; release.ps1 tags from it. Shown on the
+# parent's page, nothing branches on it.
+MONITOR_VERSION = Path(__file__).with_name("VERSION").read_text(encoding="ascii").strip()
 
 # A child is a Windows account with `DATA_DIR/<child>/`, hidden from them, and
 # `SHARED_DIR/<child>/`, writable by every local account, so nothing in it is

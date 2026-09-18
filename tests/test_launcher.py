@@ -59,13 +59,16 @@ def sign(zip_path: Path, pfx: Path) -> None:
 
 
 def make_release(served_dir: Path, version: str, pfx: Path) -> Path:
-    """The layout release.ps1 builds: a monitor and a shared folder, VERSION inside."""
+    """The layout release.ps1 builds: flat, with the installer alongside, which
+    an update must leave where it is."""
     zip_path = served_dir / "enoughy.zip"
     with zipfile.ZipFile(zip_path, "w") as z:
-        z.writestr("monitor/VERSION", version)
-        z.writestr("monitor/monitor.py", "from pathlib import Path\nPath(__file__).with_name('started.txt').write_text('new')\n")
-        z.writestr("monitor/config.py", "# new\n")
-        z.writestr("shared/remaining_time_widget.py", "# new widget\n")
+        z.writestr("VERSION", version)
+        z.writestr("monitor.py", "from pathlib import Path\nPath(__file__).with_name('started.txt').write_text('new')\n")
+        z.writestr("config.py", "# new\n")
+        z.writestr("remaining_time_widget.py", "# new widget\n")
+        z.writestr("launcher.ps1", "# new launcher\n")
+        z.writestr("install.ps1", "# new installer\n")
     sign(zip_path, pfx)
     return zip_path
 
@@ -117,6 +120,8 @@ def run_launcher(machine: Path, url: str) -> dict:
         "version": (monitor_dir / "VERSION").read_text(),
         "config": (monitor_dir / "config.py").read_text(),
         "widget": (machine / "ScreenTimeShared" / "remaining_time_widget.py").read_text(),
+        "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "launcher.ps1").read_text(),
+        "installer_absent": not (monitor_dir / "install.ps1").exists(),
         "log": log.read_text() if log.exists() else "",
         "staged": (monitor_dir / "update").exists(),
     }
@@ -134,6 +139,7 @@ def test_a_newer_release_is_staged_at_one_boot_and_installed_at_the_next(machine
     assert result["version"] == "0.6.0"
     assert result["config"] == "# new\n"
     assert result["widget"] == "# new widget\n"
+    assert result["launcher_kept"] and result["installer_absent"]  # only a reinstall changes those
     assert "updated 0.5.0 to 0.6.0" in result["log"]
 
 
@@ -181,7 +187,7 @@ def test_the_monitor_starts_even_when_the_log_cannot_be_written(machine, server,
 
 def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    staged = machine / "ScreenTime" / "update" / "monitor"
+    staged = machine / "ScreenTime" / "update"
     staged.mkdir(parents=True)
     (staged / "VERSION").write_text("0.4.0")
     with open(staged / "held.py", "w"):  # an open handle, as a virus scanner would have
@@ -195,7 +201,7 @@ def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machin
 
 def test_a_half_unpacked_release_is_never_installed_and_does_not_block_the_next(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    half = machine / "ScreenTime" / "update.new" / "monitor"  # the power went while unpacking
+    half = machine / "ScreenTime" / "update.new"  # the power went while unpacking
     half.mkdir(parents=True)
     (half / "VERSION").write_text("0.9.0")
     result = run_launcher(machine, server["url"])

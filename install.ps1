@@ -42,8 +42,6 @@ if ($enabledUsers -notcontains $childUser) {
 # The folder the child may write in -- config.py is the single source for it.
 $SharedDir = [regex]::Match($configText, 'SHARED_DIR\s*=\s*Path\(r?["'']([^"'']+)').Groups[1].Value
 if (-not $SharedDir) { throw "Could not read SHARED_DIR from config.py." }
-$Version = [regex]::Match($configText, 'MONITOR_VERSION\s*=\s*"([^"]+)"').Groups[1].Value   # what the launcher compares releases against
-if (-not $Version) { throw "Could not read MONITOR_VERSION from config.py." }
 
 # Everything kept for a child sits in a folder named after the account: one under
 # data\ (locked; every folder there is a child to the monitor) and one in the
@@ -175,11 +173,10 @@ $pythonw = Join-Path $PythonDir pythonw.exe   # windowless twin, for the widget
 # Monitor folder: copy the files, then lock it to SYSTEM + Administrators only.
 # That lock is what stops the child reading data\<child>\secret.txt and forging codes.
 New-Item -ItemType Directory -Force $childDataDir | Out-Null
-Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py", "$src\launcher.ps1", "$src\release_key.cer" $MonitorDir -Force
-# The launcher's two files: the installed version, and whether it fetches
-# releases at boot. To stop that on a machine, edit UPDATE_MODE to `manual`; a
-# reinstall keeps it.
-Set-Content "$MonitorDir\VERSION" $Version -Encoding ascii -NoNewline
+Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py", "$src\VERSION", "$src\launcher.ps1", "$src\release_key.cer" $MonitorDir -Force
+# VERSION is what the launcher compares releases against. UPDATE_MODE says
+# whether it fetches them at boot: to stop that on a machine, edit it to
+# `manual`; a reinstall keeps it.
 if (-not (Test-Path "$MonitorDir\UPDATE_MODE")) { Set-Content "$MonitorDir\UPDATE_MODE" auto -Encoding ascii -NoNewline }
 icacls $MonitorDir /inheritance:r /grant "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null   # S-1-5-18 = SYSTEM, S-1-5-32-544 = Administrators
 # icacls signals failure only through its exit code, which $ErrorActionPreference

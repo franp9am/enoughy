@@ -32,12 +32,6 @@ Ordered by importance within each section.
   in the client's `SETTINGS`.
 * Real login: replace BasicAuth with a session cookie and a login form.
 * Server logging.
-* One-step release. Today it is three edits: `MONITOR_VERSION` in `config.py`,
-  `$Ref` in `bootstrap.ps1`, then the tag. Let the tag be the only source:
-  `bootstrap.ps1` asks the GitHub API for the latest release instead of carrying
-  a pin, and the monitor reads its version from a file written at release time.
-  `release.ps1` already zips, signs and uploads; it refuses a tag that config.py
-  does not agree with until then.
 * Simplify installation: family, parent and child creation in the DB and the
   corresponding logins, with less effort from the maintainer.
 
