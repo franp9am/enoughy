@@ -9,9 +9,9 @@ Needs: the private key at `~\.enoughy\release_key.pfx` (release_key.cer in the
 repo is its public half), `gh` logged in, a clean tree on `main`, pushed.
 
 1. Write the new version in `VERSION`. Commit, push.
-2. From a PowerShell whose policy allows scripts:
+2. From a PowerShell in the repo folder:
 
-       .\release.ps1 "What changed, in a sentence for the parent."
+       powershell -ExecutionPolicy Bypass -File .\release.ps1 "What changed, in a sentence for the parent."
 
    It tags the commit `v<version>` with the notes, pushes the tag, signs the zip and
    publishes the release with it. It refuses a version that is released already.
