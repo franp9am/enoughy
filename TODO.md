@@ -4,6 +4,7 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
+* Install and uninstall exe, no powershell, certificate, test easy install
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into
@@ -14,7 +15,6 @@ Ordered by importance within each section.
   Left: the installer adding a child next to the ones there (one widget task
   each, the monitor task kept); `icacls` locking each child's shared folder to
   that account. The pre-0.5 layout move goes once no such machine remains.
-* Install and uninstall exe, no powershell, certificate, test easy install
 
 ## Server-side
 
