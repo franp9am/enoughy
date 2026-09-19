@@ -12,7 +12,7 @@
     $Url = "https://github.com/franp9am/enoughy/releases/latest/download/enoughy.zip"
     if ($env:ENOUGHY_ZIP) { $Url = $env:ENOUGHY_ZIP }   # any zip built by release.ps1, for testing before a release
 
-    $dir = Join-Path $env:TEMP "ScreenTimeInstall"
+    $dir = Join-Path $env:TEMP "EnoughyInstall"
     if (Test-Path $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
     New-Item -ItemType Directory $dir | Out-Null
     $zip = Join-Path $dir "enoughy.zip"

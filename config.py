@@ -9,7 +9,7 @@ MONITOR_VERSION = Path(__file__).with_name("VERSION").read_text(encoding="ascii"
 # `SHARED_DIR/<child>/`, writable by every local account, so nothing in it is
 # trusted. The installer creates both; every directory in DATA_DIR is a child.
 DATA_DIR = Path(__file__).parent / "data"
-SHARED_DIR = Path(r"C:\ProgramData\ScreenTimeShared")
+SHARED_DIR = Path(r"C:\ProgramData\EnoughyShared")
 CRASH_LOG_FILE = DATA_DIR / "crash.log"  # the monitor's own, so not under any child
 
 SYNC_TIMEOUT_SECONDS = 5  # a slow server must not stall the check loop

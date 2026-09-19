@@ -9,11 +9,11 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$MonitorDir = "C:\ProgramData\ScreenTime",
-    [string]$SharedDir  = "C:\ProgramData\ScreenTimeShared",
-    [string]$PythonDir  = "C:\ProgramData\ScreenTimePython",
-    [string]$MonitorTaskName = "ScreenTimeMonitor",
-    [string]$WidgetTaskName  = "ScreenTimeWidget",
+    [string]$MonitorDir = "C:\ProgramData\Enoughy",
+    [string]$SharedDir  = "C:\ProgramData\EnoughyShared",
+    [string]$PythonDir  = "C:\ProgramData\EnoughyPython",
+    [string]$MonitorTaskName = "EnoughyMonitor",
+    [string]$WidgetTaskName  = "EnoughyWidget",
     [switch]$KeepData
 )
 

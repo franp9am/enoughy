@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
-$MonitorDir = "C:\ProgramData\ScreenTime"   # monitor + data; hidden from the child
-$PythonDir  = "C:\ProgramData\ScreenTimePython"   # its own interpreter; readable by the child
+$MonitorDir = "C:\ProgramData\Enoughy"   # monitor + data; hidden from the child
+$PythonDir  = "C:\ProgramData\EnoughyPython"   # its own interpreter; readable by the child
 $DefaultServerUrl = "https://marwin.pfranek.cz"   # the author's server; a child token from it is what turns syncing on
 
 # Re-launch as administrator if we aren't already.
@@ -137,7 +137,7 @@ if (Test-Path $python) {
 }
 if ($installedVersion -ne $PythonVersion) {
     Write-Host "Downloading Python $PythonVersion from python.org (about 13 MB)..."
-    $downloadDir = Join-Path $env:TEMP "ScreenTimePython"
+    $downloadDir = Join-Path $env:TEMP "EnoughyPython"
     New-Item -ItemType Directory -Force $downloadDir | Out-Null
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $ProgressPreference = "SilentlyContinue"   # the progress bar makes Invoke-WebRequest many times slower
@@ -149,7 +149,7 @@ if ($installedVersion -ne $PythonVersion) {
     # Only now is an older copy touched, so a failed download leaves a working monitor.
     # A running one holds the DLLs open; it starts again at the next boot anyway.
     if (Test-Path $PythonDir) {
-        foreach ($t in "ScreenTimeMonitor", "ScreenTimeWidget") { Stop-ScheduledTask $t -ErrorAction SilentlyContinue }
+        foreach ($t in "EnoughyMonitor", "EnoughyWidget") { Stop-ScheduledTask $t -ErrorAction SilentlyContinue }
         Get-Process python, pythonw -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$PythonDir\*" } | Stop-Process -Force
         Remove-Item -LiteralPath $PythonDir -Recurse -Force
     }
@@ -210,13 +210,13 @@ $link.Save()
 $run  = New-ScheduledTaskAction -Execute powershell.exe -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$MonitorDir\launcher.ps1`"" -WorkingDirectory $MonitorDir
 $who  = New-ScheduledTaskPrincipal -UserId SYSTEM -LogonType ServiceAccount -RunLevel Highest
 $opts = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask "ScreenTimeMonitor" -Action $run -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $who -Settings $opts -Force | Out-Null
+Register-ScheduledTask "EnoughyMonitor" -Action $run -Trigger (New-ScheduledTaskTrigger -AtStartup) -Principal $who -Settings $opts -Force | Out-Null
 
 # Task 2 -- show the overlay in the child's session when they log in.
 $run = New-ScheduledTaskAction -Execute $pythonw -Argument "`"$SharedDir\remaining_time_widget.py`" `"$remainingFile`"" -WorkingDirectory $SharedDir
 $who = New-ScheduledTaskPrincipal -UserId $childUser -LogonType Interactive
 # default task settings would skip the start on battery power
-Register-ScheduledTask "ScreenTimeWidget" -Action $run -Trigger (New-ScheduledTaskTrigger -AtLogOn -User $childUser) -Principal $who -Settings $opts -Force | Out-Null
+Register-ScheduledTask "EnoughyWidget" -Action $run -Trigger (New-ScheduledTaskTrigger -AtLogOn -User $childUser) -Principal $who -Settings $opts -Force | Out-Null
 
 if ($secretHex) {
     Write-Host "`nShared secret, needed by grant_extra_time_offline.py on your own machine:" -ForegroundColor Yellow

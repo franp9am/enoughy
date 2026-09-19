@@ -13,8 +13,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $MonitorDir = $PSScriptRoot
-$SharedDir  = Join-Path (Split-Path $MonitorDir) "ScreenTimeShared"
-$python     = Join-Path (Split-Path $MonitorDir) "ScreenTimePython\python.exe"
+$SharedDir  = Join-Path (Split-Path $MonitorDir) "EnoughyShared"
+$python     = Join-Path (Split-Path $MonitorDir) "EnoughyPython\python.exe"
 $Staged     = "$MonitorDir\update"   # inside the locked folder, so only the launcher writes there
 
 function Log($message) {   # called from catches, so it must not throw

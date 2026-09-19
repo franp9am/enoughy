@@ -17,7 +17,7 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
   Both next to the monitor in a folder the child cannot read.
   A child is a Windows account, and what the monitor keeps for them is under
   `data\<account>\` there, with what the child may touch under
-  `C:\ProgramData\ScreenTimeShared\<account>\`. One child per install for now; the
+  `C:\ProgramData\EnoughyShared\<account>\`. One child per install for now; the
   layout is ready for more.
 * `remaining_time_widget.py` -- a small always-on-top "time left" box in the child's
   session. Cosmetic; the child may hide it with Ctrl+Alt+H or kill it.
@@ -36,17 +36,17 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
    re-launches itself as admin and asks which local account is the child's, optionally
    for the child token and URL of the parent's server, and where the "Extra time"
    shortcut goes, probably `C:\Users\<child>\Desktop`.
-   Then it downloads its own Python from python.org into `C:\ProgramData\ScreenTimePython`
+   Then it downloads its own Python from python.org into `C:\ProgramData\EnoughyPython`
    (about 13 MB, checked against hashes pinned in the script), copies the monitor into
-   `C:\ProgramData\ScreenTime` and locks
-   that folder, puts the widget in the shared `C:\ProgramData\ScreenTimeShared`, and
+   `C:\ProgramData\Enoughy` and locks
+   that folder, puts the widget in the shared `C:\ProgramData\EnoughyShared`, and
    registers the two scheduled tasks.
 3. Reboot. The monitor runs from boot, the widget appears when the child logs in.
 
 A fresh install generates the secret for signing extra-time codes and prints it at the
 end -- the parent's machine needs the same one, in `data/secret.txt` next to
 `grant_extra_time_offline.py` or in `CHILD_SECRET`. It stays in
-`C:\ProgramData\ScreenTime\data\<child>\secret.txt`, which an administrator can read or
+`C:\ProgramData\Enoughy\data\<child>\secret.txt`, which an administrator can read or
 replace (reboot afterwards); a reinstall keeps it.
 
 To remove everything, open PowerShell **as administrator** (right-click it in the Start
@@ -138,7 +138,7 @@ carried into the next day, so -20 h and -6 h cost the same single day.
 **A signed code**, for when there is no server. The parent runs
 `grant_extra_time_offline.py` and gets `<date>:<seconds>:<signature>`, e.g.
 `2026-07-23:3600:a184` for an extra hour. The child pastes it into
-`C:\ProgramData\ScreenTimeShared\<child>\extra_time.txt` (the "Extra time" shortcut the
+`C:\ProgramData\EnoughyShared\<child>\extra_time.txt` (the "Extra time" shortcut the
 install put on the desktop). The date is only a nonce, not an expiry -- a code stays valid
 forever, but each one can be redeemed exactly once.
 

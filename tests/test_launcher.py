@@ -77,11 +77,11 @@ def make_release(served_dir: Path, version: str, pfx: Path) -> Path:
 def machine(tmp_path, keys):
     """What install.ps1 leaves behind, under tmp_path instead of ProgramData.
     The private Python is a junction to the one running the tests."""
-    monitor_dir = tmp_path / "ScreenTime"
+    monitor_dir = tmp_path / "Enoughy"
     (monitor_dir / "data").mkdir(parents=True)
-    (tmp_path / "ScreenTimeShared").mkdir()
+    (tmp_path / "EnoughyShared").mkdir()
     import _winapi
-    _winapi.CreateJunction(sys.base_prefix, str(tmp_path / "ScreenTimePython"))
+    _winapi.CreateJunction(sys.base_prefix, str(tmp_path / "EnoughyPython"))
     shutil.copy(REPO / "launcher.ps1", monitor_dir)
     shutil.copy(keys["cer"], monitor_dir / "release_key.cer")
     (monitor_dir / "UPDATE_MODE").write_text("auto")
@@ -90,7 +90,7 @@ def machine(tmp_path, keys):
         "from pathlib import Path\nPath(__file__).with_name('started.txt').write_text('old')\n"
     )
     (monitor_dir / "config.py").write_text("# old\n")
-    (tmp_path / "ScreenTimeShared" / "remaining_time_widget.py").write_text("# old widget\n")
+    (tmp_path / "EnoughyShared" / "remaining_time_widget.py").write_text("# old widget\n")
     return tmp_path
 
 
@@ -110,16 +110,16 @@ def run_launcher(machine: Path, url: str) -> dict:
     """One boot: the launcher with no network wait, against the local server."""
     subprocess.run(
         ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-         "-File", str(machine / "ScreenTime" / "launcher.ps1"), "-Url", url, "-Wait", "0"],
+         "-File", str(machine / "Enoughy" / "launcher.ps1"), "-Url", url, "-Wait", "0"],
         capture_output=True, text=True, check=True, timeout=120,
     )
-    monitor_dir = machine / "ScreenTime"
+    monitor_dir = machine / "Enoughy"
     log = monitor_dir / "data" / "crash.log"
     return {
         "started": (monitor_dir / "started.txt").read_text(),
         "version": (monitor_dir / "VERSION").read_text(),
         "config": (monitor_dir / "config.py").read_text(),
-        "widget": (machine / "ScreenTimeShared" / "remaining_time_widget.py").read_text(),
+        "widget": (machine / "EnoughyShared" / "remaining_time_widget.py").read_text(),
         "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "launcher.ps1").read_text(),
         "installer_absent": not (monitor_dir / "install.ps1").exists(),
         "log": log.read_text() if log.exists() else "",
@@ -169,7 +169,7 @@ def test_the_same_or_an_older_release_is_staged_but_not_installed(machine, serve
 
 def test_manual_mode_never_fetches(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    (machine / "ScreenTime" / "UPDATE_MODE").write_text("manual")
+    (machine / "Enoughy" / "UPDATE_MODE").write_text("manual")
     result = run_launcher(machine, server["url"])
     assert result["started"] == "old"
     assert not result["staged"]
@@ -180,7 +180,7 @@ def test_manual_mode_still_installs_what_is_already_staged(machine, server, keys
     at the last auto boot still lands, and no later one follows it."""
     make_release(server["dir"], "0.6.0", keys["pfx"])
     run_launcher(machine, server["url"])   # auto: staged, not yet installed
-    (machine / "ScreenTime" / "UPDATE_MODE").write_text("manual")
+    (machine / "Enoughy" / "UPDATE_MODE").write_text("manual")
     result = run_launcher(machine, server["url"])
     assert result["version"] == "0.6.0"
     assert "updated 0.5.0 to 0.6.0" in result["log"]
@@ -191,7 +191,7 @@ def test_manual_mode_still_installs_what_is_already_staged(machine, server, keys
 
 
 def test_the_monitor_starts_even_when_the_log_cannot_be_written(machine, server, keys):
-    monitor_dir = machine / "ScreenTime"
+    monitor_dir = machine / "Enoughy"
     (monitor_dir / "update").mkdir()  # staged but empty, so the install fails and wants to log
     log = monitor_dir / "data" / "crash.log"
     log.write_text("")
@@ -202,7 +202,7 @@ def test_the_monitor_starts_even_when_the_log_cannot_be_written(machine, server,
 
 def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    staged = machine / "ScreenTime" / "update"
+    staged = machine / "Enoughy" / "update"
     staged.mkdir(parents=True)
     (staged / "VERSION").write_text("0.4.0")
     with open(staged / "held.py", "w"):  # an open handle, as a virus scanner would have
@@ -216,7 +216,7 @@ def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machin
 
 def test_a_half_unpacked_release_is_never_installed_and_does_not_block_the_next(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    half = machine / "ScreenTime" / "update.new"  # the power went while unpacking
+    half = machine / "Enoughy" / "update.new"  # the power went while unpacking
     half.mkdir(parents=True)
     (half / "VERSION").write_text("0.9.0")
     result = run_launcher(machine, server["url"])
