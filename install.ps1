@@ -52,6 +52,21 @@ $childSharedDir = "$SharedDir\$childUser"
 $redeemFile     = "$childSharedDir\extra_time.txt"
 $remainingFile  = "$childSharedDir\remaining_time.txt"
 
+# Before 0.7 the three folders were called ScreenTime*. Move them and drop the
+# tasks by the old names, which point into them. The tasks go first: Windows
+# will not rename a folder around a running exe. (Temporary, like the block below.)
+if ((Test-Path "C:\ProgramData\ScreenTime") -and -not (Test-Path $MonitorDir)) {
+    foreach ($t in "ScreenTimeMonitor", "ScreenTimeWidget") {
+        Stop-ScheduledTask $t -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask $t -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    Get-Process python, pythonw -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "C:\ProgramData\ScreenTimePython\*" } | Stop-Process -Force
+    foreach ($suffix in "", "Shared", "Python") {   # $MonitorDir + suffix is each new folder
+        if (Test-Path "C:\ProgramData\ScreenTime$suffix") { Move-Item -LiteralPath "C:\ProgramData\ScreenTime$suffix" "$MonitorDir$suffix" }
+    }
+    Write-Host "Moved the ScreenTime folders of the earlier install to Enoughy"
+}
+
 # Before 0.5 the child's files sat in data\ itself, with the account in
 # target_user.txt. Move them under the account, target_user.txt last: while it
 # exists the move is not done and the next run redoes it. The earlier child
