@@ -102,8 +102,9 @@ if (-not (Test-Path $secretFile)) {
     $secretHex = -join ($bytes | ForEach-Object { $_.ToString("x2") })   # printed at the end
 }
 
+$keptToken = if (Test-Path $tokenFile) { [IO.File]::ReadAllText($tokenFile).Trim() } else { "" }   # empty counts as none, as in the monitor
 $tokenPrompt = "Child token from add_child.py on the parent's server"
-if (Test-Path $tokenFile) {
+if ($keptToken) {
     $tokenPrompt += " (Enter keeps the current one)"
 } else {
     $tokenPrompt += " (Enter to run without server syncing)"
@@ -194,7 +195,7 @@ Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\
 # is `auto` with a token and `manual` for an offline machine, which then talks
 # to nobody. Edit the file to change it; a reinstall keeps it.
 if (-not (Test-Path "$MonitorDir\UPDATE_MODE")) {
-    $updateMode = if ($childToken -or (Test-Path $tokenFile)) { "auto" } else { "manual" }
+    $updateMode = if ($childToken -or $keptToken) { "auto" } else { "manual" }
     Set-Content "$MonitorDir\UPDATE_MODE" $updateMode -Encoding ascii -NoNewline
 }
 icacls $MonitorDir /inheritance:r /grant "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null   # S-1-5-18 = SYSTEM, S-1-5-32-544 = Administrators
