@@ -197,5 +197,6 @@ and the widget's Tk part.
 
 ## License
 
-Copyright (c) 2026 Peter Franek. MIT License -- see `LICENSE`.
-Use it, change it, sell it; just keep the copyright notice.
+Copyright (c) 2026 Peter Franek. GNU AGPL v3 or later -- see `LICENSE`.
+Use it, change it, sell it; if you distribute a modified version or run
+one as a service, publish its source under the same license.
