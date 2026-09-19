@@ -189,10 +189,14 @@ $pythonw = Join-Path $PythonDir pythonw.exe   # windowless twin, for the widget
 # That lock is what stops the child reading data\<child>\secret.txt and forging codes.
 New-Item -ItemType Directory -Force $childDataDir | Out-Null
 Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py", "$src\VERSION", "$src\launcher.ps1", "$src\release_key.cer" $MonitorDir -Force
-# VERSION is what the launcher compares releases against. UPDATE_MODE says
-# whether it fetches them at boot: to stop that on a machine, edit it to
-# `manual`; a reinstall keeps it.
-if (-not (Test-Path "$MonitorDir\UPDATE_MODE")) { Set-Content "$MonitorDir\UPDATE_MODE" auto -Encoding ascii -NoNewline }
+# VERSION is what the launcher compares releases against. UPDATE_MODE is
+# `auto` (fetch releases at boot) or `manual` (stay as installed). The default
+# is `auto` with a token and `manual` for an offline machine, which then talks
+# to nobody. Edit the file to change it; a reinstall keeps it.
+if (-not (Test-Path "$MonitorDir\UPDATE_MODE")) {
+    $updateMode = if ($childToken -or (Test-Path $tokenFile)) { "auto" } else { "manual" }
+    Set-Content "$MonitorDir\UPDATE_MODE" $updateMode -Encoding ascii -NoNewline
+}
 icacls $MonitorDir /inheritance:r /grant "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" | Out-Null   # S-1-5-18 = SYSTEM, S-1-5-32-544 = Administrators
 # icacls signals failure only through its exit code, which $ErrorActionPreference
 # does not catch -- unchecked, the secret below lands in a folder the child can read.
@@ -239,4 +243,5 @@ if ($secretHex) {
     Write-Host "  (write it to data\secret.txt there, or set CHILD_SECRET; it stays in $secretFile here)"
 }
 Write-Host "`nDone. Monitor starts after a reboot; the widget appears when $childUser logs in."
+Write-Host "Updates: $(Get-Content "$MonitorDir\UPDATE_MODE") (edit $MonitorDir\UPDATE_MODE to switch between auto and manual)"
 Read-Host "`nPress Enter to close" | Out-Null
