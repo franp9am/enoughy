@@ -15,6 +15,8 @@ Ordered by importance within each section.
   Left: the installer adding a child next to the ones there (one widget task
   each, the monitor task kept); `icacls` locking each child's shared folder to
   that account. The pre-0.5 layout move goes once no such machine remains.
+* `tick` checks the time before charging the elapsed minute, so the shutdown
+  comes one tick after the widget says "Time's up".
 
 ## Server-side
 
