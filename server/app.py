@@ -217,12 +217,13 @@ def settings_in_words(settings: dict) -> str:
     # not spelled out here: the settings page shows the dict as the child sent it.
     if settings.get("DAILY_LIMIT_OVERRIDES"):
         limit = f"{limit}\u00a0+overrides"
-    hours = settings.get("ALLOWED_HOURS")  # [day starts, night starts]
-    if hours is None:
+    if "ALLOWED_HOURS" in settings:
+        hours = settings["ALLOWED_HOURS"]  # [day starts, night starts], or null for no night
+    else:
         # before 0.7 the window came as two hours, the last one included in
         # full; goes once every machine installed before 0.7 is reinstalled
         hours = (settings["EARLIEST_HOUR_INCLUDED"], settings["LATEST_HOUR_INCLUDED"] + 1)
-    window = f"{hours[0]}-{hours[1]}"
+    window = "no night" if hours is None else f"{hours[0]}-{hours[1]}"
     if settings.get("ALLOWED_HOURS_OVERRIDES"):
         window = f"{window}\u00a0+overrides"
     parts = [limit, window]

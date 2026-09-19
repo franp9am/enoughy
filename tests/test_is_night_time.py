@@ -2,7 +2,7 @@ import datetime
 
 import monitor
 
-SETTINGS = {"ALLOWED_HOURS": [6, 21], "ALLOWED_HOURS_OVERRIDES": {"fri": [8, 23]}}
+SETTINGS = {"ALLOWED_HOURS": ["6:00", "21:00"], "ALLOWED_HOURS_OVERRIDES": {"fri": ["8:00", "23:00"]}}
 MON = datetime.date(2026, 9, 14)
 FRI = datetime.date(2026, 9, 18)
 
@@ -36,6 +36,24 @@ def test_a_weekday_with_its_own_window_uses_it():
 
 
 def test_a_window_to_24_lasts_until_midnight():
-    settings = {"ALLOWED_HOURS": [0, 24], "ALLOWED_HOURS_OVERRIDES": {}}
+    settings = {"ALLOWED_HOURS": ["0:00", "24:00"], "ALLOWED_HOURS_OVERRIDES": {}}
     assert not monitor.is_night_time(at(0, 0), settings)
     assert not monitor.is_night_time(at(23, 59), settings)
+
+
+def test_the_window_can_begin_and_end_mid_hour():
+    settings = {"ALLOWED_HOURS": ["6:30", "20:10"], "ALLOWED_HOURS_OVERRIDES": {}}
+    assert monitor.is_night_time(at(6, 29), settings)
+    assert not monitor.is_night_time(at(6, 30), settings)
+    assert not monitor.is_night_time(at(20, 9), settings)
+    assert monitor.is_night_time(at(20, 10), settings)
+
+
+def test_null_is_no_night():
+    settings = {"ALLOWED_HOURS": None, "ALLOWED_HOURS_OVERRIDES": {"fri": ["8:00", "23:00"]}}
+    assert not monitor.is_night_time(at(0, 0), settings)
+    assert not monitor.is_night_time(at(23, 59), settings)
+    assert monitor.is_night_time(at(23, 0, FRI), settings)  # Friday keeps its own window
+    settings = {"ALLOWED_HOURS": ["6:00", "21:00"], "ALLOWED_HOURS_OVERRIDES": {"fri": None}}
+    assert monitor.is_night_time(at(23, 0), settings)
+    assert not monitor.is_night_time(at(23, 0, FRI), settings)

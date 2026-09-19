@@ -12,9 +12,9 @@ IN_FORCE = {
     "DAILY_LIMIT_SECONDS": 2 * HOUR,
     "CARRYOVER": False,
     "MAX_CARRYOVER_SECONDS": 3 * HOUR,
-    "ALLOWED_HOURS": [8, 20],
+    "ALLOWED_HOURS": ["8:00", "20:00"],
     "DAILY_LIMIT_OVERRIDES": {"sat": 3 * HOUR},
-    "ALLOWED_HOURS_OVERRIDES": {"fri": [8, 22]},
+    "ALLOWED_HOURS_OVERRIDES": {"fri": ["8:00", "22:00"]},
 }
 
 
@@ -39,7 +39,7 @@ def test_without_a_fallback_the_defaults_fill_the_gaps():
 
 
 def test_one_bad_value_rejects_the_whole_change():
-    change = {"DAILY_LIMIT_SECONDS": HOUR, "ALLOWED_HOURS": [6, 25]}  # no such hour
+    change = {"DAILY_LIMIT_SECONDS": HOUR, "ALLOWED_HOURS": ["6:00", "25:00"]}  # no such hour
     assert validated(change) == IN_FORCE
 
 
@@ -47,25 +47,35 @@ def test_an_unknown_setting_rejects_the_whole_change():
     assert validated({"DAILY_LIMIT_SECONDS": HOUR, "BEDTIME": 21}) == IN_FORCE
 
 
-def test_a_window_is_two_hours_at_least_one_apart():
-    assert validated({"ALLOWED_HOURS": [0, 24]})["ALLOWED_HOURS"] == [0, 24]  # the whole day
-    assert validated({"ALLOWED_HOURS": [12, 13]})["ALLOWED_HOURS"] == [12, 13]
-    for window in ([21, 6], [12, 12], [6], [6, 12, 18], [-1, 12], [6, "21"], (6, 21), "6-21"):
+def test_a_window_is_two_times_of_day_at_least_an_hour_apart():
+    for window in (["0:00", "24:00"], ["12:00", "13:00"], ["06:30", "20:10"], ["22:59", "23:59"]):
+        assert validated({"ALLOWED_HOURS": window})["ALLOWED_HOURS"] == window, window
+    for window in (
+        ["21:00", "6:00"], ["12:00", "12:00"], ["12:00", "12:59"], ["6:00"], ["6:00", "12:00", "18:00"],
+        ["-1:00", "12:00"], ["6:00", "24:01"], ["6:60", "21:00"], ["6", "21"], ["6:0", "21:00"],
+        [6, 21], (6, 21), "6:00-21:00",
+    ):
         assert validated({"ALLOWED_HOURS": window}) == IN_FORCE, window
 
 
 def test_a_weekday_window_is_checked_like_the_general_one():
-    change = {"ALLOWED_HOURS_OVERRIDES": {"fri": [6, 24], "sat": [12, 13]}}
+    change = {"ALLOWED_HOURS_OVERRIDES": {"fri": ["6:00", "24:00"], "sat": ["12:30", "13:30"]}}
     assert validated(change) == {**IN_FORCE, **change}
     assert validated({"ALLOWED_HOURS_OVERRIDES": {}}) == {**IN_FORCE, "ALLOWED_HOURS_OVERRIDES": {}}
-    assert validated({"ALLOWED_HOURS_OVERRIDES": {"fri": [21, 6]}}) == IN_FORCE
-    assert validated({"ALLOWED_HOURS_OVERRIDES": {"friday": [6, 21]}}) == IN_FORCE
+    assert validated({"ALLOWED_HOURS_OVERRIDES": {"fri": ["21:00", "6:00"]}}) == IN_FORCE
+    assert validated({"ALLOWED_HOURS_OVERRIDES": {"friday": ["6:00", "21:00"]}}) == IN_FORCE
     assert validated({"ALLOWED_HOURS_OVERRIDES": {"fri": 21}}) == IN_FORCE
 
 
 def test_none_is_accepted_only_where_nullable():
     assert validated({"MAX_CARRYOVER_SECONDS": None})["MAX_CARRYOVER_SECONDS"] is None
     assert validated({"DAILY_LIMIT_SECONDS": None}) == IN_FORCE
+
+
+def test_a_null_window_is_no_night():
+    assert validated({"ALLOWED_HOURS": None})["ALLOWED_HOURS"] is None
+    change = {"ALLOWED_HOURS_OVERRIDES": {"sat": None}}
+    assert validated(change) == {**IN_FORCE, **change}
 
 
 def test_a_bool_is_not_an_int_and_an_int_is_not_a_bool():
@@ -123,7 +133,7 @@ def test_a_file_from_before_0_7_keeps_its_window_and_the_rest(settings_file):
     old = {"DAILY_LIMIT_SECONDS": 2 * HOUR, "EARLIEST_HOUR_INCLUDED": 8, "LATEST_HOUR_INCLUDED": 19}
     settings_file.write_text(json.dumps(old), encoding="utf-8")
     assert settings.settings_in_force(settings_file) == {
-        **settings.default_settings(), "DAILY_LIMIT_SECONDS": 2 * HOUR, "ALLOWED_HOURS": [8, 20]
+        **settings.default_settings(), "DAILY_LIMIT_SECONDS": 2 * HOUR, "ALLOWED_HOURS": ["8:00", "20:00"]
     }
     # an old window that was unusable, or half missing, is junk like any other
     for old_names in ({"EARLIEST_HOUR_INCLUDED": 19, "LATEST_HOUR_INCLUDED": 8}, {"LATEST_HOUR_INCLUDED": 19}):

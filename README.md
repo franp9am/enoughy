@@ -90,9 +90,9 @@ Example:
   "DAILY_LIMIT_SECONDS": 3600,
   "CARRYOVER": true,
   "MAX_CARRYOVER_SECONDS": 18000,
-  "ALLOWED_HOURS": [6, 21],
+  "ALLOWED_HOURS": ["6:00", "21:00"],
   "DAILY_LIMIT_OVERRIDES": {"mon": 1800, "sat": 7200},
-  "ALLOWED_HOURS_OVERRIDES": {"fri": [6, 23], "sat": [8, 23]}
+  "ALLOWED_HOURS_OVERRIDES": {"fri": ["6:00", "23:00"], "sat": ["8:00", "23:00"]}
 }
 ```
 
@@ -103,13 +103,13 @@ five hours of it. A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, w
 cap. Five minutes before the night the child sees a message; for the time running out
 there is none, the widget turns red instead.
 
-`ALLOWED_HOURS` names two moments, when the day starts and when the night starts: `[6, 21]`
-allows 6:00 up to 21:00, and at 21:00 the machine shuts down. The second number is the
-hour of the shutdown, not the last hour allowed -- `[6, 22]` keeps the machine up until
-22:00 -- and `[0, 24]` is no night at all. The two overrides take the days `mon` to `sun`,
-each with its own limit in seconds or its own `[day starts, night starts]`; `{}` means
-every day is the same. When the machine was off for some days, carryover credits each of
-them its own limit.
+`ALLOWED_HOURS` names two moments, when the day starts and when the night starts:
+`["6:00", "21:00"]` allows 6:00 up to 21:00, and at 21:00 the machine shuts down. The
+second time is the shutdown, not the last hour allowed -- `["6:00", "22:00"]` keeps the
+machine up until 22:00 -- and any minute goes, as in `["6:30", "20:10"]`; `null` is no
+night at all. The two overrides take the days `mon` to `sun`, each with its own limit in
+seconds or its own `[day starts, night starts]`, or `null`; `{}` means every day is the
+same. When the machine was off for some days, carryover credits each of them its own limit.
 
 Edit that file, or let the parent's server set them. Delete it and
 the monitor falls back to the defaults in `settings.py`, writing the file again at its

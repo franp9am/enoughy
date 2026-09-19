@@ -23,7 +23,7 @@ from config import (
     SIGNATURE_CHARS,
     STARTUP_DELAY_SECONDS,
 )
-from settings import WEEKDAY_NAMES, ensure_settings_file, save_settings, settings_in_force
+from settings import WEEKDAY_NAMES, ensure_settings_file, minutes, save_settings, settings_in_force
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -79,17 +79,20 @@ def compute_carryover_sec(today: datetime.date, settings, data_dir: Path) -> int
     return carryover if cap is None else min(carryover, cap)
 
 
-def allowed_hours(date: datetime.date, settings) -> list:
+def allowed_hours(date: datetime.date, settings):
     """The day's own `[day starts, night starts]` when its weekday has one, else
-    the general one."""
+    the general one; None is no night."""
     weekday = WEEKDAY_NAMES[date.weekday()]
     return settings["ALLOWED_HOURS_OVERRIDES"].get(weekday, settings["ALLOWED_HOURS"])
 
 
 def is_night_time(now, settings):
-    day_starts, night_starts = allowed_hours(now.date(), settings)
-    # [6, 21]: 20:59 is still day, 21:00 is night
-    return not day_starts <= now.hour < night_starts
+    window = allowed_hours(now.date(), settings)
+    if window is None:
+        return False
+    day_starts, night_starts = window
+    # ["6:00", "20:30"]: 20:29 is still day, 20:30 is night
+    return not minutes(day_starts) <= now.hour * 60 + now.minute < minutes(night_starts)
 
 
 def load_data(datafile):

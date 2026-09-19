@@ -203,7 +203,7 @@ def test_an_acceptable_settings_change_is_taken_and_written(files, sync):
 def test_an_unacceptable_settings_change_is_refused_and_reported(files, sync):
     in_force = settings(DAILY_LIMIT_SECONDS=2 * HOUR)
     write_settings_file(in_force, files["settings"])
-    wanted = settings(ALLOWED_HOURS=[6, 25])  # no such hour
+    wanted = settings(ALLOWED_HOURS=["6:00", "25:00"])  # no such hour
     sync.answer = SyncAnswer(pending_grants=[], settings_change=SettingsChange(id=13, settings=wanted))
 
     new_settings, data = run(files, in_force=in_force)
