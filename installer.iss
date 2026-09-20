@@ -331,7 +331,7 @@ begin
   // Task 2: the overlay in the child's session when they log in.
   At('registering the widget task');
   RegisterTask('EnoughyWidget', 9, Child(''), 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
-    ExpandConstant('\"{#SharedDir}\remaining_time_widget.py\" \"') + ChildSharedDir + '\remaining_time.txt\"', ExpandConstant('{#SharedDir}'));
+    ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + ChildSharedDir + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
