@@ -37,6 +37,8 @@ OutputBaseFilename=enoughy-setup
 WizardStyle=modern
 ; The monitor starts at boot; the widget when the child logs in.
 AlwaysRestart=yes
+; Writes "Setup Log <date> #<n>.txt" to the running account's Temp folder.
+SetupLogging=yes
 
 [Files]
 Source: "monitor.py";      DestDir: "{app}"
@@ -296,25 +298,48 @@ begin
   Service.GetFolder('\').RegisterTaskDefinition(Name, Task, 6, UserId, '', LogonType);   // 6 = create or update
 end;
 
-procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Step: String;   // named in the error when a post-install step fails
+
+procedure At(Name: String);
 begin
-  if CurStep <> ssPostInstall then Exit;   // the files are copied, the wizard is answered
-  if not PythonInstalled then InstallPython;
+  Step := Name;
+  Log('enoughy: ' + Name);
+end;
+
+procedure PostInstall;
+begin
+  At('installing Python'); if not PythonInstalled then InstallPython;
   // monitor.py runs as SYSTEM on this interpreter, so the child must not be able to
   // write into it: SYSTEM and Administrators full, Users read-only.
+  At('locking the Python folder');
   Run('{sys}\icacls.exe', '"{#PythonDir}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX', 'Locking {#PythonDir}');
   // The monitor folder: SYSTEM and Administrators only. That lock is what stops
   // the child reading secret.txt and forging codes, so it comes before the secret.
+  At('locking the monitor folder');
   Run('{sys}\icacls.exe', '"{app}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {app}');
-  WriteCredentials;
+  At('writing the credentials'); WriteCredentials;
   // The shared folder: every local account may write. It holds only the widget
   // and, per child, the number it shows and the redeem file, nothing trusted.
+  At('opening the shared folder');
   Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
   if not FileExists(ChildSharedDir + '\extra_time.txt') then SaveStringToFile(ChildSharedDir + '\extra_time.txt', '', False);
   // Task 1: the launcher as SYSTEM at every boot; it starts monitor.py and installs releases.
+  At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
     ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));
   // Task 2: the overlay in the child's session when they log in.
+  At('registering the widget task');
   RegisterTask('EnoughyWidget', 9, Child(''), 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
-    ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + ChildSharedDir + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
+    ExpandConstant('\"{#SharedDir}\remaining_time_widget.py\" \"') + ChildSharedDir + '\remaining_time.txt\"', ExpandConstant('{#SharedDir}'));
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep <> ssPostInstall then Exit;   // the files are copied, the wizard is answered
+  try
+    PostInstall;
+  except
+    RaiseException('While ' + Step + ': ' + GetExceptionMessage);
+  end;
 end;
