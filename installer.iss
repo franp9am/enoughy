@@ -107,7 +107,8 @@ begin
   Result := AccountPage.CheckListBox.ItemCaption[AccountPage.SelectedValueIndex];
 end;
 
-function ChildDataDir: String;   begin Result := ExpandConstant('{app}\data\') + Child(''); end;
+// Not {app}: the token page reads this folder before the wizard has set {app}.
+function ChildDataDir: String;   begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
 function ChildSharedDir: String; begin Result := ExpandConstant('{#SharedDir}\') + Child(''); end;
 
 // Every enabled local account, from WMI; a typed name invites a typo that would
