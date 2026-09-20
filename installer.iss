@@ -273,10 +273,14 @@ begin
   end;
 end;
 
-// The same task install.ps1 registers: runs on battery, never times out.
+// The same task install.ps1 registers: runs on battery, never times out. The
+// definition comes from the Task Scheduler API, but schtasks registers it: the
+// API's register call wants a null password, which this script cannot pass.
 procedure RegisterTask(Name: String; TriggerType: Integer; UserId: String; LogonType: Integer; RunLevel: Integer; Exe, Args, WorkDir: String);
 var
   Service, Task, Settings, Trigger, Action, Principal: Variant;
+  Xml, XmlFile: String;
+  Stream: TFileStream;
 begin
   Service := CreateOleObject('Schedule.Service');
   Service.Connect();
@@ -295,7 +299,11 @@ begin
   Principal.UserId := UserId;
   Principal.LogonType := LogonType;
   Principal.RunLevel := RunLevel;
-  Service.GetFolder('\').RegisterTaskDefinition(Name, Task, 6, UserId, '', LogonType);   // 6 = create or update
+  Xml := #$FEFF + Task.XmlText;   // BOM + UTF-16, the encoding the XML declares and schtasks reads
+  XmlFile := ExpandConstant('{tmp}\') + Name + '.xml';
+  Stream := TFileStream.Create(XmlFile, fmCreate);
+  try Stream.Write(Xml, Length(Xml) * 2); finally Stream.Free; end;
+  Run('{sys}\schtasks.exe', '/Create /TN ' + Name + ' /XML "' + XmlFile + '" /F', 'Registering the task ' + Name);
 end;
 
 var
