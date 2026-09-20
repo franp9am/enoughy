@@ -1,0 +1,319 @@
+; installer.iss -- the setup exe, built with Inno Setup 6 (https://jrsoftware.org/isinfo.php):
+;
+;   iscc installer.iss        -> dist\enoughy-setup.exe
+;
+; What install.ps1 does, as an exe: it asks which account is the child's and for
+; the parent's server, downloads its own Python, copies the monitor into
+; C:\ProgramData\Enoughy and locks it, the widget into the shared folder, puts
+; the "Extra time" shortcut on the shared desktop and registers the two tasks.
+; It shows up in Apps & Features; that uninstall removes all of it. The wizard
+; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
+;
+; Not yet, next to install.ps1: moving a ScreenTime or pre-0.5 install, and a
+; choice of folder for the shortcut.
+
+#define FileHandle FileOpen("VERSION")
+#define Version Trim(FileRead(FileHandle))
+#expr FileClose(FileHandle)
+
+#define MonitorDir "{commonappdata}\Enoughy"
+#define SharedDir  "{commonappdata}\EnoughyShared"
+#define PythonDir  "{commonappdata}\EnoughyPython"
+
+[Setup]
+AppId=enoughy
+AppName=enoughy
+AppVersion={#Version}
+AppPublisher=enoughy.com
+DefaultDirName={#MonitorDir}
+DisableDirPage=yes
+DisableProgramGroupPage=yes
+UsePreviousAppDir=no
+PrivilegesRequired=admin
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=dist
+OutputBaseFilename=enoughy-setup
+WizardStyle=modern
+; The monitor starts at boot; the widget when the child logs in.
+AlwaysRestart=yes
+
+[Files]
+Source: "monitor.py";      DestDir: "{app}"
+Source: "os_tooling.py";   DestDir: "{app}"
+Source: "remote_sync.py";  DestDir: "{app}"
+Source: "config.py";       DestDir: "{app}"
+Source: "settings.py";     DestDir: "{app}"
+Source: "VERSION";         DestDir: "{app}"
+Source: "launcher.ps1";    DestDir: "{app}"
+Source: "release_key.cer"; DestDir: "{app}"
+Source: "remaining_time_widget.py"; DestDir: "{#SharedDir}"
+
+[Dirs]
+Name: "{app}\data\{code:Child}"
+Name: "{#SharedDir}\{code:Child}"
+
+[Icons]
+; Opens the redeem file; the child pastes a code into it.
+Name: "{commondesktop}\Extra time"; Filename: "{#SharedDir}\{code:Child}\extra_time.txt"
+
+[UninstallRun]
+Filename: "{sys}\schtasks.exe"; Parameters: "/End /TN EnoughyMonitor";       Flags: runhidden; RunOnceId: "end-monitor"
+Filename: "{sys}\schtasks.exe"; Parameters: "/End /TN EnoughyWidget";        Flags: runhidden; RunOnceId: "end-widget"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN EnoughyMonitor /F"; Flags: runhidden; RunOnceId: "delete-monitor"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN EnoughyWidget /F";  Flags: runhidden; RunOnceId: "delete-widget"
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\data"
+Type: filesandordirs; Name: "{#SharedDir}"
+Type: filesandordirs; Name: "{#PythonDir}"
+
+[Code]
+// A private Python for the two tasks: python.org's installer without pip, docs,
+// tests and the launcher, four MSIs that "msiexec /a" unpacks without registering
+// anything. To upgrade, change the version and the hashes (of
+// https://www.python.org/ftp/python/<v>/amd64/<part>.msi).
+const
+  PythonVersion = '3.13.15';
+  PythonParts = 'core exe lib tcltk';
+  PythonHashes =
+    'eff25b160b54a77c5953cf5803fc147a1ced084513265dfefc227583b1355484 ' +
+    '47f02452bde1f05b4d06fb93841ce380624c882ef75caddd1b1207d1a36bb4d2 ' +
+    '6d3130114d7f57eaa33d86e8366a669dfc73cfe8df772bef93ce2d9ea799f751 ' +
+    'ec1e0fe1188969a48da63f24536183c95fc0393cf93588c646b253e91dc9b179';
+  DefaultServerUrl = 'https://marwin.pfranek.cz';   // the author's server; a child token from it is what turns syncing on
+
+var
+  AccountPage: TInputOptionWizardPage;
+  ServerPage: TInputQueryWizardPage;
+  DownloadPage: TDownloadWizardPage;
+  NewSecret: String;   // generated on a fresh install, shown at the end
+
+// The N-th (from 0) word of a space-separated list, for the constants above.
+function Nth(S: String; N: Integer): String;
+var
+  P: Integer;
+begin
+  while N > 0 do begin
+    Delete(S, 1, Pos(' ', S));
+    N := N - 1;
+  end;
+  P := Pos(' ', S);
+  if P = 0 then Result := S else Result := Copy(S, 1, P - 1);
+end;
+
+function Child(Param: String): String;
+begin
+  Result := AccountPage.CheckListBox.ItemCaption[AccountPage.SelectedValueIndex];
+end;
+
+function ChildDataDir: String;   begin Result := ExpandConstant('{app}\data\') + Child(''); end;
+function ChildSharedDir: String; begin Result := ExpandConstant('{#SharedDir}\') + Child(''); end;
+
+// Every enabled local account, from WMI; a typed name invites a typo that would
+// leave the monitor watching an account nobody uses.
+function LocalAccounts: TArrayOfString;
+var
+  Locator, Service, Users: Variant;
+  I: Integer;
+begin
+  Locator := CreateOleObject('WbemScripting.SWbemLocator');
+  Service := Locator.ConnectServer('', 'root\cimv2');
+  Users := Service.ExecQuery('SELECT Name FROM Win32_UserAccount WHERE LocalAccount = TRUE AND Disabled = FALSE');
+  SetArrayLength(Result, Users.Count);
+  for I := 0 to Users.Count - 1 do
+    Result[I] := Users.ItemIndex(I).Name;
+end;
+
+procedure InitializeWizard;
+var
+  Accounts: TArrayOfString;
+  I, Candidates, LastCandidate: Integer;
+begin
+  AccountPage := CreateInputOptionPage(wpWelcome, 'Child account', 'Which local account is the child''s?',
+    'The monitor counts the time this account is logged in and shuts the computer down when it is up.', True, False);
+  Accounts := LocalAccounts;
+  Candidates := 0;
+  for I := 0 to GetArrayLength(Accounts) - 1 do begin
+    AccountPage.Add(Accounts[I]);
+    // Preselected when it is the only one besides the parent running this and Windows' own.
+    if (CompareText(Accounts[I], GetUserNameString) <> 0) and (Pos(' ' + Lowercase(Accounts[I]) + ' ', ' guest defaultaccount wdagutilityaccount ') = 0) then begin
+      Candidates := Candidates + 1;
+      LastCandidate := I;
+    end;
+  end;
+  if Candidates = 1 then AccountPage.Values[LastCandidate] := True;
+
+  ServerPage := CreateInputQueryPage(AccountPage.ID, 'Parent''s server', 'Where does the monitor report to?',
+    'The child token comes from add_child.py on the parent''s server. Leave it empty to run without syncing; then the server is never contacted.');
+  ServerPage.Add('Child token:', False);
+  ServerPage.Add('Server URL:', False);
+
+  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
+end;
+
+function ReadFile(FileName, Default: String): String;
+var
+  S: AnsiString;
+begin
+  Result := Default;
+  if LoadStringFromFile(FileName, S) and (Trim(S) <> '') then Result := Trim(S);
+end;
+
+function PythonInstalled: Boolean;
+begin
+  Result := ReadFile(ExpandConstant('{#PythonDir}\PYTHON_VERSION'), '') = PythonVersion;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  // A reinstall shows what it has; Enter keeps it, like install.ps1.
+  if CurPageID = ServerPage.ID then begin
+    ServerPage.Values[0] := ReadFile(ChildDataDir + '\child_token.txt', '');
+    ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
+  end;
+  if (CurPageID = wpFinished) and (NewSecret <> '') then
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
+      'Shared secret, needed by grant_extra_time_offline.py on your own machine (it stays in ' +
+      ChildDataDir + '\secret.txt here):' + #13#10 + NewSecret;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  if (CurPageID = AccountPage.ID) and (AccountPage.SelectedValueIndex < 0) then begin
+    MsgBox('Pick the child''s account.', mbError, MB_OK);
+    Result := False;
+  end;
+  if (CurPageID = wpReady) and not PythonInstalled then begin
+    DownloadPage.Clear;
+    for I := 0 to 3 do
+      DownloadPage.Add('https://www.python.org/ftp/python/' + PythonVersion + '/amd64/' + Nth(PythonParts, I) + '.msi',
+        Nth(PythonParts, I) + '.msi', Nth(PythonHashes, I));   // checked against the pinned hash
+    DownloadPage.Show;
+    try
+      try
+        DownloadPage.Download;
+      except
+        if not DownloadPage.AbortedByUser then
+          MsgBox('Could not download Python ' + PythonVersion + ' from python.org: ' + GetExceptionMessage, mbError, MB_OK);
+        Result := False;
+      end;
+    finally
+      DownloadPage.Hide;
+    end;
+  end;
+end;
+
+procedure Run(Exe, Args, What: String);
+var
+  Code: Integer;
+begin
+  if not Exec(ExpandConstant(Exe), ExpandConstant(Args), '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
+    RaiseException(ExpandConstant(What) + ' failed (exit code ' + IntToStr(Code) + ').');
+end;
+
+procedure InstallPython;
+var
+  I, Code: Integer;
+begin
+  // A running monitor holds the DLLs open. Both tasks go (they are registered
+  // again below), so after a reboot nothing runs from the folder.
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/End /TN EnoughyMonitor', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/End /TN EnoughyWidget', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN EnoughyMonitor /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN EnoughyWidget /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  if DirExists(ExpandConstant('{#PythonDir}')) and not DelTree(ExpandConstant('{#PythonDir}'), True, True, True) then
+    RaiseException('The old Python in ' + ExpandConstant('{#PythonDir}') + ' is still in use. Reboot and run Setup again.');
+  for I := 0 to 3 do
+    Run('{sys}\msiexec.exe', '/a "{tmp}\' + Nth(PythonParts, I) + '.msi" /qn TARGETDIR="{#PythonDir}"', 'Unpacking ' + Nth(PythonParts, I) + '.msi');
+  for I := 0 to 3 do
+    DeleteFile(ExpandConstant('{#PythonDir}\' + Nth(PythonParts, I) + '.msi'));   // /a leaves a copy of each package next to the files
+  Run('{#PythonDir}\python.exe', '-m compileall -q "{#PythonDir}\Lib"', 'Compiling the Python library');   // the child's account cannot write .pyc files here
+  SaveStringToFile(ExpandConstant('{#PythonDir}\PYTHON_VERSION'), PythonVersion, False);
+end;
+
+// 16 random bytes from Windows' own generator, as hex.
+function BCryptGenRandom(Algorithm: Integer; Buffer: AnsiString; Count, Flags: Integer): Integer;
+  external 'BCryptGenRandom@bcrypt.dll stdcall';
+
+function RandomHex: String;
+var
+  Buffer: AnsiString;
+  I: Integer;
+begin
+  SetLength(Buffer, 16);
+  if BCryptGenRandom(0, Buffer, 16, 2) <> 0 then RaiseException('Windows gave no random bytes for the secret.');   // 2 = system-preferred RNG
+  for I := 1 to 16 do Result := Result + Format('%.2x', [Ord(Buffer[I])]);
+end;
+
+// Both credentials go to files in the locked data folder. A fresh install gets
+// a random secret for signing extra-time codes; a reinstall keeps the one it has.
+procedure WriteCredentials;
+var
+  Token, UpdateMode: String;
+begin
+  if not FileExists(ChildDataDir + '\secret.txt') then begin
+    NewSecret := RandomHex;
+    SaveStringToFile(ChildDataDir + '\secret.txt', NewSecret, False);
+  end;
+  Token := Trim(ServerPage.Values[0]);
+  if Token <> '' then SaveStringToFile(ChildDataDir + '\child_token.txt', Token, False);
+  SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
+  // `auto` fetches releases at boot, `manual` stays as installed; the default is
+  // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
+  if not FileExists(ExpandConstant('{app}\UPDATE_MODE')) then begin
+    if Token <> '' then UpdateMode := 'auto' else UpdateMode := 'manual';
+    SaveStringToFile(ExpandConstant('{app}\UPDATE_MODE'), UpdateMode, False);
+  end;
+end;
+
+// The same task install.ps1 registers: runs on battery, never times out.
+procedure RegisterTask(Name: String; TriggerType: Integer; UserId: String; LogonType: Integer; RunLevel: Integer; Exe, Args, WorkDir: String);
+var
+  Service, Task, Settings, Trigger, Action, Principal: Variant;
+begin
+  Service := CreateOleObject('Schedule.Service');
+  Service.Connect();
+  Task := Service.NewTask(0);
+  Settings := Task.Settings;
+  Settings.DisallowStartIfOnBatteries := False;
+  Settings.StopIfGoingOnBatteries := False;
+  Settings.ExecutionTimeLimit := 'PT0S';
+  Trigger := Task.Triggers.Create(TriggerType);
+  if TriggerType = 9 then Trigger.UserId := UserId;   // logon of this account only
+  Action := Task.Actions.Create(0);   // run a program
+  Action.Path := Exe;
+  Action.Arguments := Args;
+  Action.WorkingDirectory := WorkDir;
+  Principal := Task.Principal;
+  Principal.UserId := UserId;
+  Principal.LogonType := LogonType;
+  Principal.RunLevel := RunLevel;
+  Service.GetFolder('\').RegisterTaskDefinition(Name, Task, 6, UserId, '', LogonType);   // 6 = create or update
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep <> ssPostInstall then Exit;   // the files are copied, the wizard is answered
+  if not PythonInstalled then InstallPython;
+  // monitor.py runs as SYSTEM on this interpreter, so the child must not be able to
+  // write into it: SYSTEM and Administrators full, Users read-only.
+  Run('{sys}\icacls.exe', '"{#PythonDir}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX', 'Locking {#PythonDir}');
+  // The monitor folder: SYSTEM and Administrators only. That lock is what stops
+  // the child reading secret.txt and forging codes, so it comes before the secret.
+  Run('{sys}\icacls.exe', '"{app}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {app}');
+  WriteCredentials;
+  // The shared folder: every local account may write. It holds only the widget
+  // and, per child, the number it shows and the redeem file, nothing trusted.
+  Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
+  if not FileExists(ChildSharedDir + '\extra_time.txt') then SaveStringToFile(ChildSharedDir + '\extra_time.txt', '', False);
+  // Task 1: the launcher as SYSTEM at every boot; it starts monitor.py and installs releases.
+  RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
+    ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));
+  // Task 2: the overlay in the child's session when they log in.
+  RegisterTask('EnoughyWidget', 9, Child(''), 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
+    ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + ChildSharedDir + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
+end;
