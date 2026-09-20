@@ -3,9 +3,10 @@
 ;   iscc installer.iss        -> dist\enoughy-setup.exe
 ;
 ; What install.ps1 does, as an exe: it asks which account is the child's and for
-; the parent's server, downloads its own Python, copies the monitor into
-; C:\ProgramData\Enoughy and locks it, the widget into the shared folder, puts
-; the "Extra time" shortcut on the shared desktop and registers the two tasks.
+; the parent's server, unpacks its own Python (bundled from build\python, which
+; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
+; locks it, the widget into the shared folder, puts the "Extra time" shortcut on
+; the shared desktop and registers the two tasks.
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
@@ -50,6 +51,8 @@ Source: "VERSION";         DestDir: "{app}"
 Source: "launcher.ps1";    DestDir: "{app}"
 Source: "release_key.cer"; DestDir: "{app}"
 Source: "remaining_time_widget.py"; DestDir: "{#SharedDir}"
+; A running monitor holds the DLLs; Setup closes it, or replaces them at the reboot.
+Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignoreversion restartreplace
 
 [Dirs]
 Name: "{app}\data\{code:Child}"
@@ -71,38 +74,13 @@ Type: filesandordirs; Name: "{#SharedDir}"
 Type: filesandordirs; Name: "{#PythonDir}"
 
 [Code]
-// A private Python for the two tasks: python.org's installer without pip, docs,
-// tests and the launcher, four MSIs that "msiexec /a" unpacks without registering
-// anything. To upgrade, change the version and the hashes (of
-// https://www.python.org/ftp/python/<v>/amd64/<part>.msi).
 const
-  PythonVersion = '3.13.15';
-  PythonParts = 'core exe lib tcltk';
-  PythonHashes =
-    'eff25b160b54a77c5953cf5803fc147a1ced084513265dfefc227583b1355484 ' +
-    '47f02452bde1f05b4d06fb93841ce380624c882ef75caddd1b1207d1a36bb4d2 ' +
-    '6d3130114d7f57eaa33d86e8366a669dfc73cfe8df772bef93ce2d9ea799f751 ' +
-    'ec1e0fe1188969a48da63f24536183c95fc0393cf93588c646b253e91dc9b179';
   DefaultServerUrl = 'https://marwin.pfranek.cz';   // the author's server; a child token from it is what turns syncing on
 
 var
   AccountPage: TInputOptionWizardPage;
   ServerPage: TInputQueryWizardPage;
-  DownloadPage: TDownloadWizardPage;
   NewSecret: String;   // generated on a fresh install, shown at the end
-
-// The N-th (from 0) word of a space-separated list, for the constants above.
-function Nth(S: String; N: Integer): String;
-var
-  P: Integer;
-begin
-  while N > 0 do begin
-    Delete(S, 1, Pos(' ', S));
-    N := N - 1;
-  end;
-  P := Pos(' ', S);
-  if P = 0 then Result := S else Result := Copy(S, 1, P - 1);
-end;
 
 function Child(Param: String): String;
 begin
@@ -151,8 +129,6 @@ begin
     'The child token comes from add_child.py on the parent''s server. Leave it empty to run without syncing; then the server is never contacted.');
   ServerPage.Add('Child token:', False);
   ServerPage.Add('Server URL:', False);
-
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
 end;
 
 function ReadFile(FileName, Default: String): String;
@@ -161,11 +137,6 @@ var
 begin
   Result := Default;
   if LoadStringFromFile(FileName, S) and (Trim(S) <> '') then Result := Trim(S);
-end;
-
-function PythonInstalled: Boolean;
-begin
-  Result := ReadFile(ExpandConstant('{#PythonDir}\PYTHON_VERSION'), '') = PythonVersion;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -182,31 +153,11 @@ begin
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
-var
-  I: Integer;
 begin
   Result := True;
   if (CurPageID = AccountPage.ID) and (AccountPage.SelectedValueIndex < 0) then begin
     MsgBox('Pick the child''s account.', mbError, MB_OK);
     Result := False;
-  end;
-  if (CurPageID = wpReady) and not PythonInstalled then begin
-    DownloadPage.Clear;
-    for I := 0 to 3 do
-      DownloadPage.Add('https://www.python.org/ftp/python/' + PythonVersion + '/amd64/' + Nth(PythonParts, I) + '.msi',
-        Nth(PythonParts, I) + '.msi', Nth(PythonHashes, I));   // checked against the pinned hash
-    DownloadPage.Show;
-    try
-      try
-        DownloadPage.Download;
-      except
-        if not DownloadPage.AbortedByUser then
-          MsgBox('Could not download Python ' + PythonVersion + ' from python.org: ' + GetExceptionMessage, mbError, MB_OK);
-        Result := False;
-      end;
-    finally
-      DownloadPage.Hide;
-    end;
   end;
 end;
 
@@ -216,26 +167,6 @@ var
 begin
   if not Exec(ExpandConstant(Exe), ExpandConstant(Args), '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
     RaiseException(ExpandConstant(What) + ' failed (exit code ' + IntToStr(Code) + ').');
-end;
-
-procedure InstallPython;
-var
-  I, Code: Integer;
-begin
-  // A running monitor holds the DLLs open. Both tasks go (they are registered
-  // again below), so after a reboot nothing runs from the folder.
-  Exec(ExpandConstant('{sys}\schtasks.exe'), '/End /TN EnoughyMonitor', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Exec(ExpandConstant('{sys}\schtasks.exe'), '/End /TN EnoughyWidget', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN EnoughyMonitor /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN EnoughyWidget /F', '', SW_HIDE, ewWaitUntilTerminated, Code);
-  if DirExists(ExpandConstant('{#PythonDir}')) and not DelTree(ExpandConstant('{#PythonDir}'), True, True, True) then
-    RaiseException('The old Python in ' + ExpandConstant('{#PythonDir}') + ' is still in use. Reboot and run Setup again.');
-  for I := 0 to 3 do
-    Run('{sys}\msiexec.exe', '/a "{tmp}\' + Nth(PythonParts, I) + '.msi" /qn TARGETDIR="{#PythonDir}"', 'Unpacking ' + Nth(PythonParts, I) + '.msi');
-  for I := 0 to 3 do
-    DeleteFile(ExpandConstant('{#PythonDir}\' + Nth(PythonParts, I) + '.msi'));   // /a leaves a copy of each package next to the files
-  Run('{#PythonDir}\python.exe', '-m compileall -q "{#PythonDir}\Lib"', 'Compiling the Python library');   // the child's account cannot write .pyc files here
-  SaveStringToFile(ExpandConstant('{#PythonDir}\PYTHON_VERSION'), PythonVersion, False);
 end;
 
 // 16 random bytes from Windows' own generator, as hex.
@@ -317,7 +248,6 @@ end;
 
 procedure PostInstall;
 begin
-  At('installing Python'); if not PythonInstalled then InstallPython;
   // monitor.py runs as SYSTEM on this interpreter, so the child must not be able to
   // write into it: SYSTEM and Administrators full, Users read-only.
   At('locking the Python folder');
