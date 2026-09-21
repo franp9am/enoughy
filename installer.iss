@@ -84,42 +84,50 @@ var
   AccountPage: TInputOptionWizardPage;
   ServerPage: TInputQueryWizardPage;
   NewSecret: String;   // generated on a fresh install, shown at the end
+  Accounts: TArrayOfString;   // the local account names, one per row of the account page
 
 function Child(Param: String): String;
 begin
-  Result := AccountPage.CheckListBox.ItemCaption[AccountPage.SelectedValueIndex];
+  Result := Accounts[AccountPage.SelectedValueIndex];
 end;
 
 // Not {app}: the token page reads this folder before the wizard has set {app}.
 function ChildDataDir: String;   begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
 function ChildSharedDir: String; begin Result := ExpandConstant('{#SharedDir}\') + Child(''); end;
 
-// Every enabled local account, from WMI; a typed name invites a typo that would
-// leave the monitor watching an account nobody uses.
-function LocalAccounts: TArrayOfString;
+// One row per enabled local account, from WMI; a typed name invites a typo that
+// would leave the monitor watching an account nobody uses. Behind a Microsoft
+// account Windows puts a name like "peter_fwx12", so the row shows the person too.
+procedure ListAccounts;
 var
-  Locator, Service, Users: Variant;
+  Locator, Service, Users, User, FullName: Variant;
   I: Integer;
+  Caption: String;
 begin
   Locator := CreateOleObject('WbemScripting.SWbemLocator');
   Service := Locator.ConnectServer('', 'root\cimv2');
-  Users := Service.ExecQuery('SELECT Name FROM Win32_UserAccount WHERE LocalAccount = TRUE AND Disabled = FALSE');
-  SetArrayLength(Result, Users.Count);
-  for I := 0 to Users.Count - 1 do
-    Result[I] := Users.ItemIndex(I).Name;
+  Users := Service.ExecQuery('SELECT Name, FullName FROM Win32_UserAccount WHERE LocalAccount = TRUE AND Disabled = FALSE');
+  SetArrayLength(Accounts, Users.Count);
+  for I := 0 to Users.Count - 1 do begin
+    User := Users.ItemIndex(I);
+    Accounts[I] := User.Name;
+    Caption := Accounts[I];
+    FullName := User.FullName;
+    if not VarIsNull(FullName) and (FullName <> '') and (CompareText(FullName, Accounts[I]) <> 0) then
+      Caption := Caption + '   (' + FullName + ')';
+    AccountPage.Add(Caption);
+  end;
 end;
 
 procedure InitializeWizard;
 var
-  Accounts: TArrayOfString;
   I, Candidates, LastCandidate: Integer;
 begin
   AccountPage := CreateInputOptionPage(wpWelcome, 'Child account', 'Which local account is the child''s?',
     'The monitor counts the time this account is logged in and shuts the computer down when it is up.', True, False);
-  Accounts := LocalAccounts;
+  ListAccounts;
   Candidates := 0;
   for I := 0 to GetArrayLength(Accounts) - 1 do begin
-    AccountPage.Add(Accounts[I]);
     // Preselected when it is the only one besides the parent running this and Windows' own.
     if (CompareText(Accounts[I], GetUserNameString) <> 0) and (Pos(' ' + Lowercase(Accounts[I]) + ' ', ' guest defaultaccount wdagutilityaccount ') = 0) then begin
       Candidates := Candidates + 1;
