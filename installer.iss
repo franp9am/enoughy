@@ -30,6 +30,9 @@ DefaultDirName={#MonitorDir}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 UsePreviousAppDir=no
+; Not in the locked {app}: Apps & Features starts the uninstaller unelevated,
+; so it must be readable by everyone, and writable only by administrators.
+UninstallFilesDir={commonpf}\enoughy
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
