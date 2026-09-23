@@ -453,6 +453,17 @@ def tick(now, child: str, secret: bytes):
 
     settings = sync_with_server(data, datafile, now, settings, child)
 
+    soon = now + datetime.timedelta(seconds=NIGHT_WARNING_SECONDS)
+    warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"
+    if is_night_time(soon, settings) and not any(e.startswith(warning) for e in data["event_log"]):
+        os_tooling.notify(warning, child)
+        data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
+
+    data["time_spent_sec"] += seconds_to_charge(data, now)
+    data["ticks"].append(now.strftime(TICK_TIME_FORMAT))
+    data["last_tick"] = now_str
+    save_data(data, datafile)
+
     if remaining_seconds(data, settings, now.date()) <= 0:
         shut_down(
             reason="time up",
@@ -464,17 +475,6 @@ def tick(now, child: str, secret: bytes):
             child=child,
         )
         return
-
-    soon = now + datetime.timedelta(seconds=NIGHT_WARNING_SECONDS)
-    warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"
-    if is_night_time(soon, settings) and not any(e.startswith(warning) for e in data["event_log"]):
-        os_tooling.notify(warning, child)
-        data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
-
-    data["time_spent_sec"] += seconds_to_charge(data, now)
-    data["ticks"].append(now.strftime(TICK_TIME_FORMAT))
-    data["last_tick"] = now_str
-    save_data(data, datafile)
     write_remaining_time_file(remaining_seconds(data, settings, now.date()), remaining_time_file)
 
 

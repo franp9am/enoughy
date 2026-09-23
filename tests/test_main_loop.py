@@ -144,15 +144,15 @@ def test_the_first_tick_of_a_day_creates_the_file_and_charges_one_interval(machi
 
 
 def test_time_up_orders_the_shutdown(machine, files):
-    write_day(files, spent=HOUR)
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
 
-    tick(at(8, 0))
+    tick(at(8, 0))  # this tick's own minute uses up the hour
 
-    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]  # in the same tick, not one later
     assert machine.notifications == ["time up"]
     assert remaining_shown(files) == 0
     data = today_data(files)
-    assert data["time_spent_sec"] == HOUR  # nothing more is charged
+    assert data["time_spent_sec"] == HOUR
     assert data["event_log"] == ["time up 2026-09-14 08:00:00"]
 
 
@@ -397,7 +397,7 @@ def test_an_earlier_night_from_the_server_lags_one_tick(machine, files, sync):
 
 def test_the_server_hears_of_a_shutdown_before_it_happens(machine, files, sync, monkeypatch):
     write_server_files(files)
-    write_day(files, spent=HOUR)
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
     syncs_before_shutdown = []
     monkeypatch.setattr(os_tooling, "shutdown", lambda delay: syncs_before_shutdown.append(sync.calls))
 
