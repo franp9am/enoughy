@@ -14,7 +14,6 @@ Ordered by importance within each section.
   Left: the installer adding a child next to the ones there (one widget task
   each, the monitor task kept); `icacls` locking each child's shared folder to
   that account. The pre-0.5 layout move goes once no such machine remains.
-* clean up folder structure
 
 ## Server-side
 

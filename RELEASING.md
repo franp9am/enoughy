@@ -5,10 +5,10 @@ child's machine receives: the monitor files, the widget, the launcher, the
 installer. A fresh install downloads it and runs the installer from it; every
 installed launcher fetches it at boot and takes the monitor files out of it.
 
-Needs: the private key at `~\.enoughy\release_key.pfx` (release_key.cer in the
-repo is its public half), `gh` logged in, a clean tree on `main`, pushed.
+Needs: the private key at `~\.enoughy\release_key.pfx` (`monitor/release_key.cer`
+is its public half), `gh` logged in, a clean tree on `main`, pushed.
 
-1. Write the new version in `VERSION`. Commit, push.
+1. Write the new version in `monitor/VERSION`. Commit, push.
 2. From a PowerShell in the repo folder:
 
        powershell -ExecutionPolicy Bypass -File .\release.ps1 "What changed, in a sentence for the parent."
@@ -30,7 +30,7 @@ has it:
 
 which removes the release and the tag, remote and local.
 
-`VERSION` is the only place the version is written. `config.py` reads it for the
+`monitor/VERSION` is the only place the version is written. `config.py` reads it for the
 monitor's reports, the installer copies it next to the launcher, `release.ps1`
 tags from it and ships it in the zip, and the launcher compares the shipped one
 with the installed one.

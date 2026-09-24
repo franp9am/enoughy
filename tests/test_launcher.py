@@ -82,7 +82,7 @@ def machine(tmp_path, keys):
     (tmp_path / "EnoughyShared").mkdir()
     import _winapi
     _winapi.CreateJunction(sys.base_prefix, str(tmp_path / "EnoughyPython"))
-    shutil.copy(REPO / "launcher.ps1", monitor_dir)
+    shutil.copy(REPO / "monitor" / "launcher.ps1", monitor_dir)
     shutil.copy(keys["cer"], monitor_dir / "release_key.cer")
     (monitor_dir / "UPDATE_MODE").write_text("auto")
     (monitor_dir / "VERSION").write_text("0.5.0")
@@ -120,7 +120,7 @@ def run_launcher(machine: Path, url: str) -> dict:
         "version": (monitor_dir / "VERSION").read_text(),
         "config": (monitor_dir / "config.py").read_text(),
         "widget": (machine / "EnoughyShared" / "remaining_time_widget.py").read_text(),
-        "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "launcher.ps1").read_text(),
+        "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "monitor" / "launcher.ps1").read_text(),
         "installer_absent": not (monitor_dir / "install.ps1").exists(),
         "log": log.read_text() if log.exists() else "",
         "staged": (monitor_dir / "update").exists(),

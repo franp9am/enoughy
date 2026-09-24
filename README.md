@@ -8,20 +8,25 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 
 ## Parts
 
-* `monitor.py` -- runs as SYSTEM from boot, counts the child's session time, shuts the
+* `monitor/` -- what runs as SYSTEM on the child's machine.
+  `monitor.py` -- runs as SYSTEM from boot, counts the child's session time, shuts the
   machine down when the limit is used up or the allowed hours end. A tick only counts,
   and a shutdown only happens, while the child is logged in with the screen unlocked;
   a locked machine is left alone until somebody unlocks it.
-* `config.py` -- what is fixed at install: paths, intervals, the version (read from `VERSION`). `settings.py` --
+  `config.py` -- what is fixed at install: paths, intervals, the version (read from `VERSION`). `settings.py` --
   what the parent changes: the settings' schema, their validation, the settings file.
-  Both next to the monitor in a folder the child cannot read.
+  All installed to one folder the child cannot read.
   A child is a Windows account, and what the monitor keeps for them is under
   `data\<account>\` there, with what the child may touch under
   `C:\ProgramData\EnoughyShared\<account>\`. One child per install for now; the
   layout is ready for more.
-* `remaining_time_widget.py` -- a small always-on-top "time left" box in the child's
-  session. Cosmetic; the child may hide it with Ctrl+Alt+H or kill it.
+* `widget/` -- a small always-on-top "time left" box in the child's session, one file
+  that imports nothing from the monitor. Cosmetic; the child may hide it with Ctrl+Alt+H or kill it.
+* `parent/` -- what the parent runs on their own machine: `grant_extra_time_offline.py`,
+  which signs an extra-time code when there is no server.
 * `server/` -- optional web page for the parent, to grant time remotely and see usage.
+* `installer/` -- the setup exe: the Inno Setup script and the script that fetches the
+  Python it bundles. `release.ps1` at the root publishes a release.
 
 ## Setup on the child's machine
 
@@ -142,8 +147,8 @@ carried into the next day, so -20 h and -6 h cost the same single day.
 install put on the desktop). The date is only a nonce, not an expiry -- a code stays valid
 forever, but each one can be redeemed exactly once.
 
-`grant_extra_time_offline.py` imports nothing else from the project, so copying that
-one file to the parent's machine is enough, as long as its `SIGNATURE_CHARS` matches
+`parent/grant_extra_time_offline.py` imports nothing else from the project, so copying
+that one file to the parent's machine is enough, as long as its `SIGNATURE_CHARS` matches
 `config.py` and both machines hold the same secret.
 
 ## Optional: the parent's server
@@ -188,8 +193,8 @@ into its own cache for the run. From the repository root:
 
     uv run --with pytest python -m pytest tests -q
 
-`python -m pytest` rather than plain `pytest`, so the repository root is on the import
-path and the tests can `import monitor`.
+`pytest.ini` puts `monitor/` and `widget/` on the import path, so the tests can
+`import monitor` by its bare name, as the installed machine does.
 
 They cover the monitor's logic and, in `tests/test_main_loop.py`, whole scenarios on a
 fake machine. Untested on purpose: `os_tooling` (needs real Windows sessions), `main()`

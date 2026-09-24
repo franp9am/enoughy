@@ -1,9 +1,9 @@
 ; installer.iss -- the setup exe, built with Inno Setup 6 (https://jrsoftware.org/isinfo.php):
 ;
-;   iscc installer.iss        -> dist\enoughy-setup.exe
+;   iscc installer\installer.iss   -> installer\dist\enoughy-setup.exe
 ;
 ; What install.ps1 does, as an exe: it asks which account is the child's and for
-; the parent's server, unpacks its own Python (bundled from build\python, which
+; the parent's server, unpacks its own Python (bundled from installer\build\python, which
 ; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
 ; locks it, the widget into the shared folder, puts the "Extra time" shortcut on
 ; the shared desktop and registers the two tasks.
@@ -13,7 +13,7 @@
 ; Not yet, next to install.ps1: moving a ScreenTime or pre-0.5 install, and a
 ; choice of folder for the shortcut.
 
-#define FileHandle FileOpen("VERSION")
+#define FileHandle FileOpen("..\monitor\VERSION")
 #define Version Trim(FileRead(FileHandle))
 #expr FileClose(FileHandle)
 
@@ -45,15 +45,15 @@ AlwaysRestart=yes
 SetupLogging=yes
 
 [Files]
-Source: "monitor.py";      DestDir: "{app}"
-Source: "os_tooling.py";   DestDir: "{app}"
-Source: "remote_sync.py";  DestDir: "{app}"
-Source: "config.py";       DestDir: "{app}"
-Source: "settings.py";     DestDir: "{app}"
-Source: "VERSION";         DestDir: "{app}"
-Source: "launcher.ps1";    DestDir: "{app}"
-Source: "release_key.cer"; DestDir: "{app}"
-Source: "remaining_time_widget.py"; DestDir: "{#SharedDir}"
+Source: "..\monitor\monitor.py";      DestDir: "{app}"
+Source: "..\monitor\os_tooling.py";   DestDir: "{app}"
+Source: "..\monitor\remote_sync.py";  DestDir: "{app}"
+Source: "..\monitor\config.py";       DestDir: "{app}"
+Source: "..\monitor\settings.py";     DestDir: "{app}"
+Source: "..\monitor\VERSION";         DestDir: "{app}"
+Source: "..\monitor\launcher.ps1";    DestDir: "{app}"
+Source: "..\monitor\release_key.cer"; DestDir: "{app}"
+Source: "..\widget\remaining_time_widget.py"; DestDir: "{#SharedDir}"
 ; A running monitor holds the DLLs; Setup closes it, or replaces them at the reboot.
 Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignoreversion restartreplace
 

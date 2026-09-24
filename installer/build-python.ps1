@@ -1,5 +1,5 @@
 # build-python.ps1 -- the private Python the setup exe bundles, unpacked once
-# per version into build\python (git-ignored). Run it before iscc when that
+# per version into installer\build\python (git-ignored). Run it before iscc when that
 # folder is missing or the version below changes.
 #
 # python.org's installer is four MSIs; without pip, docs, tests and the launcher

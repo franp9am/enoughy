@@ -18,21 +18,22 @@ $src = $PSScriptRoot
 
 if (-not (Test-Path $KeyFile)) { throw "No signing key at $KeyFile." }
 if (git status --porcelain) { throw "The working tree is not clean; commit first." }
-$Tag = "v" + (Get-Content "$src\VERSION").Trim()
+$Tag = "v" + (Get-Content "$src\monitor\VERSION").Trim()
 if (git ls-remote --tags origin $Tag) { throw "$Tag is released already; bump VERSION first." }   # on origin: a local tag may be gone
 
 $password = Read-Host "Password for $KeyFile" -AsSecureString
 $cert = New-Object Security.Cryptography.X509Certificates.X509Certificate2($KeyFile, $password, [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
-$public = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$src\release_key.cer")
+$public = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$src\monitor\release_key.cer")
 if ($cert.Thumbprint -ne $public.Thumbprint) { throw "release_key.cer is not the public half of $KeyFile; no machine would accept the release." }
 $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
 
-# Flat, like the repo: what install.ps1 copies, and the installer itself.
+# Flat, whatever the repo's folders: what install.ps1 copies, and the installer itself.
 $stage = Join-Path $env:TEMP "enoughy-release"
 if (Test-Path $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 New-Item -ItemType Directory "$stage\files" | Out-Null
-Copy-Item "$src\monitor.py", "$src\os_tooling.py", "$src\remote_sync.py", "$src\config.py", "$src\settings.py", "$src\VERSION", "$src\remaining_time_widget.py",
-          "$src\launcher.ps1", "$src\release_key.cer", "$src\install.ps1", "$src\install.cmd", "$src\uninstall.ps1", "$src\uninstall.cmd" "$stage\files"
+Copy-Item "$src\monitor\monitor.py", "$src\monitor\os_tooling.py", "$src\monitor\remote_sync.py", "$src\monitor\config.py", "$src\monitor\settings.py",
+          "$src\monitor\VERSION", "$src\monitor\launcher.ps1", "$src\monitor\release_key.cer", "$src\widget\remaining_time_widget.py",
+          "$src\install.ps1", "$src\install.cmd", "$src\uninstall.ps1", "$src\uninstall.cmd" "$stage\files"
 Add-Type -AssemblyName System.IO.Compression.FileSystem   # Compress-Archive would do the same; both write backslashes, which Expand-Archive reads
 $zip = "$stage\enoughy.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory("$stage\files", $zip)
