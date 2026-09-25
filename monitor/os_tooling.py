@@ -1,7 +1,9 @@
 import ctypes
+import os
 import subprocess
 import time
 from ctypes import wintypes
+from pathlib import Path
 from typing import Optional
 
 WTS_CURRENT_SERVER = None  # the C macro is a null handle, and ctypes passes None as one
@@ -97,6 +99,15 @@ def user_logged_in(user: str) -> bool:
         return any(name.lower() == user.lower() for name in users_at_screen().values())
     except OSError:
         return legacy_user_logged_in(user)
+
+
+def write_atomically(target: Path, text: str) -> None:
+    """A reader sees the old content or the new, never an empty or half-written
+    file; `open(..., "w")` truncates first, and a crash or a concurrent read can
+    land between that and the write."""
+    tmp_file = target.with_suffix(".tmp")
+    tmp_file.write_text(text, encoding="utf-8")
+    os.replace(tmp_file, target)
 
 
 def notify(message: str, user: str) -> None:

@@ -117,10 +117,7 @@ def load_data(datafile):
 
 
 def save_data(data, datafile):
-    tmp_file = datafile.with_suffix(".tmp")
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp_file, datafile)  # atomic, prevents random breakage
+    os_tooling.write_atomically(datafile, json.dumps(data, indent=2))
 
 
 def load_used_codes(used_codes_file: Path) -> set:
@@ -168,12 +165,9 @@ def remaining_seconds(data, settings, date: datetime.date):
 
 def write_remaining_time_file(remaining_sec, target: Path):
     """Publish remaining seconds to a child-readable file for a UI to display."""
-    tmp_file = target.with_suffix(".tmp")
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        with open(tmp_file, "w", encoding="utf-8") as f:
-            f.write(str(max(0, remaining_sec)))
-        os.replace(tmp_file, target)
+        os_tooling.write_atomically(target, str(max(0, remaining_sec)))
     except Exception:
         pass  # not critical
 

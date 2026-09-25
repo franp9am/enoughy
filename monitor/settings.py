@@ -2,10 +2,11 @@
 validation, and the child's settings file. What is fixed at install -- paths,
 intervals, the version -- is in config.py."""
 import json
-import os
 import re
 import sys
 from pathlib import Path
+
+from os_tooling import write_atomically
 
 WEEKDAY_NAMES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")  # in date.weekday() order
 DAILY_LIMIT_RANGE = range(24 * 60 * 60 + 1)
@@ -150,9 +151,7 @@ def settings_in_force(settings_file: Path) -> dict:
 
 
 def write_settings_file(settings: dict, settings_file: Path) -> None:
-    tmp_file = settings_file.with_suffix(".tmp")
-    tmp_file.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    os.replace(tmp_file, settings_file)  # atomic
+    write_atomically(settings_file, json.dumps(settings, indent=2))
 
 
 def save_settings(sent: dict, settings_file: Path) -> dict:

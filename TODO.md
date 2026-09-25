@@ -8,8 +8,6 @@ Ordered by importance within each section.
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into
   a new date and a fresh daily limit.
-* The same atomic write (temp file + `os.replace`) is copied all over; it wants
-  one shared home.
 * Several children on one machine. The per-child layout is there since 0.5.
   Left: the installer adding a child next to the ones there (one widget task
   each, the monitor task kept); `icacls` locking each child's shared folder to

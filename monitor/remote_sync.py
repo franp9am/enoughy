@@ -6,13 +6,13 @@ machine down whether the server answers or not.
 """
 
 import json
-import os
 import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import List, Optional
 
 from config import MONITOR_VERSION, SYNC_TIMEOUT_SECONDS
+from os_tooling import write_atomically
 
 
 @dataclass
@@ -76,10 +76,7 @@ def load_applied_grant_ids(applied_grants_file: Path) -> List[int]:
 
 
 def save_applied_grant_ids(grant_ids, applied_grants_file: Path) -> None:
-    tmp_file = applied_grants_file.with_suffix(".tmp")
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        json.dump(sorted(grant_ids), f)
-    os.replace(tmp_file, applied_grants_file)  # make the write atomic
+    write_atomically(applied_grants_file, json.dumps(sorted(grant_ids)))
 
 
 def load_settings_change_outcome(outcome_file: Path) -> Optional[dict]:
@@ -92,10 +89,7 @@ def load_settings_change_outcome(outcome_file: Path) -> Optional[dict]:
 
 
 def save_settings_change_outcome(change_id: int, taken: bool, outcome_file: Path) -> None:
-    tmp_file = outcome_file.with_suffix(".tmp")
-    with open(tmp_file, "w", encoding="utf-8") as f:
-        json.dump({"id": change_id, "taken": taken}, f)
-    os.replace(tmp_file, outcome_file)  # make the write atomic
+    write_atomically(outcome_file, json.dumps({"id": change_id, "taken": taken}))
 
 
 def send_status(
