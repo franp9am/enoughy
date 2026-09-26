@@ -8,10 +8,12 @@ Ordered by importance within each section.
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into
   a new date and a fresh daily limit.
-* Several children on one machine. The per-child layout is there since 0.5.
-  Left: the installer adding a child next to the ones there (one widget task
-  each, the monitor task kept); `icacls` locking each child's shared folder to
-  that account. The pre-0.5 layout move goes once no such machine remains.
+* `release.ps1` builds the setup exe and uploads it next to the zip; until then
+  `RELEASING.md` attaches it by hand.
+* Several children on one machine: since 0.8 the setup adds a child next to the
+  ones there. Left: `icacls` locking each child's shared folder to that account.
+  An install older than 0.5 needs `install.ps1` from the v0.7.0 release first,
+  which moves its files under `data\<child>`; that goes once no such machine remains.
 
 ## Server-side
 

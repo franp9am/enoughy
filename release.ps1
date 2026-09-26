@@ -1,11 +1,10 @@
-# release.ps1 -- zip everything a child's machine receives, sign it, tag the
-# commit v<VERSION> and publish both as a GitHub release, which a fresh install
-# runs from and every launcher updates from.
+# release.ps1 -- zip what every launcher updates from, sign it, tag the commit
+# v<VERSION> and publish both as a GitHub release. The setup exe is not built or
+# uploaded here yet; RELEASING.md says how it is attached by hand.
 #
 #   powershell -ExecutionPolicy Bypass -File .\release.ps1 "What changed, in a sentence for the parent." [-KeyFile ...]
 #
-# The bypass is for a window whose policy refuses scripts; the install .cmd
-# files do the same for parents.
+# The bypass is for a window whose policy refuses scripts.
 #
 # Needs the private key (release_key.cer is its public half) and a logged-in gh.
 # Lose the key and no installed machine updates without a visit.
@@ -27,13 +26,12 @@ $public = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$s
 if ($cert.Thumbprint -ne $public.Thumbprint) { throw "release_key.cer is not the public half of $KeyFile; no machine would accept the release." }
 $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
 
-# Flat, whatever the repo's folders: what install.ps1 copies, and the installer itself.
+# Flat, whatever the repo's folders: the files a child's machine runs.
 $stage = Join-Path $env:TEMP "enoughy-release"
 if (Test-Path $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 New-Item -ItemType Directory "$stage\files" | Out-Null
 Copy-Item "$src\monitor\monitor.py", "$src\monitor\os_tooling.py", "$src\monitor\remote_sync.py", "$src\monitor\config.py", "$src\monitor\settings.py",
-          "$src\monitor\VERSION", "$src\monitor\launcher.ps1", "$src\monitor\release_key.cer", "$src\widget\remaining_time_widget.py",
-          "$src\install.ps1", "$src\install.cmd", "$src\uninstall.ps1", "$src\uninstall.cmd" "$stage\files"
+          "$src\monitor\VERSION", "$src\monitor\launcher.ps1", "$src\monitor\release_key.cer", "$src\widget\remaining_time_widget.py" "$stage\files"
 Add-Type -AssemblyName System.IO.Compression.FileSystem   # Compress-Archive would do the same; both write backslashes, which Expand-Archive reads
 $zip = "$stage\enoughy.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory("$stage\files", $zip)

@@ -163,7 +163,7 @@ def test_an_answer_that_is_not_the_protocol_raises_to_the_caller(server):
         send(server)
 
 
-# --- the files written by install.ps1 --------------------------------------
+# --- the files written by the setup ----------------------------------------
 
 
 def test_the_server_url_is_read_without_whitespace_or_trailing_slash(tmp_path):

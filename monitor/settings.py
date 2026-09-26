@@ -128,8 +128,8 @@ def validated_settings(stored: dict, fallback=None) -> dict:
 
 def upgraded(stored: dict) -> dict:
     """A file written before 0.7 has the window as two hours, the last one
-    included. Goes once no such machine remains, like the layout move in
-    install.ps1; anything else in the old names is left for validation to reject."""
+    included. Goes once no such machine remains; anything else in the old
+    names is left for validation to reject."""
     old = stored.get("EARLIEST_HOUR_INCLUDED"), stored.get("LATEST_HOUR_INCLUDED")
     if all(is_int_in(hour, range(24)) for hour in old):
         stored = {name: value for name, value in stored.items() if not name.endswith("_HOUR_INCLUDED")}

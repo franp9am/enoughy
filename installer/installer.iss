@@ -2,8 +2,8 @@
 ;
 ;   iscc installer\installer.iss   -> installer\dist\enoughy-setup.exe
 ;
-; What install.ps1 does, as an exe: it asks which account is the child's and for
-; the parent's server, unpacks its own Python (bundled from installer\build\python, which
+; It asks which account is the child's and for the parent's server, unpacks its
+; own Python (bundled from installer\build\python, which
 ; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
 ; locks it, the widget into the shared folder, and for each child puts an
 ; "Extra time" shortcut on the shared desktop and registers a widget task at
@@ -12,8 +12,8 @@
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
-; Not yet, next to install.ps1: moving a ScreenTime or pre-0.5 install, and a
-; choice of folder for the shortcut.
+; Not done: moving a ScreenTime or pre-0.5 install (install.ps1 in the v0.7.0
+; release does that), and a choice of folder for the shortcut.
 
 #define FileHandle FileOpen("..\monitor\VERSION")
 #define Version Trim(FileRead(FileHandle))
@@ -148,7 +148,7 @@ end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  // A reinstall shows what it has; Enter keeps it, like install.ps1.
+  // A reinstall shows what it has; Enter keeps it.
   if CurPageID = ServerPage.ID then begin
     ServerPage.Values[0] := ReadFile(ChildDataDir + '\child_token.txt', '');
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
@@ -252,7 +252,7 @@ begin
   end;
 end;
 
-// The same task install.ps1 registers: runs on battery, never times out. The
+// The task runs on battery and never times out. The
 // definition comes from the Task Scheduler API, but schtasks registers it: the
 // API's register call wants a null password, which this script cannot pass.
 procedure RegisterTask(Name: String; TriggerType: Integer; UserId: String; LogonType: Integer; RunLevel: Integer; Exe, Args, WorkDir: String);

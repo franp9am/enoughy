@@ -31,21 +31,14 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 ## Setup on the child's machine
 
 1. Give the child a **non-admin** Windows account.
-2. Open PowerShell (type `powershell` in the Start menu; no admin needed) and paste:
-
-   ```powershell
-   irm https://raw.githubusercontent.com/franp9am/enoughy/main/bootstrap.ps1 | iex
-   ```
-
-   This fetches the latest release, one zip, into a temp folder and starts the installer, which
-   re-launches itself as admin and asks which local account is the child's, optionally
-   for the child token and URL of the parent's server, and where the "Extra time"
-   shortcut goes, probably `C:\Users\<child>\Desktop`.
-   Then it downloads its own Python from python.org into `C:\ProgramData\EnoughyPython`
-   (about 13 MB, checked against hashes pinned in the script), copies the monitor into
-   `C:\ProgramData\Enoughy` and locks
-   that folder, puts the widget in the shared `C:\ProgramData\EnoughyShared`, and
-   registers the two scheduled tasks.
+2. Download `enoughy-setup.exe` from the latest release,
+   https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
+   administrator rights, which local account is the child's, and optionally for the
+   child token and URL of the parent's server. Then it unpacks its own Python into
+   `C:\ProgramData\EnoughyPython`, copies the monitor into `C:\ProgramData\Enoughy` and
+   locks that folder, puts the widget in the shared `C:\ProgramData\EnoughyShared`, puts
+   an "Extra time (<child>)" shortcut on the desktop and registers the scheduled tasks.
+   Run it again and pick another account to add a second child.
 3. Reboot. The monitor runs from boot, the widget appears when the child logs in.
 
 A fresh install generates the secret for signing extra-time codes and prints it at the
@@ -54,26 +47,15 @@ end -- the parent's machine needs the same one, in `data/secret.txt` next to
 `C:\ProgramData\Enoughy\data\<child>\secret.txt`, which an administrator can read or
 replace (reboot afterwards); a reinstall keeps it.
 
-To remove everything, open PowerShell **as administrator** (right-click it in the Start
-menu) and paste:
+To remove everything, uninstall enoughy in Apps & Features. That removes the tasks,
+the folders and the usage history.
 
-```powershell
-irm https://raw.githubusercontent.com/franp9am/enoughy/main/uninstall.ps1 | iex
-```
+Upgrading by copying files over is not enough: the monitor refuses to start without
+a child folder under `data\`, which only the setup creates. Run the setup again. An
+install older than 0.5 keeps the child's files in `data\` itself; the setup does not
+move them, `install.ps1` from the v0.7.0 release does.
 
-Prefer to see the files first? Download `enoughy.zip` from a release, extract it, and double-click
-`install.cmd` or `uninstall.cmd` (the latter takes `-KeepData` to keep the usage history).
-The `.cmd` files only hand the matching `.ps1` to PowerShell with `-ExecutionPolicy Bypass`,
-which is what lets them run on a machine whose default policy refuses scripts; they change
-no setting. The pasted lines need no such help: the policy governs script files, not text.
-
-Upgrading by copying the scripts over is not enough: the monitor refuses to start without
-a child folder under `data\`, which only the installer creates. Run the installer again;
-over an install older than 0.5 it moves the child's files from `data\` itself into that
-folder.
-
-Releasing is in `RELEASING.md`. The URLs above point at `main`, so they stay the same
-across releases.
+Releasing is in `RELEASING.md`. The release link above always shows the latest one.
 
 ### Safety
 
@@ -161,7 +143,7 @@ shutting down as usual, and grants queue until the machine syncs again.
 cd server
 uv sync
 uv run python add_parent.py <login> <family>   # prints the htpasswd line to run next
-uv run python add_child.py <family> <name>     # prints the child token for install.ps1
+uv run python add_child.py <family> <name>     # prints the child token for the setup
 uv run uvicorn app:app --host 127.0.0.1
 ```
 
@@ -180,11 +162,10 @@ old report and sends back only what that version understands.
 
 None on the child's machine, and no Python needs to be installed there: the installer
 unpacks a private copy of a pinned python.org release for the monitor and the widget,
-leaving any Python the parent has alone. Nothing is registered with Windows, so it does
-not show up in Apps & Features; `uninstall.cmd` deletes it. To move to a newer release,
-change `$PythonVersion` and the four SHA-256 hashes at the top of the Python block in
-`install.ps1` and run the installer again. The server has its own dependencies, in
-`server/pyproject.toml`.
+leaving any Python the parent has alone. Nothing of it is registered with Windows; the
+setup's own uninstall deletes it. To move to a newer release, change `$PythonVersion`
+and the four SHA-256 hashes in `installer\build-python.ps1`, run it, and build the setup
+again. The server has its own dependencies, in `server/pyproject.toml`.
 
 ## Tests
 

@@ -183,11 +183,11 @@ def log_unexpected_error():
 
 
 def load_children(data_dir: Path) -> list:
-    """The children's accounts: every directory install.ps1 made under data;
+    """The children's accounts: every directory the setup made under data;
     there is no default."""
     children = sorted(p.name for p in data_dir.iterdir() if p.is_dir()) if data_dir.is_dir() else []
     if not children:
-        raise ValueError(f"No child directory in {data_dir}; run install.ps1 to set one up")
+        raise ValueError(f"No child directory in {data_dir}; run the setup to make one")
     return children
 
 

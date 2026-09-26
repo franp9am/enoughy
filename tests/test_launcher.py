@@ -59,7 +59,7 @@ def sign(zip_path: Path, pfx: Path) -> None:
 
 
 def make_release(served_dir: Path, version: str, pfx: Path) -> Path:
-    """The layout release.ps1 builds: flat, with the installer alongside, which
+    """The layout release.ps1 builds: flat, with the launcher alongside, which
     an update must leave where it is."""
     zip_path = served_dir / "enoughy.zip"
     with zipfile.ZipFile(zip_path, "w") as z:
@@ -68,14 +68,13 @@ def make_release(served_dir: Path, version: str, pfx: Path) -> Path:
         z.writestr("config.py", "# new\n")
         z.writestr("remaining_time_widget.py", "# new widget\n")
         z.writestr("launcher.ps1", "# new launcher\n")
-        z.writestr("install.ps1", "# new installer\n")
     sign(zip_path, pfx)
     return zip_path
 
 
 @pytest.fixture
 def machine(tmp_path, keys):
-    """What install.ps1 leaves behind, under tmp_path instead of ProgramData.
+    """What the setup leaves behind, under tmp_path instead of ProgramData.
     The private Python is a junction to the one running the tests."""
     monitor_dir = tmp_path / "Enoughy"
     (monitor_dir / "data").mkdir(parents=True)
@@ -121,7 +120,6 @@ def run_launcher(machine: Path, url: str) -> dict:
         "config": (monitor_dir / "config.py").read_text(),
         "widget": (machine / "EnoughyShared" / "remaining_time_widget.py").read_text(),
         "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "monitor" / "launcher.ps1").read_text(),
-        "installer_absent": not (monitor_dir / "install.ps1").exists(),
         "log": log.read_text() if log.exists() else "",
         "staged": (monitor_dir / "update").exists(),
     }
@@ -139,7 +137,7 @@ def test_a_newer_release_is_staged_at_one_boot_and_installed_at_the_next(machine
     assert result["version"] == "0.6.0"
     assert result["config"] == "# new\n"
     assert result["widget"] == "# new widget\n"
-    assert result["launcher_kept"] and result["installer_absent"]  # only a reinstall changes those
+    assert result["launcher_kept"]  # only running the setup again changes it
     assert "updated 0.5.0 to 0.6.0" in result["log"]
 
 

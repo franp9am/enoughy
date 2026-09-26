@@ -1,4 +1,4 @@
-"""What install.ps1 leaves that the monitor cannot run without: a directory
+"""What the setup leaves that the monitor cannot run without: a directory
 per child, and the secret in it."""
 import pytest
 
