@@ -424,6 +424,10 @@ def tick(now, child: str, secret: bytes):
         write_remaining_time_file(remaining_seconds(data, settings, now.date()), remaining_time_file)
         return
 
+    settings = sync_with_server(data, datafile, now, settings, child)
+
+    # After the sync: hours the parent extended on the server while the machine
+    # was off must count now, not after one more shutdown and boot.
     if is_night_time(now, settings):
         shut_down(
             reason="Night time",
@@ -444,8 +448,6 @@ def tick(now, child: str, secret: bytes):
         data["granted_sec"] += extra_time
         os_tooling.notify(f"extra time {extra_time}", child)
         save_data(data, datafile)
-
-    settings = sync_with_server(data, datafile, now, settings, child)
 
     soon = now + datetime.timedelta(seconds=NIGHT_WARNING_SECONDS)
     warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"

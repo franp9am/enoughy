@@ -4,6 +4,14 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
+* Review the order of one tick and of startup with several children in mind.
+  The startup sync reaches only the child logged in at that moment; the others
+  get their first sync in their first logged-in tick, so every decision there
+  (night, time up) must come after that sync. Night was checked before it until
+  0.8, which cost one more restart when the parent had extended the hours while
+  the machine was off. Walk through: one child shut down, a grant or a settings
+  change on the server, reboot, the other child logs in during the warmup, logs
+  off, the first logs in mid-cycle.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
 * Time zone is changeable by a standard user, which rolls `datetime.now()` into

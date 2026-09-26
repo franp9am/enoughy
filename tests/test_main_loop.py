@@ -378,7 +378,25 @@ def test_a_lower_limit_from_the_server_orders_the_shutdown(machine, files, sync)
     assert remaining_shown(files) == 0
 
 
-def test_an_earlier_night_from_the_server_lags_one_tick(machine, files, sync):
+def test_a_later_night_from_the_server_counts_in_the_same_tick(machine, files, sync):
+    """Shut down for the night, the hours extended on the server while the
+    machine was off, the child logged in again after the startup sync: the
+    first tick must not shut it down once more."""
+    write_server_files(files)
+    write_day(files, spent=HOUR // 2)
+    sync.answer = SyncAnswer(
+        pending_grants=[],
+        settings_change=SettingsChange(id=8, settings={"ALLOWED_HOURS": ["6:00", "23:00"]}),
+    )
+
+    tick(at(NIGHT_HOUR, 30))
+
+    assert machine.shutdowns == []
+    assert machine.notifications == []
+    assert settings_in_force(files["settings"])["ALLOWED_HOURS"] == ["6:00", "23:00"]
+
+
+def test_an_earlier_night_from_the_server_counts_in_the_same_tick(machine, files, sync):
     write_server_files(files)
     write_day(files, spent=HOUR // 2)
     sync.answer = SyncAnswer(
@@ -386,13 +404,11 @@ def test_an_earlier_night_from_the_server_lags_one_tick(machine, files, sync):
         settings_change=SettingsChange(id=8, settings={"ALLOWED_HOURS": ["6:00", "18:00"]}),
     )
 
-    tick(at(18, 30))  # night is checked before the sync, with the hours known so far
-    assert machine.shutdowns == []
-    assert settings_in_force(files["settings"])["ALLOWED_HOURS"] == ["6:00", "18:00"]
+    tick(at(18, 30))
 
-    tick(at(18, 31))
     assert machine.shutdowns == [NIGHT_SHUTDOWN_DELAY_SECONDS]
-    assert machine.notifications == ["5 minutes to night", "Night time"]  # the warning uses the new hours
+    assert machine.notifications == ["Night time"]
+    assert settings_in_force(files["settings"])["ALLOWED_HOURS"] == ["6:00", "18:00"]
 
 
 def test_the_server_hears_of_a_shutdown_before_it_happens(machine, files, sync, monkeypatch):
