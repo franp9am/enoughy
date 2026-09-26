@@ -9,14 +9,16 @@ Ordered by importance within each section.
   up) must come after the tick's own sync. Night came before it until 0.8.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
-* Time zone is changeable by a standard user, which rolls `datetime.now()` into
-  a new date and a fresh daily limit.
 * `release.ps1` builds the setup exe and uploads it next to the zip; until then
   `RELEASING.md` attaches it by hand.
 * Several children on one machine: since 0.8 the setup adds a child next to the
   ones there. Left: `icacls` locking each child's shared folder to that account.
   An install older than 0.5 needs `install.ps1` from the v0.7.0 release first,
   which moves its files under `data\<child>`; that goes once no such machine remains.
+* A changed time zone, which a standard user may set, moves the clock out of the
+  night and rolls the date into a fresh limit. Cheap first step: keep the UTC
+  offset in the day file, and on a change log an event and charge the tick by
+  the old offset, so the parent sees it on the page the same day.
 
 ## Server-side
 
@@ -46,6 +48,9 @@ Ordered by importance within each section.
 
 ## Someday / maybe
 
+* Time on a base the child cannot move: account in UTC and treat the local
+  offset as data, DST included. Nontrivial, and the trick is rare; the event
+  above shows whether anyone uses it.
 * Full client rewrite in C# with a signed exe installer; the monitor becomes
   a Windows service then.
 * Restricted internet, instead of shutdown when the quota ends or as a second
