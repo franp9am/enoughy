@@ -5,8 +5,10 @@
 ; What install.ps1 does, as an exe: it asks which account is the child's and for
 ; the parent's server, unpacks its own Python (bundled from installer\build\python, which
 ; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
-; locks it, the widget into the shared folder, puts the "Extra time" shortcut on
-; the shared desktop and registers the two tasks.
+; locks it, the widget into the shared folder, and for each child puts an
+; "Extra time" shortcut on the shared desktop and registers a widget task at
+; logon, next to the monitor task at boot. Running it again and picking another
+; account adds that child next to the ones there.
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
@@ -61,17 +63,12 @@ Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignorev
 Name: "{app}\data\{code:Child}"
 Name: "{#SharedDir}\{code:Child}"
 
-[Icons]
-; Opens the redeem file; the child pastes a code into it.
-Name: "{commondesktop}\Extra time"; Filename: "{#SharedDir}\{code:Child}\extra_time.txt"
-
-[UninstallRun]
-Filename: "{sys}\schtasks.exe"; Parameters: "/End /TN EnoughyMonitor";       Flags: runhidden; RunOnceId: "end-monitor"
-Filename: "{sys}\schtasks.exe"; Parameters: "/End /TN EnoughyWidget";        Flags: runhidden; RunOnceId: "end-widget"
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN EnoughyMonitor /F"; Flags: runhidden; RunOnceId: "delete-monitor"
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN EnoughyWidget /F";  Flags: runhidden; RunOnceId: "delete-widget"
+[InstallDelete]
+; The one shortcut of installs up to 0.7; now there is one per child.
+Type: files; Name: "{commondesktop}\Extra time.lnk"
 
 [UninstallDelete]
+Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{#SharedDir}"
 Type: filesandordirs; Name: "{#PythonDir}"
@@ -92,8 +89,7 @@ begin
 end;
 
 // Not {app}: the token page reads this folder before the wizard has set {app}.
-function ChildDataDir: String;   begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
-function ChildSharedDir: String; begin Result := ExpandConstant('{#SharedDir}\') + Child(''); end;
+function ChildDataDir: String; begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
 
 // One row per enabled local account, from WMI; a typed name invites a typo that
 // would leave the monitor watching an account nobody uses. Behind a Microsoft
@@ -180,6 +176,47 @@ begin
     RaiseException(ExpandConstant(What) + ' failed (exit code ' + IntToStr(Code) + ').');
 end;
 
+// For ending and deleting a task that may not exist: a failure is no error.
+procedure TryRun(Exe, Args: String);
+var
+  Code: Integer;
+begin
+  Exec(ExpandConstant(Exe), ExpandConstant(Args), '', SW_HIDE, ewWaitUntilTerminated, Code);
+end;
+
+procedure DeleteTask(Name: String);
+begin
+  TryRun('{sys}\schtasks.exe', '/End /TN "' + Name + '"');
+  TryRun('{sys}\schtasks.exe', '/Delete /TN "' + Name + '" /F');
+end;
+
+// The children of this machine: every folder under data\, which is what the
+// monitor goes by too. Delete a folder to stop watching that account.
+function Children: TArrayOfString;
+var
+  Found: TFindRec;
+  N: Integer;
+begin
+  N := 0;
+  if FindFirst(ExpandConstant('{app}\data\*'), Found) then
+    try
+      repeat
+        if (Found.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and (Found.Name <> '.') and (Found.Name <> '..') then begin
+          SetArrayLength(Result, N + 1);
+          Result[N] := Found.Name;
+          N := N + 1;
+        end;
+      until not FindNext(Found);
+    finally
+      FindClose(Found);
+    end;
+end;
+
+function WidgetTask(Child: String): String;
+begin
+  Result := 'EnoughyWidget-' + Child;
+end;
+
 // 16 random bytes from Windows' own generator, as hex.
 function BCryptGenRandom(Algorithm: Integer; Buffer: AnsiString; Count, Flags: Integer): Integer;
   external 'BCryptGenRandom@bcrypt.dll stdcall';
@@ -245,7 +282,7 @@ begin
   XmlFile := ExpandConstant('{tmp}\') + Name + '.xml';
   Stream := TFileStream.Create(XmlFile, fmCreate);
   try Stream.Write(Xml, Length(Xml) * 2); finally Stream.Free; end;
-  Run('{sys}\schtasks.exe', '/Create /TN ' + Name + ' /XML "' + XmlFile + '" /F', 'Registering the task ' + Name);
+  Run('{sys}\schtasks.exe', '/Create /TN "' + Name + '" /XML "' + XmlFile + '" /F', 'Registering the task ' + Name);
 end;
 
 var
@@ -258,6 +295,10 @@ begin
 end;
 
 procedure PostInstall;
+var
+  Names: TArrayOfString;
+  I: Integer;
+  Shared: String;
 begin
   // monitor.py runs as SYSTEM on this interpreter, so the child must not be able to
   // write into it: SYSTEM and Administrators full, Users read-only.
@@ -272,15 +313,26 @@ begin
   // and, per child, the number it shows and the redeem file, nothing trusted.
   At('opening the shared folder');
   Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
-  if not FileExists(ChildSharedDir + '\extra_time.txt') then SaveStringToFile(ChildSharedDir + '\extra_time.txt', '', False);
   // Task 1: the launcher as SYSTEM at every boot; it starts monitor.py and installs releases.
   At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
     ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));
-  // Task 2: the overlay in the child's session when they log in.
-  At('registering the widget task');
-  RegisterTask('EnoughyWidget', 9, Child(''), 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
-    ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + ChildSharedDir + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
+  // Per child: the redeem file, the shortcut on the shared desktop that opens
+  // it (the child pastes a code into it), and task 2, the overlay in their
+  // session when they log in. Every child in data\ gets these again, so a
+  // machine set up for one child at a time ends up consistent with data\; that
+  // also replaces the single EnoughyWidget task and shortcut of installs up to 0.7.
+  At('setting up the children');
+  DeleteTask('EnoughyWidget');
+  Names := Children;
+  for I := 0 to GetArrayLength(Names) - 1 do begin
+    Shared := ExpandConstant('{#SharedDir}\') + Names[I];
+    ForceDirectories(Shared);
+    if not FileExists(Shared + '\extra_time.txt') then SaveStringToFile(Shared + '\extra_time.txt', '', False);
+    CreateShellLink(ExpandConstant('{commondesktop}\Extra time (') + Names[I] + ').lnk', '', Shared + '\extra_time.txt', '', '', '', 0, SW_SHOWNORMAL);
+    RegisterTask(WidgetTask(Names[I]), 9, Names[I], 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
+      ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + Shared + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -291,4 +343,16 @@ begin
   except
     RaiseException('While ' + Step + ': ' + GetExceptionMessage);
   end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Names: TArrayOfString;
+  I: Integer;
+begin
+  if CurUninstallStep <> usUninstall then Exit;   // before the files go, while data\ still lists the children
+  DeleteTask('EnoughyMonitor');
+  DeleteTask('EnoughyWidget');   // installs up to 0.7
+  Names := Children;
+  for I := 0 to GetArrayLength(Names) - 1 do DeleteTask(WidgetTask(Names[I]));
 end;
