@@ -22,6 +22,7 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
   layout is ready for more.
 * `widget/` -- a small always-on-top "time left" box in the child's session, one file
   that imports nothing from the monitor. Cosmetic; the child may hide it with Ctrl+Alt+H or kill it.
+  Next to it `enter_code.py`, the dialog behind the "Extra time" shortcut.
 * `parent/` -- what the parent runs on their own machine: `grant_extra_time_offline.py`,
   which signs an extra-time code when there is no server.
 * `server/` -- optional web page for the parent, to grant time remotely and see usage.
@@ -37,7 +38,8 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
    child token and URL of the parent's server. Then it unpacks its own Python into
    `C:\ProgramData\EnoughyPython`, copies the monitor into `C:\ProgramData\Enoughy` and
    locks that folder, puts the widget in the shared `C:\ProgramData\EnoughyShared`, puts
-   an "Extra time (<child>)" shortcut on the desktop and registers the scheduled tasks.
+   an "Extra time" shortcut on the desktop and in the Start menu, and registers the
+   scheduled tasks.
    Run it again and pick another account to add a second child.
 3. Reboot. The monitor runs from boot, the widget appears when the child logs in.
 
@@ -124,9 +126,10 @@ carried into the next day, so -20 h and -6 h cost the same single day.
 
 **A signed code**, for when there is no server. The parent runs
 `grant_extra_time_offline.py` and gets `<date>:<seconds>:<signature>`, e.g.
-`2026-07-23:3600:a184` for an extra hour. The child pastes it into
-`C:\ProgramData\EnoughyShared\<child>\extra_time.txt` (the "Extra time" shortcut the
-install put on the desktop). The date is only a nonce, not an expiry -- a code stays valid
+`2026-07-23:3600:a184` for an extra hour. The child opens "Extra time" -- from the desktop, or by typing
+"extra" in the Start menu -- and pastes it into the box, which writes it to
+`C:\ProgramData\EnoughyShared\<child>\extra_time.txt`; the monitor picks it up within a
+minute and says so. The date is only a nonce, not an expiry -- a code stays valid
 forever, but each one can be redeemed exactly once.
 
 `parent/grant_extra_time_offline.py` imports nothing else from the project, so copying

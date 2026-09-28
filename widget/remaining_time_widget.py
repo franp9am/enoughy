@@ -11,6 +11,8 @@ import tkinter as tk
 from ctypes import wintypes
 from pathlib import Path
 
+import enter_code
+
 # The installer passes the child's file, <shared>/<child>/remaining_time.txt;
 # started by hand without one, the widget looks next to itself.
 DEFAULT_REMAINING_TIME_FILE = Path(__file__).parent / "remaining_time.txt"
@@ -245,4 +247,5 @@ class RemainingTimeWidget:
 
 
 if __name__ == "__main__":
+    enter_code.make_shortcut(enter_code.START_MENU_SHORTCUT)  # the widget runs for children only
     RemainingTimeWidget().run()

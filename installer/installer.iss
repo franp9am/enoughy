@@ -5,15 +5,16 @@
 ; It asks which account is the child's and for the parent's server, unpacks its
 ; own Python (bundled from installer\build\python, which
 ; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
-; locks it, the widget into the shared folder, and for each child puts an
-; "Extra time" shortcut on the shared desktop and registers a widget task at
-; logon, next to the monitor task at boot. Running it again and picking another
-; account adds that child next to the ones there.
+; locks it, the widget and the "Extra time" dialog into the shared folder, with
+; one shortcut to the dialog on the shared desktop and one in the shared Start
+; menu, and for each child registers a widget task at logon, next to the monitor
+; task at boot. Running it again and picking another account adds that child
+; next to the ones there.
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
 ; Not done: moving a ScreenTime or pre-0.5 install (install.ps1 in the v0.7.0
-; release does that), and a choice of folder for the shortcut.
+; release does that).
 
 #define FileHandle FileOpen("..\monitor\VERSION")
 #define Version Trim(FileRead(FileHandle))
@@ -56,6 +57,7 @@ Source: "..\monitor\VERSION";         DestDir: "{app}"
 Source: "..\monitor\launcher.ps1";    DestDir: "{app}"
 Source: "..\monitor\release_key.cer"; DestDir: "{app}"
 Source: "..\widget\remaining_time_widget.py"; DestDir: "{#SharedDir}"
+Source: "..\widget\enter_code.py";            DestDir: "{#SharedDir}"
 ; A running monitor holds the DLLs; Setup closes it, or replaces them at the reboot.
 Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignoreversion restartreplace
 
@@ -63,12 +65,17 @@ Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignorev
 Name: "{app}\data\{code:Child}"
 Name: "{#SharedDir}\{code:Child}"
 
+[Icons]
+; One for the whole machine: the dialog goes by the account that opens it. The
+; Start menu one is found by typing "extra", wherever the desktop is.
+Name: "{commondesktop}\Extra time";  Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{#SharedDir}\enter_code.py"""; WorkingDir: "{#SharedDir}"
+Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{#SharedDir}\enter_code.py"""; WorkingDir: "{#SharedDir}"
+
 [InstallDelete]
-; The one shortcut of installs up to 0.7; now there is one per child.
-Type: files; Name: "{commondesktop}\Extra time.lnk"
+; The shortcut per child of 0.8, which opened the redeem file itself.
+Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 
 [UninstallDelete]
-Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{#SharedDir}"
 Type: filesandordirs; Name: "{#PythonDir}"
@@ -317,11 +324,11 @@ begin
   At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
     ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));
-  // Per child: the redeem file, the shortcut on the shared desktop that opens
-  // it (the child pastes a code into it), and task 2, the overlay in their
-  // session when they log in. Every child in data\ gets these again, so a
-  // machine set up for one child at a time ends up consistent with data\; that
-  // also replaces the single EnoughyWidget task and shortcut of installs up to 0.7.
+  // Per child: the redeem file, which the "Extra time" dialog writes the code
+  // into, and task 2, the overlay in their session when they log in. Every
+  // child in data\ gets these again, so a machine set up for one child at a
+  // time ends up consistent with data\; that also replaces the single
+  // EnoughyWidget task of installs up to 0.7.
   At('setting up the children');
   DeleteTask('EnoughyWidget');
   Names := Children;
@@ -329,7 +336,6 @@ begin
     Shared := ExpandConstant('{#SharedDir}\') + Names[I];
     ForceDirectories(Shared);
     if not FileExists(Shared + '\extra_time.txt') then SaveStringToFile(Shared + '\extra_time.txt', '', False);
-    CreateShellLink(ExpandConstant('{commondesktop}\Extra time (') + Names[I] + ').lnk', '', Shared + '\extra_time.txt', '', '', '', 0, SW_SHOWNORMAL);
     RegisterTask(WidgetTask(Names[I]), 9, Names[I], 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
       ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + Shared + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
   end;
