@@ -317,15 +317,17 @@ begin
   Run('{sys}\icacls.exe', '"{app}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {app}');
   At('writing the credentials'); WriteCredentials;
   // The shared folder: every local account may write. It holds only the widget
-  // and, per child, the number it shows and the redeem file, nothing trusted.
+  // and the dialog, nothing trusted; each child's folder in it is locked below.
   At('opening the shared folder');
   Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
   // Task 1: the launcher as SYSTEM at every boot; it starts monitor.py and installs releases.
   At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
     ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));
-  // Per child: the redeem file, which the "Extra time" dialog writes the code
-  // into, and task 2, the overlay in their session when they log in. Every
+  // Per child: their shared folder, which besides SYSTEM and Administrators
+  // only that account may write, so no child touches another's; in it the
+  // redeem file, which the "Extra time" dialog writes the code
+  // into; and task 2, the overlay in their session when they log in. Every
   // child in data\ gets these again, so a machine set up for one child at a
   // time ends up consistent with data\; that also replaces the single
   // EnoughyWidget task of installs up to 0.7.
@@ -335,6 +337,7 @@ begin
   for I := 0 to GetArrayLength(Names) - 1 do begin
     Shared := ExpandConstant('{#SharedDir}\') + Names[I];
     ForceDirectories(Shared);
+    Run('{sys}\icacls.exe', '"' + Shared + '" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F "' + Names[I] + '":(OI)(CI)M', 'Locking ' + Shared);
     if not FileExists(Shared + '\extra_time.txt') then SaveStringToFile(Shared + '\extra_time.txt', '', False);
     RegisterTask(WidgetTask(Names[I]), 9, Names[I], 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
       ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + Shared + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));

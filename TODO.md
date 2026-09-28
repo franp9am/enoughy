@@ -11,10 +11,6 @@ Ordered by importance within each section.
   sync, so debugging works from the server page without machine access.
 * `release.ps1` builds the setup exe and uploads it next to the zip; until then
   `RELEASING.md` attaches it by hand.
-* Several children on one machine: since 0.8 the setup adds a child next to the
-  ones there. Left: `icacls` locking each child's shared folder to that account.
-  An install older than 0.5 needs `install.ps1` from the v0.7.0 release first,
-  which moves its files under `data\<child>`; that goes once no such machine remains.
 * A changed time zone, which a standard user may set, moves the clock out of the
   night and rolls the date into a fresh limit. Cheap first step: keep the UTC
   offset in the day file, and on a change log an event and charge the tick by
