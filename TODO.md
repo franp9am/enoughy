@@ -4,9 +4,6 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
-* Review the order of a tick with several children: only the child logged in
-  at startup gets the startup sync, so every decision in a tick (night, time
-  up) must come after the tick's own sync. Night came before it until 0.8.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
 * A changed time zone, which a standard user may set, moves the clock out of the
@@ -50,3 +47,5 @@ Ordered by importance within each section.
 * Restricted internet, instead of shutdown when the quota ends or as a second
   mode: a firewall rule scoped to the child's account that allows a whitelist
   and nothing else. Maybe Wikipedia alone, maybe limited ChatGPT or Claude.
+* A carryover change from the server counts a day late: the day file, with
+  its carryover, is created before the day's first sync.
