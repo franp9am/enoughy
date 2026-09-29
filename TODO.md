@@ -9,8 +9,6 @@ Ordered by importance within each section.
   up) must come after the tick's own sync. Night came before it until 0.8.
 * Send recent `event_log` lines (or at least the last caught exception) with each
   sync, so debugging works from the server page without machine access.
-* `release.ps1` builds the setup exe and uploads it next to the zip; until then
-  `RELEASING.md` attaches it by hand.
 * A changed time zone, which a standard user may set, moves the clock out of the
   night and rolls the date into a fresh limit. Cheap first step: keep the UTC
   offset in the day file, and on a change log an event and charge the tick by
