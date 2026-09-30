@@ -4,8 +4,9 @@ Ordered by importance within each section.
 
 ## Client / monitor
 
-* Send recent `event_log` lines (or at least the last caught exception) with each
-  sync, so debugging works from the server page without machine access.
+* Send the day's whole `event_log` and the last `crash.log` entry with each
+  sync, so debugging works from the server page without machine access; cap
+  the crash log at 1 MB (rename to `.old`) and read only its tail.
 * A changed time zone, which a standard user may set, moves the clock out of the
   night and rolls the date into a fresh limit. Cheap first step: keep the UTC
   offset in the day file, and on a change log an event and charge the tick by
