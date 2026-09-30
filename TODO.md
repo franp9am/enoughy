@@ -50,3 +50,15 @@ Ordered by importance within each section.
   and nothing else. Maybe Wikipedia alone, maybe limited ChatGPT or Claude.
 * A carryover change from the server counts a day late: the day file, with
   its carryover, is created before the day's first sync.
+* Several devices for one child, sharing one budget. Server-side only,
+  through the existing grants: every device keeps counting and shutting down
+  on its own, and the server turns one device's usage into a negative grant
+  for its siblings, so all of them converge on the same remaining within a
+  tick. Grants and settings changes become addressed to the child, delivered
+  and answered per device; `children` splits into `children` and `devices`,
+  which own the token and the status rows. No monitor or protocol change, so
+  every installed version keeps working. Two devices on at once cost double,
+  as an unlocked idle session does today. Offline mode cannot share anything:
+  a second install there is a second child, which is also the answer to give
+  until a customer asks for more. Not before the server is tested against a
+  recorded 0.1.0 sync.
