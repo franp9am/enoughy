@@ -34,7 +34,8 @@ def get_code(extra_sec=3600, date=None):
         date = datetime.date.today().isoformat()
 
     # The date is a nonce that keeps each code unique; it is part of the signed
-    # payload but is never checked against the real calendar on redemption.
+    # payload and only checked against the calendar on redemption when the
+    # child's config.py says CHECK_DATE_IN_REDEEM_CODES = True.
     payload = f"{date}:{extra_sec}"
     sign = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}:{sign[:SIGNATURE_CHARS]}"
@@ -55,7 +56,8 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Nonce date (default: today, e.g. 2026-07-23). "
-        "Override to issue a second code of the same amount on the same day.",
+        "Override to issue a second code of the same amount on the same day; "
+        "with CHECK_DATE_IN_REDEEM_CODES on the child's side use another amount instead.",
     )
 
     args = parser.parse_args()

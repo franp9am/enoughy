@@ -23,4 +23,5 @@ STARTUP_DELAY_SECONDS = 40  # wait after boot before the first check
 NETWORK_WARMUP_SECONDS = 20
 
 SIGNATURE_CHARS = 4  # changing it invalidates codes already handed out
+CHECK_DATE_IN_REDEEM_CODES = False  # True: a code is good only on the day it carries
 MAX_REDEEM_FILE_BYTES = 128

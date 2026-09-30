@@ -11,6 +11,7 @@ from typing import Optional
 import os_tooling
 import remote_sync
 from config import (
+    CHECK_DATE_IN_REDEEM_CODES,
     CHECK_INTERVAL_SECONDS,
     CRASH_LOG_FILE,
     DATA_DIR,
@@ -135,11 +136,11 @@ def record_used_code(code: str, used_codes_file: Path):
         f.write(code + "\n")
 
 
-def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path) -> int:
+def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path, today) -> int:
     """Seconds granted by the code in the redeem file: zero unless the code is
     valid and has never been used, in which case it is entered in the ledger
     before its seconds are handed out."""
-    redeem = handle_redeem_file(redeem_file, secret)
+    redeem = handle_redeem_file(redeem_file, secret, today)
     if redeem["status"] != "valid":
         return 0
     if redeem["redeem_code"] in load_used_codes(used_codes_file):
@@ -151,7 +152,8 @@ def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path) 
 def add_redeemed_time(data, datafile, now, child: str, secret: bytes):
     """Adds the time of a code waiting in the child's redeem file, if there is one."""
     extra_time = redeem_unused_code(
-        SHARED_DIR / child / "extra_time.txt", secret, DATA_DIR / child / "used_redeem_codes.txt"
+        SHARED_DIR / child / "extra_time.txt", secret, DATA_DIR / child / "used_redeem_codes.txt",
+        now.date(),
     )
     if extra_time:
         data["event_log"].append(f"redeem code {extra_time} {now.strftime(TIMESTAMP_FORMAT)}")
@@ -209,7 +211,7 @@ def verify(msg: bytes, sig_hex: str, secret: bytes) -> bool:
     return expected == sig_hex
 
 
-def handle_redeem_file(redeem_file: Path, secret: bytes):
+def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
     """Checks the redeem code from file and adds the time to the data file"""
     if not len(secret):  # if secret is not loaded, program should not break
         return {
@@ -281,12 +283,22 @@ def handle_redeem_file(redeem_file: Path, secret: bytes):
 
     req_sig = parts[2]
     # The date is a signed nonce that keeps otherwise-identical codes distinct;
-    # it is not checked against the calendar, so a code has no expiry date.
+    # unless the config says so it is not checked against the calendar, and a
+    # code has no expiry date.
     extracted_payload = f"{req_date}:{req_extra_time}".encode()
 
     if not verify(extracted_payload, req_sig, secret):
         return {
             "status": "invalid signature",
+            "redeem_code": redeem_content,
+            "extra_time_sec": 0,
+        }
+
+    # After the signature, so the date cannot be probed; before the ledger, so
+    # a code pasted on the wrong day is not used up.
+    if CHECK_DATE_IN_REDEEM_CODES and req_date != today.isoformat():
+        return {
+            "status": "wrong date",
             "redeem_code": redeem_content,
             "extra_time_sec": 0,
         }

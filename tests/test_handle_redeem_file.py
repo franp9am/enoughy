@@ -1,3 +1,4 @@
+import datetime
 import hashlib
 import hmac
 
@@ -8,6 +9,7 @@ from config import MAX_REDEEM_FILE_BYTES, SIGNATURE_CHARS
 
 SECRET = b"\x01\x02\x03\x04"
 OTHER_SECRET = b"\x05\x06\x07\x08"
+TODAY = datetime.date(2026, 9, 14)
 
 
 def sign(payload: str, secret=SECRET) -> str:
@@ -27,7 +29,7 @@ def redeem_file(tmp_path):
 
 def handle(redeem_file, content, secret=SECRET):
     redeem_file.write_text(content, encoding="utf-8")
-    return monitor.handle_redeem_file(redeem_file, secret)
+    return monitor.handle_redeem_file(redeem_file, secret, TODAY)
 
 
 def test_without_a_secret_nothing_is_accepted(redeem_file):
@@ -37,7 +39,7 @@ def test_without_a_secret_nothing_is_accepted(redeem_file):
 
 
 def test_a_missing_file_is_created_empty_for_the_child_to_use(redeem_file):
-    result = monitor.handle_redeem_file(redeem_file, SECRET)
+    result = monitor.handle_redeem_file(redeem_file, SECRET, TODAY)
     assert result["status"] == "no_file"
     assert redeem_file.is_file() and redeem_file.read_text() == ""
 
@@ -86,6 +88,36 @@ def test_variant_spellings_of_the_amount_normalize_to_one_code(redeem_file):
         assert result["redeem_code"] == code(seconds=600)
 
 
+# --- the date: a nonce, or with CHECK_DATE_IN_REDEEM_CODES the one day the code is good ---
+
+
+def test_by_default_a_code_from_another_day_is_valid(redeem_file):
+    assert handle(redeem_file, code(date="2026-09-01"))["status"] == "valid"
+
+
+def test_with_the_check_on_a_code_is_good_on_its_day_only(redeem_file, monkeypatch):
+    monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", True)
+    assert handle(redeem_file, code(date="2026-09-14"))["status"] == "valid"
+    assert handle(redeem_file, code(date="2026-09-13"))["status"] == "wrong date"
+    assert handle(redeem_file, code(date="2026-09-15"))["status"] == "wrong date"
+
+
+def test_with_the_check_on_a_forged_date_is_still_an_invalid_signature(redeem_file, monkeypatch):
+    monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", True)
+    _, seconds, sig = code(date="2026-09-13").split(":")
+    assert handle(redeem_file, f"2026-09-14:{seconds}:{sig}")["status"] == "invalid signature"
+
+
+def test_a_code_refused_for_its_date_is_not_used_up(redeem_file, tmp_path, monkeypatch):
+    used_codes_file = tmp_path / "used_redeem_codes.txt"
+    monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", True)
+    redeem_file.write_text(code(date="2026-09-13"), encoding="utf-8")
+    assert monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY) == 0
+    assert not used_codes_file.exists()
+    monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", False)
+    assert monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY) == 600
+
+
 # --- the ledger: a code works once, across days ---
 
 
@@ -96,7 +128,7 @@ def used_codes_file(tmp_path):
 
 def redeem(redeem_file, used_codes_file, content):
     redeem_file.write_text(content, encoding="utf-8")
-    return monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file)
+    return monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY)
 
 
 def test_a_fresh_code_is_granted_and_entered_in_the_ledger(redeem_file, used_codes_file):

@@ -131,7 +131,9 @@ carried into the next day, so -20 h and -6 h cost the same single day.
 "extra" in the Start menu -- and pastes it into the box, which writes it to
 `C:\ProgramData\EnoughyShared\<child>\extra_time.txt`; the monitor picks it up within a
 minute and says so. The date is only a nonce, not an expiry -- a code stays valid
-forever, but each one can be redeemed exactly once.
+forever, but each one can be redeemed exactly once. `CHECK_DATE_IN_REDEEM_CODES = True`
+in `config.py` makes a code good on the day it carries only; a code pasted on another
+day is refused and stays unused.
 
 `parent/grant_extra_time_offline.py` imports nothing else from the project, so copying
 that one file to the parent's machine is enough, as long as its `SIGNATURE_CHARS` matches
