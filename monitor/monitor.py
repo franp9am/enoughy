@@ -14,6 +14,7 @@ from config import (
     CHECK_INTERVAL_SECONDS,
     CRASH_LOG_FILE,
     DATA_DIR,
+    GRACE_CHECK_SECONDS,
     MAX_REDEEM_FILE_BYTES,
     NETWORK_WARMUP_SECONDS,
     NIGHT_SHUTDOWN_DELAY_SECONDS,
@@ -145,6 +146,18 @@ def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path) 
         return 0
     record_used_code(redeem["redeem_code"], used_codes_file)
     return redeem["extra_time_sec"]
+
+
+def add_redeemed_time(data, datafile, now, child: str, secret: bytes):
+    """Adds the time of a code waiting in the child's redeem file, if there is one."""
+    extra_time = redeem_unused_code(
+        SHARED_DIR / child / "extra_time.txt", secret, DATA_DIR / child / "used_redeem_codes.txt"
+    )
+    if extra_time:
+        data["event_log"].append(f"redeem code {extra_time} {now.strftime(TIMESTAMP_FORMAT)}")
+        data["granted_sec"] += extra_time
+        os_tooling.notify(f"extra time {extra_time}", child)
+        save_data(data, datafile)
 
 
 def daily_limit_seconds(date: datetime.date, settings) -> int:
@@ -393,9 +406,10 @@ def startup(now, child: str):
     )
 
 
-def shut_down(reason, delay_seconds, data, datafile, now, settings, child: str):
-    """Tell the child, record why, get the last word to the server, and only
-    then order the shutdown."""
+def announce_shutdown(reason, data, datafile, now, settings, child: str):
+    """Tell the child, record why and get the last word to the server. The
+    shutdown is ordered after this: a failure here only costs this tick, the
+    next one retries."""
     write_remaining_time_file(0, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify(reason, child)
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
@@ -403,9 +417,25 @@ def shut_down(reason, delay_seconds, data, datafile, now, settings, child: str):
     # without this the page keeps stale numbers, and a grant that caused this
     # shutdown stays pending until the next boot
     sync_with_server(data, datafile, now, settings, child)
-    # last, because it blocks until the machine goes down; a failure above
-    # only costs this tick, the next one retries
-    os_tooling.shutdown(delay_seconds)
+
+
+def shut_down_unless_extra_time(data, datafile, now, settings, child: str, secret: bytes):
+    """The grace period once the time is up: a code or a server grant that
+    leaves some time calls the shutdown off. The whole period belongs to the
+    tick it started in, so `now` stays that of the tick and nothing is charged."""
+    os_tooling.order_shutdown(SHUTDOWN_DELAY_SECONDS)
+    for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS):
+        time.sleep(GRACE_CHECK_SECONDS)
+        add_redeemed_time(data, datafile, now, child, secret)
+        settings = sync_with_server(data, datafile, now, settings, child)
+        remaining = remaining_seconds(data, settings, now.date())
+        if remaining > 0:
+            os_tooling.abort_shutdown()
+            data["event_log"].append(f"shutdown called off {now.strftime(TIMESTAMP_FORMAT)}")
+            save_data(data, datafile)
+            write_remaining_time_file(remaining, SHARED_DIR / child / "remaining_time.txt")
+            return
+    os_tooling.shutdown(0)  # blocks until the machine is down
 
 
 def tick(now, child: str, secret: bytes):
@@ -429,25 +459,11 @@ def tick(now, child: str, secret: bytes):
     # After the sync: hours the parent extended on the server while the machine
     # was off must count now, not after one more shutdown and boot.
     if is_night_time(now, settings):
-        shut_down(
-            reason="Night time",
-            delay_seconds=NIGHT_SHUTDOWN_DELAY_SECONDS,
-            data=data,
-            datafile=datafile,
-            now=now,
-            settings=settings,
-            child=child,
-        )
+        announce_shutdown("Night time", data, datafile, now, settings, child)
+        os_tooling.shutdown(NIGHT_SHUTDOWN_DELAY_SECONDS)  # blocks until the machine is down
         return
 
-    extra_time = redeem_unused_code(
-        shared_dir / "extra_time.txt", secret, data_dir / "used_redeem_codes.txt"
-    )
-    if extra_time:
-        data["event_log"].append(f"redeem code {extra_time} {now_str}")
-        data["granted_sec"] += extra_time
-        os_tooling.notify(f"extra time {extra_time}", child)
-        save_data(data, datafile)
+    add_redeemed_time(data, datafile, now, child, secret)
 
     soon = now + datetime.timedelta(seconds=NIGHT_WARNING_SECONDS)
     warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"
@@ -461,15 +477,8 @@ def tick(now, child: str, secret: bytes):
     save_data(data, datafile)
 
     if remaining_seconds(data, settings, now.date()) <= 0:
-        shut_down(
-            reason="time up",
-            delay_seconds=SHUTDOWN_DELAY_SECONDS,
-            data=data,
-            datafile=datafile,
-            now=now,
-            settings=settings,
-            child=child,
-        )
+        announce_shutdown("time up", data, datafile, now, settings, child)
+        shut_down_unless_extra_time(data, datafile, now, settings, child, secret)
         return
     write_remaining_time_file(remaining_seconds(data, settings, now.date()), remaining_time_file)
 

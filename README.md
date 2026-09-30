@@ -112,7 +112,8 @@ unrestricted. Read settings through `settings_in_force()`, never straight from `
 
 ## Extra time
 
-Two ways, and either works on its own.
+Two ways, and either works on its own. Both also work in the three minutes between
+"time up" and the shutdown, which is then called off; the night shutdown is final.
 
 **A grant from the server**, if one is set up: the parent enters minutes on the web page
 and the monitor picks them up on its next sync, within about a minute. Negative grants

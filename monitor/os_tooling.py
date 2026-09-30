@@ -125,11 +125,20 @@ def notify(message: str, user: str) -> None:
         legacy_notify(message, user)
 
 
+def order_shutdown(delay_seconds: int) -> None:
+    """Force-closes apps and powers off once the delay is over; returns at once."""
+    subprocess.run(["shutdown", "/s", "/f", "/t", str(delay_seconds)], creationflags=CREATE_NO_WINDOW)
+
+
+def abort_shutdown() -> None:
+    subprocess.run(["shutdown", "/a"], creationflags=CREATE_NO_WINDOW)
+
+
 def shutdown(delay_seconds: int) -> None:
-    """Force-closes apps and powers off, blocking until the machine is down; the
-    undelayed repeat defeats `shutdown /a`."""
+    """Orders the shutdown and blocks until the machine is down; the undelayed
+    repeat defeats a `shutdown /a` of the child."""
     for delay in (delay_seconds, 0):
-        subprocess.run(["shutdown", "/s", "/f", "/t", str(delay)], creationflags=CREATE_NO_WINDOW)
+        order_shutdown(delay)
         time.sleep(delay + SHUTDOWN_GRACE_SECONDS)
 
 

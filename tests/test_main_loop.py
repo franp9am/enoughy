@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import hmac
 import random
+import time
 
 import pytest
 
@@ -47,7 +48,7 @@ class Machine:
     def __init__(self):
         self.logged_in = True
         self.notifications = []  # what the child saw on screen
-        self.shutdowns = []  # the delay of every shutdown ordered
+        self.shutdowns = []  # the delay of every shutdown ordered, "called off" for an abort
 
 
 @pytest.fixture
@@ -56,6 +57,9 @@ def machine(monkeypatch):
     monkeypatch.setattr(os_tooling, "user_logged_in", lambda user: m.logged_in)
     monkeypatch.setattr(os_tooling, "notify", lambda message, user: m.notifications.append(message))
     monkeypatch.setattr(os_tooling, "shutdown", lambda delay: m.shutdowns.append(delay))
+    monkeypatch.setattr(os_tooling, "order_shutdown", lambda delay: m.shutdowns.append(delay))
+    monkeypatch.setattr(os_tooling, "abort_shutdown", lambda: m.shutdowns.append("called off"))
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)  # the grace period passes at once
     return m
 
 
@@ -148,7 +152,8 @@ def test_time_up_orders_the_shutdown(machine, files):
 
     tick(at(8, 0))  # this tick's own minute uses up the hour
 
-    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]  # in the same tick, not one later
+    # in the same tick, not one later; the undelayed one ends the grace period
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert machine.notifications == ["time up"]
     assert remaining_shown(files) == 0
     data = today_data(files)
@@ -239,6 +244,34 @@ def test_a_redeem_code_saves_a_machine_whose_time_is_up(machine, files):
 
     assert machine.shutdowns == []
     assert today_data(files)["time_spent_sec"] == HOUR + CHECK_INTERVAL_SECONDS
+
+
+def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files, monkeypatch):
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
+    code = redeem_code(600)
+    monkeypatch.setattr(time, "sleep", lambda seconds: files["redeem"].write_text(code, encoding="utf-8"))
+
+    tick(at(8, 0))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert machine.notifications == ["time up", "extra time 600"]
+    assert remaining_shown(files) == 600
+    assert today_data(files)["event_log"] == [
+        "time up 2026-09-14 08:00:00",
+        "redeem code 600 2026-09-14 08:00:00",
+        "shutdown called off 2026-09-14 08:00:00",
+    ]
+
+
+def test_a_redeem_code_too_small_for_the_debt_does_not_call_the_shutdown_off(machine, files, monkeypatch):
+    write_day(files, spent=HOUR + 600)
+    code = redeem_code(300)
+    monkeypatch.setattr(time, "sleep", lambda seconds: files["redeem"].write_text(code, encoding="utf-8"))
+
+    tick(at(8, 0))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+    assert today_data(files)["granted_sec"] == 300
 
 
 def test_fractions_of_a_second_are_carried_to_the_next_tick_not_lost(machine, files):
@@ -350,6 +383,19 @@ def test_a_grant_saves_a_machine_whose_time_is_up(machine, files, sync):
     assert today_data(files)["time_spent_sec"] == HOUR + CHECK_INTERVAL_SECONDS
 
 
+def test_a_grant_in_the_grace_period_calls_the_shutdown_off(machine, files, sync, monkeypatch):
+    write_server_files(files)
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
+    grant = SyncAnswer(pending_grants=[Grant(id=4, seconds=600)], settings_change=None)
+    monkeypatch.setattr(time, "sleep", lambda seconds: setattr(sync, "answer", grant))
+
+    tick(at(8, 0))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert machine.notifications == ["time up", "extra time 600"]
+    assert remaining_shown(files) == 600
+
+
 def test_a_negative_grant_from_the_server_orders_the_shutdown(machine, files, sync):
     write_server_files(files)
     write_day(files, spent=HOUR - 300)  # five minutes left
@@ -357,7 +403,7 @@ def test_a_negative_grant_from_the_server_orders_the_shutdown(machine, files, sy
 
     tick(at(8, 0))
 
-    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert machine.notifications == ["extra time -600", "time up"]
     assert today_data(files)["granted_sec"] == -600
     assert remaining_shown(files) == 0
@@ -373,7 +419,7 @@ def test_a_lower_limit_from_the_server_orders_the_shutdown(machine, files, sync)
 
     tick(at(8, 0))
 
-    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert settings_in_force(files["settings"])["DAILY_LIMIT_SECONDS"] == HOUR // 4
     assert remaining_shown(files) == 0
 
@@ -415,7 +461,7 @@ def test_the_server_hears_of_a_shutdown_before_it_happens(machine, files, sync, 
     write_server_files(files)
     write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
     syncs_before_shutdown = []
-    monkeypatch.setattr(os_tooling, "shutdown", lambda delay: syncs_before_shutdown.append(sync.calls))
+    monkeypatch.setattr(os_tooling, "order_shutdown", lambda delay: syncs_before_shutdown.append(sync.calls))
 
     tick(at(8, 0))
 
