@@ -13,8 +13,8 @@
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
-; Not done: moving a ScreenTime or pre-0.5 install (install.ps1 in the v0.7.0
-; release does that).
+; A ScreenTime install (0.1.0) is removed, its data with it. Not done: moving
+; one, or a pre-0.5 install (install.ps1 in the v0.7.0 release does that).
 
 #define FileHandle FileOpen("..\monitor\VERSION")
 #define Version Trim(FileRead(FileHandle))
@@ -155,9 +155,11 @@ end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  // A reinstall shows what it has; Enter keeps it.
+  // A reinstall shows what it has; Enter keeps it. Over a ScreenTime install,
+  // which is still there at this page, its token is the one shown.
   if CurPageID = ServerPage.ID then begin
-    ServerPage.Values[0] := ReadFile(ChildDataDir + '\child_token.txt', '');
+    ServerPage.Values[0] := ReadFile(ChildDataDir + '\child_token.txt',
+      ReadFile(ExpandConstant('{commonappdata}\ScreenTime\data\child_token.txt'), ''));
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
   end;
   if (CurPageID = wpFinished) and (NewSecret <> '') then
@@ -195,6 +197,21 @@ procedure DeleteTask(Name: String);
 begin
   TryRun('{sys}\schtasks.exe', '/End /TN "' + Name + '"');
   TryRun('{sys}\schtasks.exe', '/Delete /TN "' + Name + '" /F');
+end;
+
+// An install from before the name enoughy is removed, not moved: its two tasks,
+// which also ends the monitor and the widget, the shortcut it recorded and its
+// two folders. What is not there is skipped.
+procedure RemoveScreenTime;
+var
+  Old: String;
+begin
+  Old := ExpandConstant('{commonappdata}\ScreenTime');
+  DeleteTask('ScreenTimeMonitor');
+  DeleteTask('ScreenTimeWidget');
+  DeleteFile(ReadFile(Old + '\data\link_path.txt', ''));
+  DelTree(Old, True, True, True);
+  DelTree(Old + 'Shared', True, True, True);
 end;
 
 // The children of this machine: every folder under data\, which is what the
@@ -346,6 +363,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
+  if CurStep = ssInstall then RemoveScreenTime;   // before the new shortcut, which may have the old one's name
   if CurStep <> ssPostInstall then Exit;   // the files are copied, the wizard is answered
   try
     PostInstall;
