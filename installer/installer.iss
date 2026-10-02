@@ -201,7 +201,8 @@ end;
 
 // An install from before the name enoughy is removed, not moved: its two tasks,
 // which also ends the monitor and the widget, the shortcut it recorded and its
-// two folders. What is not there is skipped.
+// two folders. What is not there is skipped. Only its settings go to the child
+// picked, unless that child has some; the monitor reads the old names.
 procedure RemoveScreenTime;
 var
   Old: String;
@@ -210,6 +211,8 @@ begin
   DeleteTask('ScreenTimeMonitor');
   DeleteTask('ScreenTimeWidget');
   DeleteFile(ReadFile(Old + '\data\link_path.txt', ''));
+  ForceDirectories(ChildDataDir);
+  FileCopy(Old + '\data\settings.json', ChildDataDir + '\settings.json', True);
   DelTree(Old, True, True, True);
   DelTree(Old + 'Shared', True, True, True);
 end;
