@@ -8,9 +8,8 @@ Ordered by importance within each section.
   sync, so debugging works from the server page without machine access; cap
   the crash log at 1 MB (rename to `.old`) and read only its tail.
 * A changed time zone, which a standard user may set, moves the clock out of the
-  night and rolls the date into a fresh limit. Cheap first step: keep the UTC
-  offset in the day file, and on a change log an event and charge the tick by
-  the old offset, so the parent sees it on the page the same day.
+  night and rolls the date into a fresh limit. When the Windows zone name
+  changes, log an event for the parent's page.
 
 ## Server-side
 
@@ -21,6 +20,10 @@ Ordered by importance within each section.
   renamed, missing or malformed setting is a 500 on both `/` and `/settings` for
   that child. Render the compact line only when the known names fit, else fall
   back to plain `name=value`.
+* Store the `monitor_version` every monitor already sends, in a new nullable
+  column of `status`: which version ran when, and whether auto-update lands.
+  The live database needs one
+  `ALTER TABLE status ADD COLUMN monitor_version TEXT`, by hand.
 * Settings UI: a widget per setting, keyed by name (durations, hour picker,
   weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall back to the
   JSON box. The client stays the validator. A name's meaning never changes,
@@ -37,12 +40,13 @@ Ordered by importance within each section.
   and the top of the README.
 * A parent's manual: creating an account, adding children, installing on the
   child's machine. The README covers the install for now.
+* In that manual, an optional step that takes the right to change the time
+  zone from standard users. `secpol.msc` on Pro; Home needs a try on the test VM.
 
 ## Someday / maybe
 
-* Time on a base the child cannot move: account in UTC and treat the local
-  offset as data, DST included. Nontrivial, and the trick is rare; the event
-  above shows whether anyone uses it.
+* Delay a time zone change, if the events show anyone using the trick: count
+  by the old UTC offset for 24 hours, with night when either offset says so.
 * Full client rewrite in C# with a signed exe installer; the monitor becomes
   a Windows service then.
 * Restricted internet, instead of shutdown when the quota ends or as a second
