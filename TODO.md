@@ -1,47 +1,86 @@
 # TODO
 
-Ordered by importance within each section.
+First is in order and serves one goal. Later is roughly ordered; a new item
+goes there unless it hurts a current user or blocks the goal.
 
-## Client / monitor
+## First
 
-* Send the day's whole `event_log` and the last `crash.log` entry with each
-  sync, so debugging works from the server page without machine access; cap
-  the crash log at 1 MB (rename to `.old`) and read only its tail.
-* A changed time zone, which a standard user may set, moves the clock out of the
-  night and rolls the date into a fresh limit. When the Windows zone name
-  changes, log an event for the parent's page.
+The goal: a stranger registers and installs without the maintainer touching
+the database.
 
-## Server-side
-
-* Test the server against the report of each released monitor version, since
-  it has to stay compatible with every one still installed (see the README).
-* `settings_in_words` hardcodes the five setting names, while the rest of the
-  settings path takes names and types from whatever the child reports. A
-  renamed, missing or malformed setting is a 500 on both `/` and `/settings` for
-  that child. Render the compact line only when the known names fit, else fall
-  back to plain `name=value`.
-* Store the `monitor_version` every monitor already sends, in a new nullable
-  column of `status`: which version ran when, and whether auto-update lands.
-  The live database needs one
+* monitor: a "no night today" code for offline mode,
+  `nonight:<date>:<signature>`, pasted like an extra-time code: no night on
+  that date, the daily limit still applies. Nothing more: no time in the
+  code, no lifted limit. Not part of the goal: a current user needs it.
+* server: store the `monitor_version` every monitor already sends, in a new
+  nullable column of `status`: which version ran when, and whether
+  auto-update lands. The live database needs one
   `ALTER TABLE status ADD COLUMN monitor_version TEXT`, by hand.
-* Settings UI: a widget per setting, keyed by name (durations, hour picker,
-  weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall back to the
-  JSON box. The client stays the validator. A name's meaning never changes,
-  new meaning means new name; a server test checks every widget name exists
-  in the client's `SETTINGS`.
-* Real login: replace BasicAuth with a session cookie and a login form.
-* Server logging.
-* Simplify installation: family, parent and child creation in the DB and the
-  corresponding logins, with less effort from the maintainer.
+* server: real login, a session cookie and a login form in place of
+  BasicAuth.
+* server: registration on the site. A parent creates the account and the
+  family, with a password or an emailed login link.
+* server + installer: one setup code instead of token and secret; the
+  parent's only credential is the login:
+  * The parent adds a child on the page. The server makes the token and the
+    secret and shows a short code, single use and short-lived.
+  * The parent types the code into the installer, which fetches the token
+    and the secret. The monitor does not change, and the login password is
+    never typed on the child's computer.
+  * Offline extra-time codes: the page makes them on the server; a phone
+    app later keeps the secret and makes them itself.
+  * The price: the server knows the secret. Small, since it already grants
+    any time to a syncing child without it.
+  * Maybe later: the same signed exe served under a name that carries the
+    code, read by the installer to fill the field.
+* monitor: send the day's whole `event_log` and the last `crash.log` entry
+  with each sync, so debugging works from the server page without machine
+  access; cap the crash log at 1 MB (rename to `.old`) and read only its
+  tail.
 
-## Product, once mature
+## Later
 
-* A general description of what this is, in Czech and English, for the site
-  and the top of the README.
-* A parent's manual: creating an account, adding children, installing on the
-  child's machine. The README covers the install for now.
-* In that manual, an optional step that takes the right to change the time
-  zone from standard users. `secpol.msc` on Pro; Home needs a try on the test VM.
+* product: a general description of what this is, in Czech and English, for
+  the site and the top of the README.
+* product: a parent's manual: creating an account, adding children,
+  installing on the child's machine. The README covers the install for now.
+* product: in that manual, an optional step that takes the right to change
+  the time zone from standard users. `secpol.msc` on Pro; Home needs a try
+  on the test VM.
+* server: test the server against the report of each released monitor
+  version, since it has to stay compatible with every one still installed
+  (see the README). Due before the first stranger installs.
+* server: `settings_in_words` hardcodes the five setting names, while the
+  rest of the settings path takes names and types from whatever the child
+  reports. A renamed, missing or malformed setting is a 500 on both `/` and
+  `/settings` for that child. Render the compact line only when the known
+  names fit, else fall back to plain `name=value`.
+* server: logging.
+* monitor: a changed time zone, which a standard user may set, moves the
+  clock out of the night and rolls the date into a fresh limit. When the
+  Windows zone name changes, log an event for the parent's page.
+* monitor: the night shutdown handled like the "time up" one: called off
+  when a sync during the delay says it is no longer night.
+* server: settings UI, a widget per setting, keyed by name (durations, hour
+  picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
+  back to the JSON box. The client stays the validator. A name's meaning
+  never changes, new meaning means new name; a server test checks every
+  widget name exists in the client's `SETTINGS`.
+* product: fully offline mode, with no account, for a computer that never
+  syncs:
+  * One static page, the same file for everybody, with the secret in the
+    URL after `#`, which the server never sees. It makes extra-time codes
+    in the browser, as `grant_extra_time_offline.py` does.
+  * The link holds the secret: the parent bookmarks it, a second parent
+    gets it. Not browser storage, which Safari clears.
+  * The page generates the secret and the parent types it into the
+    installer's setup code field. Longer than a setup code, so the
+    installer writes it to `secret.txt` and never contacts the server.
+  * The typed secret checks itself: some of its characters are a checksum
+    of the rest, so the installer refuses a typo. Length and format to be
+    decided; long enough that the child cannot guess it from valid codes.
+  * Maybe later: the installer makes the secret and shows the link as a QR
+    code, so nothing is typed.
 
 ## Someday / maybe
 
