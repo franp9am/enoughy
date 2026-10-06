@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS status (
     last_tick TEXT,
     updated_at TEXT NOT NULL,
     reported_settings TEXT,
+    -- NULL from a monitor too old to say; added by hand to the live database
+    monitor_version TEXT,
     PRIMARY KEY (child_id, date)
 );
 """

@@ -41,6 +41,7 @@ class SyncRequest(BaseModel):
     settings: dict | None = None
     # of the last change delivered to the child; None before any
     settings_change_outcome: SettingsChangeOutcome | None = None
+    monitor_version: str | None = None
 
 
 class PendingGrant(BaseModel):
@@ -396,10 +397,10 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
         connection.execute(
             """INSERT INTO status (child_id, date, time_spent_sec, carryover_sec,
                                    granted_sec, remaining_sec, last_tick, updated_at,
-                                   reported_settings)
+                                   reported_settings, monitor_version)
                VALUES (:child_id, :date, :time_spent_sec, :carryover_sec,
                        :granted_sec, :remaining_sec, :last_tick, :updated_at,
-                       :reported_settings)
+                       :reported_settings, :monitor_version)
                ON CONFLICT (child_id, date) DO UPDATE SET
                    time_spent_sec = :time_spent_sec,
                    carryover_sec = :carryover_sec,
@@ -407,7 +408,8 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
                    remaining_sec = :remaining_sec,
                    last_tick = :last_tick,
                    updated_at = :updated_at,
-                   reported_settings = :reported_settings""",
+                   reported_settings = :reported_settings,
+                   monitor_version = :monitor_version""",
             {
                 "child_id": child_id,
                 "date": sync_request.date,
@@ -422,6 +424,7 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
                 "reported_settings": (
                     None if reported_settings is None else json.dumps(reported_settings)
                 ),
+                "monitor_version": sync_request.monitor_version,
             },
         )
         connection.executemany(
