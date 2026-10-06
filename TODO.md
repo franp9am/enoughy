@@ -8,10 +8,6 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* server: store the `monitor_version` every monitor already sends, in a new
-  nullable column of `status`: which version ran when, and whether
-  auto-update lands. The live database needs one
-  `ALTER TABLE status ADD COLUMN monitor_version TEXT`, by hand.
 * server: real login, a session cookie and a login form in place of
   BasicAuth.
 * server: registration on the site. A parent creates the account and the
@@ -45,7 +41,7 @@ the database.
   on the test VM.
 * server: test the server against the report of each released monitor
   version, since it has to stay compatible with every one still installed
-  (see the README). Due before the first stranger installs.
+  (see `DEVELOPING.md`). Due before the first stranger installs.
 * server: `settings_in_words` hardcodes the five setting names, while the
   rest of the settings path takes names and types from whatever the child
   reports. A renamed, missing or malformed setting is a 500 on both `/` and
@@ -64,7 +60,7 @@ the database.
   syncs:
   * One static page, the same file for everybody, with the secret in the
     URL after `#`, which the server never sees. It makes extra-time codes
-    in the browser, as `grant_extra_time_offline.py` does.
+    in the browser.
   * The link holds the secret: the parent bookmarks it, a second parent
     gets it. Not browser storage, which Safari clears.
   * The page generates the secret and the parent types it into the

@@ -9,7 +9,7 @@ then open http://127.0.0.1:8000. The database is server/data/child_control.sqlit
 unless CHILD_CONTROL_DB says otherwise. --with tzdata is for Windows, which has
 no time zone database of its own.
 
-Never deploy this: it is the exact hole the README warns about.
+Never deploy this: it is the exact hole DEVELOPING.md warns about.
 """
 import os
 

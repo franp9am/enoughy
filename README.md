@@ -5,74 +5,34 @@ No cloud account, remote control is optional, can be fully offline.
 
 Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveillance.
 
-
-## Parts
-
-* `monitor/` -- what runs as SYSTEM on the child's machine.
-  `monitor.py` -- runs as SYSTEM from boot, counts the child's session time, shuts the
-  machine down when the limit is used up or the allowed hours end. A tick only counts,
-  and a shutdown only happens, while the child is logged in with the screen unlocked;
-  a locked machine is left alone until somebody unlocks it.
-  `config.py` -- what is fixed at install: paths, intervals, the version (read from `VERSION`). `settings.py` --
-  what the parent changes: the settings' schema, their validation, the settings file.
-  All installed to one folder the child cannot read.
-  A child is a Windows account, and what the monitor keeps for them is under
-  `data\<account>\` there, with what the child may touch under
-  `C:\ProgramData\EnoughyShared\<account>\`. One child per install for now; the
-  layout is ready for more.
-* `widget/` -- a small always-on-top "time left" box in the child's session, one file
-  that imports nothing from the monitor. Cosmetic; the child may hide it with Ctrl+Alt+H or kill it.
-  Next to it `enter_code.py`, the dialog behind the "Extra time" shortcut.
-* `parent/` -- what the parent runs on their own machine: `grant_extra_time_offline.py`,
-  which signs an extra-time code when there is no server.
-* `server/` -- optional web page for the parent, to grant time remotely and see usage.
-* `installer/` -- the setup exe: the Inno Setup script and the script that fetches the
-  Python it bundles. `release.ps1` at the root publishes a release.
-
 ## Setup on the child's machine
 
 1. Give the child a **non-admin** Windows account.
 2. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
    administrator rights, which local account is the child's, and optionally for the
-   child token and URL of the parent's server. Then it unpacks its own Python into
-   `C:\ProgramData\EnoughyPython`, copies the monitor into `C:\ProgramData\Enoughy` and
-   locks that folder, puts the widget in the shared `C:\ProgramData\EnoughyShared`, puts
-   an "Extra time" shortcut on the desktop and in the Start menu, and registers the
-   scheduled tasks.
-   Run it again and pick another account to add a second child.
-3. Reboot. The monitor runs from boot, the widget appears when the child logs in.
+   child token and URL of the parent's server. Run it again and pick another account to
+   add a second child.
+3. Reboot. The monitor runs from boot, the widget with the time left appears when the
+   child logs in.
 
-A fresh install generates the secret for signing extra-time codes and prints it at the
-end -- the parent's machine needs the same one, in `data/secret.txt` next to
-`grant_extra_time_offline.py` or in `CHILD_SECRET`. It stays in
-`C:\ProgramData\Enoughy\data\<child>\secret.txt`, which an administrator can read or
-replace (reboot afterwards); a reinstall keeps it.
+A fresh install prints a secret at the end. It is only for the offline codes, see Extra
+time; with a server, ignore it. A reinstall keeps it.
 
 To remove everything, uninstall enoughy in Apps & Features. That removes the tasks,
 the folders and the usage history.
 
-Upgrading by copying files over is not enough: the monitor refuses to start without
-a child folder under `data\`, which only the setup creates. Run the setup again. An
-install older than 0.5 keeps the child's files in `data\` itself; the setup does not
-move them, `install.ps1` from the v0.7.0 release does.
+### Optional: a stronger lock
 
-Releasing is in `RELEASING.md`. The release link above always shows the latest one.
+For a child who knows computers, two more steps on the machine itself make the limit
+hard to get around:
 
-### Safety
-
-The installer does **not** do these, and without them the setup is bypassable:
-
-* password-protect the BIOS, so the machine cannot be booted from another device;
-* encrypt the disk with BitLocker, so the drive cannot be read in another machine.
+* a BIOS password, so the machine cannot be booted from another device;
+* BitLocker disk encryption, so the drive cannot be read in another machine.
 
 ## Settings
 
-The six settings the monitor obeys live in `data/<child>/settings.json`, next to the
-monitor where the child cannot read them: `DAILY_LIMIT_SECONDS`, `CARRYOVER` (unused time
-rolls over to the next day), `MAX_CARRYOVER_SECONDS`, `ALLOWED_HOURS`, and a different
-limit or hours on some weekdays in `DAILY_LIMIT_OVERRIDES` and `ALLOWED_HOURS_OVERRIDES`.
-Example:
+Six settings, in `C:\ProgramData\Enoughy\data\<child>\settings.json`:
 
 ```json
 {
@@ -86,116 +46,51 @@ Example:
 ```
 
 One hour a day, but half an hour on Mondays and two on Saturdays, usable from 6:00 until
-21:00 -- the night starts at 21:00 and ends at 6:00 -- except until 23:00 on Fridays and
-Saturdays, when it also starts later; with unused time carried over, but never more than
-five hours of it. A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, with no
-cap. Five minutes before the night the child sees a message; for the time running out
-there is none, the widget turns red instead.
+21:00, except until 23:00 on Fridays and from 8:00 until 23:00 on Saturdays; unused time
+is carried over to the next day, but never more than five hours of it.
 
-`ALLOWED_HOURS` names two moments, when the day starts and when the night starts:
-`["6:00", "21:00"]` allows 6:00 up to 21:00, and at 21:00 the machine shuts down. The
-second time is the shutdown, not the last hour allowed -- `["6:00", "22:00"]` keeps the
-machine up until 22:00 -- and any minute goes, as in `["6:30", "20:10"]`; `null` is no
-night at all. The two overrides take the days `mon` to `sun`, each with its own limit in
-seconds or its own `[day starts, night starts]`, or `null`; `{}` means every day is the
-same. When the machine was off for some days, carryover credits each of them its own limit.
+* `ALLOWED_HOURS` is when the day starts and when the night starts. At the second time
+  the machine shuts down: `["6:00", "22:00"]` keeps it up until 22:00. Any minute goes,
+  as in `["6:30", "20:10"]`; `null` is no night at all.
+* The two overrides take the days `mon` to `sun`; `{}` means every day is the same.
+* A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, with no cap.
+* Five minutes before the night the child sees a message; before the time runs out
+  there is none, the widget turns red instead.
 
-Edit that file, or let the parent's server set them. Delete it and
-the monitor falls back to the defaults in `settings.py`, writing the file again at its
-next start.
-
-`settings.py` holds, in its `SETTINGS` dict, the `default` and `allowed` values for the six
-above. Those defaults seed `settings.json` on a machine that has none and stand in for any
-value in it that is missing or out of range, so a mangled file cannot leave the machine
-unrestricted. Read settings through `settings_in_force()`, never straight from `SETTINGS`.
-`config.py` holds the rest -- paths, the check interval, the shutdown grace periods.
+Edit that file, or let the parent's server set the values. A value that is missing or
+out of range falls back to its default, so a mangled file cannot leave the machine
+unrestricted.
 
 ## Extra time
 
-Two ways, and either works on its own. Both also work in the three minutes between
-"time up" and the shutdown, which is then called off. The same three minutes follow
-"Night time", called off by a later night from the server or by a no-night code.
+If you use the parent's server, grant the time there and ignore the offline codes
+altogether. Without a server, the offline codes are how the child gets more time.
 
-**A grant from the server**, if one is set up: the parent enters minutes on the web page
-and the monitor picks them up on its next sync, within about a minute. Negative grants
-work too, and never outlive the day.
+### With the server
 
-A grant carries no date and never expires: it is applied on the day the machine next
-syncs, not the day it was made, so one entered while the PC is off lands whenever the
-child next turns it on. For a negative grant that also bounds the damage -- it can take
-at most that one day's limit and carryover, and the remainder is dropped rather than
-carried into the next day, so -20 h and -6 h cost the same single day.
+The parent enters minutes on the web page and the monitor picks them up within about a
+minute, or when the machine is next turned on. Negative minutes take time away, and
+never outlive the day. For a longer evening, set a later night in the settings there.
 
-**A signed code**, for when there is no server. The parent runs
-`grant_extra_time_offline.py` and gets `<date>:<seconds>:<signature>`, e.g.
-`2026-07-23:3600:a184` for an extra hour. The child opens "Extra time" -- from the desktop, or by typing
-"extra" in the Start menu -- and pastes it into the box, which writes it to
-`C:\ProgramData\EnoughyShared\<child>\extra_time.txt`; the monitor picks it up within a
-minute and says so. The date is only a nonce, not an expiry -- a code stays valid
-forever, but each one can be redeemed exactly once. `CHECK_DATE_IN_REDEEM_CODES = True`
-in `config.py` makes a code good on the day it carries only; a code pasted on another
-day is refused and stays unused.
+### Offline codes
 
-**A no-night code**, `<date>:nonight:<signature>` from `grant_extra_time_offline.py -n`,
-lifts the night of that one date, its small hours included: the machine stays up
-until midnight, when the next day's night applies again, and the daily limit still
-counts. A party past midnight takes a second code, for the new date, pasted in the
-three minutes after "Night time". The date is checked whatever
-`CHECK_DATE_IN_REDEEM_CODES` says, and the code works any number of times that day.
-An extra-time code pasted at night is consumed like any other; the time is carried
-over, or lost without carryover.
+The parent makes a code on their own machine and the child types it in.
 
-`parent/grant_extra_time_offline.py` imports nothing else from the project, so copying
-that one file to the parent's machine is enough, as long as its `SIGNATURE_CHARS` matches
-`config.py` and both machines hold the same secret.
+Once: open https://pfranek.cz/enoughy-extra-time.html on the parent's machine. The page
+makes the codes in the browser and sends nothing anywhere. Add the child with the
+secret from the install, then bookmark the page: name and secret are kept in its
+address after `#`, and a second parent gets the same bookmark.
 
-## Optional: the parent's server
+Then, each time, the page makes one of two codes:
 
-FastAPI + SQLite, one page listing the family's children with their usage and a box to
-grant time. It never enforces anything -- if it is down, the monitor keeps counting and
-shutting down as usual, and grants queue until the machine syncs again.
+* **Extra time:** pick the minutes and get a code such as `2026-07-23:3600:a184`. It
+  never expires and works once. The same day and minutes always give the same code, so
+  for a second one change the minutes or the day.
+* **No night:** the machine stays up until midnight on that one date, and the daily
+  limit still counts. It works any number of times that day, and on that day only.
 
-```
-cd server
-uv sync
-uv run python add_parent.py <login> <family>   # prints the htpasswd line to run next
-uv run python add_child.py <family> <name>     # prints the child token for the setup
-uv run uvicorn app:app --host 127.0.0.1
-```
-
-Authentication lives entirely in the reverse proxy in front of it: the proxy checks the
-password and passes the verified login to the app in an `X-Remote-User` header, which
-decides whose children the page shows. So the app must never be reachable except through
-the proxy -- keep it on `127.0.0.1` -- and the proxy must blank that header on anything it
-does not authenticate, or a client could name any parent it likes.
-
-The server stays compatible with every monitor version still installed. A child's
-machine is only updated by a visit, and even once auto-update ships some machines will
-lag a rollout or stay on manual mode, so the window never closes. The server accepts an
-old report and sends back only what that version understands.
-
-## Python dependencies
-
-None on the child's machine, and no Python needs to be installed there: the installer
-unpacks a private copy of a pinned python.org release for the monitor and the widget,
-leaving any Python the parent has alone. Nothing of it is registered with Windows; the
-setup's own uninstall deletes it. To move to a newer release, change `$PythonVersion`
-and the four SHA-256 hashes in `installer\build-python.ps1`, run it, and build the setup
-again. The server has its own dependencies, in `server/pyproject.toml`.
-
-## Tests
-
-The tests use pytest, which is not installed anywhere in the project; `uv` fetches it
-into its own cache for the run. From the repository root:
-
-    uv run --with pytest python -m pytest tests -q
-
-`pytest.ini` puts `monitor/` and `widget/` on the import path, so the tests can
-`import monitor` by its bare name, as the installed machine does.
-
-They cover the monitor's logic and, in `tests/test_main_loop.py`, whole scenarios on a
-fake machine. Untested on purpose: `os_tooling` (needs real Windows sessions), `main()`
-and the widget's Tk part.
+The child opens "Extra time" -- from the desktop, or by typing "extra" in the Start
+menu -- and pastes the code; the monitor picks it up within a minute and says so.
 
 ## License
 

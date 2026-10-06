@@ -13,7 +13,7 @@ TODAY = datetime.date(2026, 9, 14)
 
 
 def sign(payload: str, secret=SECRET) -> str:
-    """What grant_extra_time_offline.py does on the parent's machine."""
+    """What extra_time.html does on the parent's machine."""
     return hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
 
 
