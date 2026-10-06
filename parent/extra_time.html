@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extra time codes</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1rem;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: #fafafa; color: #1a1a1a;
+  }
+  .page { max-width: 26rem; margin: 0 auto; }
+  h1 { margin: 0 0 1.2rem; font-size: 1.4rem; font-weight: 600; }
+  .tabs { display: flex; gap: .3rem; border-bottom: 1px solid #ddd; }
+  .tab {
+    padding: .5rem .9rem; font-size: .9rem; cursor: pointer; font-family: inherit;
+    color: #666; background: #f2f2f2; border: 1px solid #ddd; border-bottom: none;
+    border-radius: 8px 8px 0 0; margin-bottom: -1px;
+  }
+  .tab:hover { background: #e8e8e8; }
+  .tab.selected { background: #fff; color: #1a1a1a; font-weight: 600; }
+  .card {
+    background: #fff; border: 1px solid #ddd; border-top: none;
+    border-radius: 0 0 10px 10px;
+  }
+  .section { padding: 1.25rem; border-top: 1px solid #eee; }
+  .section:first-child { border-top: none; }
+  .section h2 { margin: 0 0 .8rem; font-size: 1rem; font-weight: 600; color: #333; }
+  .presets { display: flex; gap: .4rem; margin-bottom: .6rem; }
+  .presets button {
+    flex: 1; padding: .55rem .2rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid #ccc; background: #fff; color: #444; font-size: .9rem; font-family: inherit;
+  }
+  .presets button:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
+  .row { display: flex; align-items: center; gap: .5rem; }
+  .row input[type="number"], .row input[type="text"] {
+    padding: .55rem .6rem; border-radius: 6px;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+  }
+  .row input[type="number"] {
+    width: 4.5rem; text-align: right;
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .row input::-webkit-inner-spin-button,
+  .row input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .row input:focus { outline: none; border-color: #888; }
+  .unit { font-size: .9rem; color: #888; }
+  .row .date { margin-left: auto; width: 8rem; text-align: center; }
+  .row .dark {
+    margin-left: auto; padding: .55rem 1.4rem; border-radius: 6px;
+    border: 1px solid #1a1a1a; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
+  }
+  .row .dark:active { transform: translateY(1px); }
+  .code-row { margin-top: .8rem; }
+  .code-row input {
+    flex: 1; background: #f6f6f6;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem;
+  }
+  .code-row .dark { margin-left: 0; }
+  .hint { margin: .7rem 0 0; font-size: .85rem; color: #888; }
+  .setup label { display: block; margin-bottom: .7rem; font-size: .85rem; color: #333; }
+  .setup input { width: 100%; margin-top: .3rem; }
+  .setup .row { justify-content: flex-end; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Extra time codes</h1>
+    <nav class="tabs" id="tabs"></nav>
+    <div class="card" id="card"></div>
+  </div>
+
+<script>
+// Mirror of handle_redeem_file in monitor/monitor.py: a code is
+// <date>:<seconds>:<signature> for extra time or <date>:nonight:<signature>
+// for no night that day, signed with HMAC-SHA256 under the child's secret.
+const SIGNATURE_CHARS = 4;  // must equal SIGNATURE_CHARS in monitor/config.py
+
+async function sign(secretHex, payload) {
+  const secret = Uint8Array.from(secretHex.match(/../g), h => parseInt(h, 16));
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const hex = Array.from(new Uint8Array(mac), b => b.toString(16).padStart(2, "0")).join("");
+  return payload + ":" + hex.slice(0, SIGNATURE_CHARS);
+}
+
+function today() {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+// The children live in the address after '#', as name=secret pairs. Bookmark
+// the address and the page is set up; a second parent gets the same link.
+// Nothing is stored anywhere else, and a server never sees what follows '#'.
+const children = () => [...new URLSearchParams(location.hash.slice(1))];
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tabs = document.getElementById("tabs"), card = document.getElementById("card");
+let selected = 0;  // index into children(); one past the end is "add a child"
+
+function render() {
+  const kids = children();
+  if (selected > kids.length) selected = kids.length;
+  tabs.innerHTML = kids.map(([name], i) =>
+    `<button class="tab${i === selected ? " selected" : ""}" data-i="${i}">${esc(name)}</button>`
+  ).join("") + `<button class="tab${selected === kids.length ? " selected" : ""}" data-i="${kids.length}" title="Add a child">+</button>`;
+  tabs.querySelectorAll(".tab").forEach(t => t.onclick = () => { selected = +t.dataset.i; render(); });
+  if (selected === kids.length) renderSetup(); else renderChild(kids[selected][1]);
+}
+
+function renderChild(secret) {
+  card.innerHTML = `
+    <div class="section row">
+      <span class="unit">Day of the code</span>
+      <input type="text" class="date" value="${today()}" spellcheck="false">
+    </div>
+    <div class="section">
+      <h2>Grant extra time</h2>
+      <div class="presets">
+        <button data-min="15">15 min</button>
+        <button data-min="30">30 min</button>
+        <button data-min="60">1 hour</button>
+        <button data-min="120">2 hours</button>
+      </div>
+      <form class="row">
+        <input type="number" name="minutes" step="1" value="60" required>
+        <span class="unit">minutes</span>
+        <button class="dark">Make code</button>
+      </form>
+      <div class="row code-row" hidden><input type="text" readonly><button class="dark">Copy</button></div>
+      <p class="hint">The child pastes the code into "Extra time". A code works once.</p>
+    </div>
+    <div class="section">
+      <h2>No night</h2>
+      <form class="row">
+        <span class="unit">Today the machine stays on until midnight; the daily limit still counts.</span>
+        <button class="dark">Make code</button>
+      </form>
+      <div class="row code-row" hidden><input type="text" readonly><button class="dark">Copy</button></div>
+    </div>`;
+  const [day, time, night] = card.querySelectorAll(".section");
+  const date = day.querySelector("input"), minutes = time.querySelector("input[name=minutes]");
+  const show = async (section, what) => {
+    const row = section.querySelector(".code-row");
+    row.querySelector("input").value = await sign(secret, `${date.value.trim().replace(/:/g, "") || today()}:${what}`);
+    row.hidden = false;
+  };
+  date.oninput = () => card.querySelectorAll(".code-row").forEach(row => row.hidden = true);
+  time.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
+    minutes.value = b.dataset.min;
+    show(time, b.dataset.min * 60);
+  });
+  time.querySelector("form").onsubmit = e => { e.preventDefault(); show(time, minutes.value * 60); };
+  night.querySelector("form").onsubmit = e => { e.preventDefault(); show(night, "nonight"); };
+  card.querySelectorAll(".code-row").forEach(row => {
+    const input = row.querySelector("input"), button = row.querySelector("button");
+    input.onclick = () => input.select();
+    button.onclick = async () => {
+      input.select();
+      try { await navigator.clipboard.writeText(input.value); } catch { document.execCommand("copy"); }
+      button.textContent = "Copied";
+      setTimeout(() => button.textContent = "Copy", 1200);
+    };
+  });
+}
+
+function renderSetup() {
+  card.innerHTML = `
+    <div class="section">
+      <h2>Add a child</h2>
+      <form class="setup">
+        <label>Name<input type="text" name="name" required></label>
+        <label>Secret, printed at the end of the install on the child's computer
+          <input type="text" name="secret" required pattern="\\s*([0-9a-fA-F]{2})+\\s*" spellcheck="false"></label>
+        <div class="row"><button class="dark">Add</button></div>
+      </form>
+      <p class="hint">The child is kept in this page's address, after #. Bookmark the
+        address once the child is added and share the bookmark with the other parent.
+        The page sends nothing anywhere.</p>
+    </div>`;
+  card.querySelector("form").onsubmit = e => {
+    e.preventDefault();
+    const f = e.target, kids = children();
+    kids.push([f.name.value.trim(), f.secret.value.trim().toLowerCase()]);
+    selected = kids.length - 1;
+    location.hash = new URLSearchParams(kids).toString();  // hashchange renders
+  };
+}
+
+addEventListener("hashchange", render);
+render();
+</script>
+</body>
+</html>
