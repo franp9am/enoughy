@@ -15,7 +15,6 @@ import os_tooling
 import remote_sync
 from config import (
     CHECK_INTERVAL_SECONDS,
-    NIGHT_SHUTDOWN_DELAY_SECONDS,
     SHUTDOWN_DELAY_SECONDS,
     SIGNATURE_CHARS,
 )
@@ -120,6 +119,12 @@ def redeem_code(seconds, date="2026-09-14") -> str:
     return f"{payload}:{sign}"
 
 
+def no_night_code(date="2026-09-14", secret=SECRET) -> str:
+    payload = f"{date}:nonight"
+    sign = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
+    return f"{payload}:{sign}"
+
+
 def tick(now):
     monitor.tick(now, KID, SECRET)
 
@@ -166,7 +171,7 @@ def test_night_time_orders_the_shutdown(machine, files):
 
     tick(at(NIGHT_HOUR))
 
-    assert machine.shutdowns == [NIGHT_SHUTDOWN_DELAY_SECONDS]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert machine.notifications == ["Night time"]
     assert remaining_shown(files) == 0
     assert today_data(files)["time_spent_sec"] == 600
@@ -272,6 +277,99 @@ def test_a_redeem_code_too_small_for_the_debt_does_not_call_the_shutdown_off(mac
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert today_data(files)["granted_sec"] == 300
+
+
+def test_a_no_night_code_keeps_the_machine_up_at_night(machine, files):
+    files["redeem"].write_text(no_night_code(), encoding="utf-8")
+    write_day(files, spent=600)
+
+    tick(at(NIGHT_HOUR))
+    tick(at(NIGHT_HOUR, 1))  # the code is still in the file
+
+    assert machine.shutdowns == []
+    assert machine.notifications == ["no night today"]
+    data = today_data(files)
+    assert data["no_night"] is True
+    assert data["event_log"] == ["no night code 2026-09-14 21:00:00"]
+    assert data["time_spent_sec"] == 600 + 2 * CHECK_INTERVAL_SECONDS
+
+
+def test_the_day_remembers_its_no_night_code_when_the_file_holds_another(machine, files):
+    files["redeem"].write_text(no_night_code(), encoding="utf-8")
+    tick(at(20, 0))
+    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+
+    tick(at(NIGHT_HOUR))
+
+    assert machine.shutdowns == []
+    assert today_data(files)["granted_sec"] == 600
+
+
+def test_a_no_night_code_leaves_the_daily_limit_alone(machine, files):
+    files["redeem"].write_text(no_night_code(), encoding="utf-8")
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
+
+    tick(at(NIGHT_HOUR))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+    assert machine.notifications == ["no night today", "time up"]
+
+
+def test_a_no_night_code_is_good_on_its_date_only(machine, files):
+    files["redeem"].write_text(no_night_code(date="2026-09-13"), encoding="utf-8")
+    tick(at(NIGHT_HOUR))
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+    assert machine.notifications == ["Night time"]
+
+
+def test_after_a_day_with_no_night_the_night_is_back_at_midnight(machine, files):
+    files["redeem"].write_text(no_night_code(), encoding="utf-8")
+
+    tick(at(23, 55))
+    tick(at(0, date=TOMORROW))
+
+    assert machine.notifications == ["no night today", "5 minutes to night", "Night time"]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+
+
+def test_a_no_night_code_signed_with_another_secret_is_ignored(machine, files):
+    files["redeem"].write_text(no_night_code(secret=b"\x05\x06\x07\x08"), encoding="utf-8")
+    tick(at(NIGHT_HOUR))
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+
+
+def test_without_a_secret_no_no_night_code_is_accepted(machine, files):
+    files["redeem"].write_text(no_night_code(secret=b""), encoding="utf-8")
+    monitor.tick(at(NIGHT_HOUR), KID, b"")
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+
+
+def test_a_no_night_code_in_the_grace_period_calls_the_night_shutdown_off(machine, files, monkeypatch):
+    write_day(files, spent=600)
+    code = no_night_code()
+    monkeypatch.setattr(time, "sleep", lambda seconds: files["redeem"].write_text(code, encoding="utf-8"))
+
+    tick(at(NIGHT_HOUR))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert machine.notifications == ["Night time", "no night today"]
+    assert remaining_shown(files) == HOUR - 600
+    assert today_data(files)["event_log"] == [
+        "Night time 2026-09-14 21:00:00",
+        "no night code 2026-09-14 21:00:00",
+        "shutdown called off 2026-09-14 21:00:00",
+    ]
+
+
+def test_an_extra_time_code_at_night_is_consumed_and_does_not_help(machine, files):
+    # the price of one redeem step for both codes; carryover keeps the time for tomorrow
+    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+
+    tick(at(NIGHT_HOUR))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
+    assert machine.notifications == ["extra time 600", "Night time"]
+    assert today_data(files)["granted_sec"] == 600
 
 
 def test_fractions_of_a_second_are_carried_to_the_next_tick_not_lost(machine, files):
@@ -452,9 +550,27 @@ def test_an_earlier_night_from_the_server_counts_in_the_same_tick(machine, files
 
     tick(at(18, 30))
 
-    assert machine.shutdowns == [NIGHT_SHUTDOWN_DELAY_SECONDS]
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert machine.notifications == ["Night time"]
     assert settings_in_force(files["settings"])["ALLOWED_HOURS"] == ["6:00", "18:00"]
+
+
+def test_a_later_night_from_the_server_in_the_grace_period_calls_the_shutdown_off(
+    machine, files, sync, monkeypatch
+):
+    write_server_files(files)
+    write_day(files, spent=HOUR // 2)
+    later = SyncAnswer(
+        pending_grants=[],
+        settings_change=SettingsChange(id=8, settings={"ALLOWED_HOURS": ["6:00", "23:00"]}),
+    )
+    monkeypatch.setattr(time, "sleep", lambda seconds: setattr(sync, "answer", later))
+
+    tick(at(NIGHT_HOUR, 30))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert machine.notifications == ["Night time"]
+    assert remaining_shown(files) == HOUR // 2
 
 
 def test_the_server_hears_of_a_shutdown_before_it_happens(machine, files, sync, monkeypatch):

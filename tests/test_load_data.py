@@ -8,6 +8,7 @@ DEFAULTS = {
     "last_tick": None,
     "carryover_sec": 0,
     "granted_sec": 0,
+    "no_night": False,
     "event_log": [],
 }
 

@@ -18,7 +18,6 @@ from config import (
     GRACE_CHECK_SECONDS,
     MAX_REDEEM_FILE_BYTES,
     NETWORK_WARMUP_SECONDS,
-    NIGHT_SHUTDOWN_DELAY_SECONDS,
     NIGHT_WARNING_SECONDS,
     SHARED_DIR,
     SHUTDOWN_DELAY_SECONDS,
@@ -88,9 +87,10 @@ def allowed_hours(date: datetime.date, settings):
     return settings["ALLOWED_HOURS_OVERRIDES"].get(weekday, settings["ALLOWED_HOURS"])
 
 
-def is_night_time(now, settings):
+def is_night_time(now, settings, no_night_date=None):
+    """`no_night_date` is the day a "no night" code was pasted for, if one was."""
     window = allowed_hours(now.date(), settings)
-    if window is None:
+    if window is None or now.date() == no_night_date:
         return False
     day_starts, night_starts = window
     # ["6:00", "20:30"]: 20:29 is still day, 20:30 is night
@@ -106,6 +106,7 @@ def load_data(datafile):
         "last_tick": None,
         "carryover_sec": 0,
         "granted_sec": 0,
+        "no_night": False,
         "event_log": [],
     }
     try:
@@ -136,11 +137,10 @@ def record_used_code(code: str, used_codes_file: Path):
         f.write(code + "\n")
 
 
-def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path, today) -> int:
-    """Seconds granted by the code in the redeem file: zero unless the code is
-    valid and has never been used, in which case it is entered in the ledger
-    before its seconds are handed out."""
-    redeem = handle_redeem_file(redeem_file, secret, today)
+def redeem_unused_code(redeem: dict, used_codes_file: Path) -> int:
+    """Seconds granted by a checked code: zero unless it is valid and has never
+    been used, in which case it is entered in the ledger before its seconds
+    are handed out."""
     if redeem["status"] != "valid":
         return 0
     if redeem["redeem_code"] in load_used_codes(used_codes_file):
@@ -149,14 +149,22 @@ def redeem_unused_code(redeem_file: Path, secret: bytes, used_codes_file: Path, 
     return redeem["extra_time_sec"]
 
 
-def add_redeemed_time(data, datafile, now, child: str, secret: bytes):
-    """Adds the time of a code waiting in the child's redeem file, if there is one."""
-    extra_time = redeem_unused_code(
-        SHARED_DIR / child / "extra_time.txt", secret, DATA_DIR / child / "used_redeem_codes.txt",
-        now.date(),
-    )
+def redeem_code(data, datafile, now, child: str, secret: bytes):
+    """Applies the code waiting in the child's redeem file, if there is one.
+    A `nonight` code lifts the night of its date, once: the day's data
+    remembers, as the file may hold another code by then, and since the date
+    is the one day the code is good there is no ledger -- pasting it twice
+    changes nothing. Seconds are added once, through the ledger."""
+    now_str = now.strftime(TIMESTAMP_FORMAT)
+    redeem = handle_redeem_file(SHARED_DIR / child / "extra_time.txt", secret, now.date())
+    if redeem["nonight"] and not data["no_night"]:
+        data["no_night"] = True
+        data["event_log"].append(f"no night code {now_str}")
+        os_tooling.notify("no night today", child)
+        save_data(data, datafile)
+    extra_time = redeem_unused_code(redeem, DATA_DIR / child / "used_redeem_codes.txt")
     if extra_time:
-        data["event_log"].append(f"redeem code {extra_time} {now.strftime(TIMESTAMP_FORMAT)}")
+        data["event_log"].append(f"redeem code {extra_time} {now_str}")
         data["granted_sec"] += extra_time
         os_tooling.notify(f"extra time {extra_time}", child)
         save_data(data, datafile)
@@ -212,12 +220,15 @@ def verify(msg: bytes, sig_hex: str, secret: bytes) -> bool:
 
 
 def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
-    """Checks the redeem code from file and adds the time to the data file"""
+    """Checks the code in the redeem file: `<date>:<seconds>:<signature>` for
+    extra time, or `<date>:nonight:<signature>` for no night on that date,
+    which is `nonight` in the result."""
     if not len(secret):  # if secret is not loaded, program should not break
         return {
             "status": "cannot load secret",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     if not redeem_file.is_file():
@@ -230,6 +241,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "no_file",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
     # prevent an attack with loading large files
     if os.path.getsize(redeem_file) > MAX_REDEEM_FILE_BYTES:
@@ -237,6 +249,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "file too large",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
     try:
         with open(redeem_file) as f:
@@ -246,6 +259,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "cannot read file",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     if not redeem_content:
@@ -253,6 +267,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "empty file",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     if not isinstance(redeem_content, str):
@@ -260,6 +275,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "cannot read file",
             "redeem_code": None,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     parts = redeem_content.split(":")
@@ -269,48 +285,57 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "status": "invalid format",
             "redeem_code": redeem_content,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     req_date = parts[0]
-    try:
-        req_extra_time = int(parts[1])  # trying to convert to integer
-    except Exception:
-        return {
-            "status": "invalid format",
-            "redeem_code": redeem_content,
-            "extra_time_sec": 0,
-        }
+    # date:nonight:signature lifts the night of that date and carries no time
+    nonight = parts[1] == "nonight"
+    req_extra_time = 0
+    if not nonight:
+        try:
+            req_extra_time = int(parts[1])  # trying to convert to integer
+        except Exception:
+            return {
+                "status": "invalid format",
+                "redeem_code": redeem_content,
+                "extra_time_sec": 0,
+                "nonight": False,
+            }
 
     req_sig = parts[2]
-    # The date is a signed nonce that keeps otherwise-identical codes distinct;
-    # unless the config says so it is not checked against the calendar, and a
-    # code has no expiry date.
-    extracted_payload = f"{req_date}:{req_extra_time}".encode()
+    # Normalized, so variants like "0600", "+600" or " 600" (all accepted by
+    # int()) sign as, and count in the used-codes ledger as, the same code.
+    what = "nonight" if nonight else req_extra_time
+    # For extra time the date is a signed nonce that keeps otherwise-identical
+    # codes distinct; unless the config says so it is not checked against the
+    # calendar, and a code has no expiry date.
+    extracted_payload = f"{req_date}:{what}".encode()
 
     if not verify(extracted_payload, req_sig, secret):
         return {
             "status": "invalid signature",
             "redeem_code": redeem_content,
             "extra_time_sec": 0,
+            "nonight": False,
         }
 
     # After the signature, so the date cannot be probed; before the ledger, so
-    # a code pasted on the wrong day is not used up.
-    if CHECK_DATE_IN_REDEEM_CODES and req_date != today.isoformat():
+    # a code pasted on the wrong day is not used up. A no-night code's date is
+    # no nonce but the one day without a night, checked whatever the config says.
+    if (nonight or CHECK_DATE_IN_REDEEM_CODES) and req_date != today.isoformat():
         return {
             "status": "wrong date",
             "redeem_code": redeem_content,
             "extra_time_sec": 0,
+            "nonight": False,
         }
-
-    # Normalize the code so variants like "0600", "+600" or " 600" (all
-    # accepted by int()) count as the same code in the used-codes ledger.
-    normalized_code = f"{req_date}:{req_extra_time}:{req_sig}"
 
     return {
         "status": "valid",
-        "redeem_code": normalized_code,
+        "redeem_code": f"{req_date}:{what}:{req_sig}",
         "extra_time_sec": req_extra_time,
+        "nonight": nonight,
     }
 
 
@@ -418,10 +443,13 @@ def startup(now, child: str):
     )
 
 
-def announce_shutdown(reason, data, datafile, now, settings, child: str):
-    """Tell the child, record why and get the last word to the server. The
-    shutdown is ordered after this: a failure here only costs this tick, the
-    next one retries."""
+def shut_down_unless_called_off(reason, data, datafile, now, settings, child: str, secret: bytes):
+    """Tell the child, record why, get the last word to the server, then the
+    grace period: a code or a server change that leaves some time and no night
+    calls the shutdown off. The shutdown is ordered only after the first
+    three steps, so a failure there costs this tick and the next one retries.
+    The whole period belongs to the tick it started in, so `now` stays that of
+    the tick and nothing is charged."""
     write_remaining_time_file(0, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify(reason, child)
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
@@ -430,18 +458,14 @@ def announce_shutdown(reason, data, datafile, now, settings, child: str):
     # shutdown stays pending until the next boot
     sync_with_server(data, datafile, now, settings, child)
 
-
-def shut_down_unless_extra_time(data, datafile, now, settings, child: str, secret: bytes):
-    """The grace period once the time is up: a code or a server grant that
-    leaves some time calls the shutdown off. The whole period belongs to the
-    tick it started in, so `now` stays that of the tick and nothing is charged."""
     os_tooling.order_shutdown(SHUTDOWN_DELAY_SECONDS)
     for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS):
         time.sleep(GRACE_CHECK_SECONDS)
-        add_redeemed_time(data, datafile, now, child, secret)
+        redeem_code(data, datafile, now, child, secret)
         settings = sync_with_server(data, datafile, now, settings, child)
         remaining = remaining_seconds(data, settings, now.date())
-        if remaining > 0:
+        no_night_date = now.date() if data["no_night"] else None
+        if remaining > 0 and not is_night_time(now, settings, no_night_date):
             os_tooling.abort_shutdown()
             data["event_log"].append(f"shutdown called off {now.strftime(TIMESTAMP_FORMAT)}")
             save_data(data, datafile)
@@ -467,19 +491,19 @@ def tick(now, child: str, secret: bytes):
         return
 
     settings = sync_with_server(data, datafile, now, settings, child)
+    redeem_code(data, datafile, now, child, secret)
+    no_night_date = now.date() if data["no_night"] else None  # tomorrow has its night again
 
     # After the sync: hours the parent extended on the server while the machine
     # was off must count now, not after one more shutdown and boot.
-    if is_night_time(now, settings):
-        announce_shutdown("Night time", data, datafile, now, settings, child)
-        os_tooling.shutdown(NIGHT_SHUTDOWN_DELAY_SECONDS)  # blocks until the machine is down
+    if is_night_time(now, settings, no_night_date):
+        shut_down_unless_called_off("Night time", data, datafile, now, settings, child, secret)
         return
-
-    add_redeemed_time(data, datafile, now, child, secret)
 
     soon = now + datetime.timedelta(seconds=NIGHT_WARNING_SECONDS)
     warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"
-    if is_night_time(soon, settings) and not any(e.startswith(warning) for e in data["event_log"]):
+    warned = any(e.startswith(warning) for e in data["event_log"])
+    if is_night_time(soon, settings, no_night_date) and not warned:
         os_tooling.notify(warning, child)
         data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
 
@@ -489,8 +513,7 @@ def tick(now, child: str, secret: bytes):
     save_data(data, datafile)
 
     if remaining_seconds(data, settings, now.date()) <= 0:
-        announce_shutdown("time up", data, datafile, now, settings, child)
-        shut_down_unless_extra_time(data, datafile, now, settings, child, secret)
+        shut_down_unless_called_off("time up", data, datafile, now, settings, child, secret)
         return
     write_remaining_time_file(remaining_seconds(data, settings, now.date()), remaining_time_file)
 

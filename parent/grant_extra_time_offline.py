@@ -41,6 +41,14 @@ def get_code(extra_sec=3600, date=None):
     return f"{payload}:{sign[:SIGNATURE_CHARS]}"
 
 
+def get_no_night_code(date=None):
+    """No night on that date; the daily limit still applies. Here the date is
+    no nonce: the code is good on that day only, any number of times."""
+    payload = f"{date or datetime.date.today().isoformat()}:nonight"
+    sign = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}:{sign[:SIGNATURE_CHARS]}"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a code with extra seconds")
     parser.add_argument(
@@ -57,9 +65,19 @@ if __name__ == "__main__":
         default=None,
         help="Nonce date (default: today, e.g. 2026-07-23). "
         "Override to issue a second code of the same amount on the same day; "
-        "with CHECK_DATE_IN_REDEEM_CODES on the child's side use another amount instead.",
+        "with CHECK_DATE_IN_REDEEM_CODES on the child's side use another amount instead. "
+        "With --no_night: the day without a night.",
+    )
+    parser.add_argument(
+        "--no_night",
+        "-n",
+        action="store_true",
+        help="A code for no night on the date instead of extra seconds",
     )
 
     args = parser.parse_args()
 
-    print(get_code(extra_sec=args.extra_sec, date=args.date))
+    if args.no_night:
+        print(get_no_night_code(date=args.date))
+    else:
+        print(get_code(extra_sec=args.extra_sec, date=args.date))

@@ -8,10 +8,6 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* monitor: a "no night today" code for offline mode,
-  `nonight:<date>:<signature>`, pasted like an extra-time code: no night on
-  that date, the daily limit still applies. Nothing more: no time in the
-  code, no lifted limit. Not part of the goal: a current user needs it.
 * server: store the `monitor_version` every monitor already sends, in a new
   nullable column of `status`: which version ran when, and whether
   auto-update lands. The live database needs one
@@ -59,8 +55,6 @@ the database.
 * monitor: a changed time zone, which a standard user may set, moves the
   clock out of the night and rolls the date into a fresh limit. When the
   Windows zone name changes, log an event for the parent's page.
-* monitor: the night shutdown handled like the "time up" one: called off
-  when a sync during the delay says it is no longer night.
 * server: settings UI, a widget per setting, keyed by name (durations, hour
   picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
   back to the JSON box. The client stays the validator. A name's meaning

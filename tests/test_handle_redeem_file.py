@@ -27,9 +27,19 @@ def redeem_file(tmp_path):
     return tmp_path / "extra_time.txt"
 
 
+@pytest.fixture
+def used_codes_file(tmp_path):
+    return tmp_path / "used_redeem_codes.txt"
+
+
 def handle(redeem_file, content, secret=SECRET):
     redeem_file.write_text(content, encoding="utf-8")
     return monitor.handle_redeem_file(redeem_file, secret, TODAY)
+
+
+def redeem(redeem_file, used_codes_file, content):
+    """What the monitor does with the file: check the code, then the ledger."""
+    return monitor.redeem_unused_code(handle(redeem_file, content), used_codes_file)
 
 
 def test_without_a_secret_nothing_is_accepted(redeem_file):
@@ -61,7 +71,12 @@ def test_a_malformed_code_is_rejected(redeem_file):
 
 def test_a_valid_code_yields_its_seconds(redeem_file):
     result = handle(redeem_file, code(seconds=600))
-    assert result == {"status": "valid", "redeem_code": code(seconds=600), "extra_time_sec": 600}
+    assert result == {
+        "status": "valid",
+        "redeem_code": code(seconds=600),
+        "extra_time_sec": 600,
+        "nonight": False,
+    }
 
 
 def test_surrounding_whitespace_is_fine(redeem_file):
@@ -111,24 +126,45 @@ def test_with_the_check_on_a_forged_date_is_still_an_invalid_signature(redeem_fi
 def test_a_code_refused_for_its_date_is_not_used_up(redeem_file, tmp_path, monkeypatch):
     used_codes_file = tmp_path / "used_redeem_codes.txt"
     monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", True)
-    redeem_file.write_text(code(date="2026-09-13"), encoding="utf-8")
-    assert monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY) == 0
+    assert redeem(redeem_file, used_codes_file, code(date="2026-09-13")) == 0
     assert not used_codes_file.exists()
     monkeypatch.setattr(monitor, "CHECK_DATE_IN_REDEEM_CODES", False)
-    assert monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY) == 600
+    assert redeem(redeem_file, used_codes_file, code(date="2026-09-13")) == 600
+
+
+# --- the no-night code: no time in it, and its date is always checked ---
+
+
+def no_night_code(date="2026-09-14", secret=SECRET) -> str:
+    payload = f"{date}:nonight"
+    return f"{payload}:{sign(payload, secret)}"
+
+
+def test_a_no_night_code_for_today_is_valid_and_carries_no_time(redeem_file):
+    result = handle(redeem_file, no_night_code())
+    assert result == {"status": "valid", "redeem_code": no_night_code(), "extra_time_sec": 0, "nonight": True}
+
+
+def test_a_no_night_code_is_good_on_its_day_only_whatever_the_config(redeem_file):
+    assert not monitor.CHECK_DATE_IN_REDEEM_CODES
+    assert handle(redeem_file, no_night_code(date="2026-09-13"))["status"] == "wrong date"
+    assert handle(redeem_file, no_night_code(date="2026-09-15"))["status"] == "wrong date"
+
+
+def test_a_no_night_code_with_a_forged_date_fails_the_signature(redeem_file):
+    sig = no_night_code(date="2026-09-13").split(":")[2]
+    assert handle(redeem_file, f"2026-09-14:nonight:{sig}")["status"] == "invalid signature"
+
+
+def test_a_no_night_code_signed_with_another_secret_is_rejected(redeem_file):
+    assert handle(redeem_file, no_night_code(secret=OTHER_SECRET))["status"] == "invalid signature"
+
+
+def test_a_no_night_code_grants_no_time(redeem_file, used_codes_file):
+    assert redeem(redeem_file, used_codes_file, no_night_code()) == 0
 
 
 # --- the ledger: a code works once, across days ---
-
-
-@pytest.fixture
-def used_codes_file(tmp_path):
-    return tmp_path / "used_redeem_codes.txt"
-
-
-def redeem(redeem_file, used_codes_file, content):
-    redeem_file.write_text(content, encoding="utf-8")
-    return monitor.redeem_unused_code(redeem_file, SECRET, used_codes_file, TODAY)
 
 
 def test_a_fresh_code_is_granted_and_entered_in_the_ledger(redeem_file, used_codes_file):

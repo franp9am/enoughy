@@ -15,9 +15,8 @@ CRASH_LOG_FILE = DATA_DIR / "crash.log"  # the monitor's own, so not under any c
 SYNC_TIMEOUT_SECONDS = 5  # a slow server must not stall the check loop
 
 CHECK_INTERVAL_SECONDS = 60
-SHUTDOWN_DELAY_SECONDS = 180  # grace period once the time is up
+SHUTDOWN_DELAY_SECONDS = 180  # grace period once the time is up or the night has begun
 GRACE_CHECK_SECONDS = 10  # how often that grace period looks for extra time
-NIGHT_SHUTDOWN_DELAY_SECONDS = 120  # grace period outside the allowed hours
 NIGHT_WARNING_SECONDS = 5 * 60  # the child is told this long before the night
 STARTUP_DELAY_SECONDS = 40  # wait after boot before the first check
 NETWORK_WARMUP_SECONDS = 20

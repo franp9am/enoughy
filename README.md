@@ -113,7 +113,8 @@ unrestricted. Read settings through `settings_in_force()`, never straight from `
 ## Extra time
 
 Two ways, and either works on its own. Both also work in the three minutes between
-"time up" and the shutdown, which is then called off; the night shutdown is final.
+"time up" and the shutdown, which is then called off. The same three minutes follow
+"Night time", called off by a later night from the server or by a no-night code.
 
 **A grant from the server**, if one is set up: the parent enters minutes on the web page
 and the monitor picks them up on its next sync, within about a minute. Negative grants
@@ -134,6 +135,15 @@ minute and says so. The date is only a nonce, not an expiry -- a code stays vali
 forever, but each one can be redeemed exactly once. `CHECK_DATE_IN_REDEEM_CODES = True`
 in `config.py` makes a code good on the day it carries only; a code pasted on another
 day is refused and stays unused.
+
+**A no-night code**, `<date>:nonight:<signature>` from `grant_extra_time_offline.py -n`,
+lifts the night of that one date, its small hours included: the machine stays up
+until midnight, when the next day's night applies again, and the daily limit still
+counts. A party past midnight takes a second code, for the new date, pasted in the
+three minutes after "Night time". The date is checked whatever
+`CHECK_DATE_IN_REDEEM_CODES` says, and the code works any number of times that day.
+An extra-time code pasted at night is consumed like any other; the time is carried
+over, or lost without carryover.
 
 `parent/grant_extra_time_offline.py` imports nothing else from the project, so copying
 that one file to the parent's machine is enough, as long as its `SIGNATURE_CHARS` matches
