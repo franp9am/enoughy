@@ -173,7 +173,7 @@ def test_save_writes_what_is_taken_and_keeps_the_file_on_refusal(settings_file):
 
 
 def test_the_basics_are_minutes_and_the_window_with_no_night_as_two_blanks():
-    assert settings.basic_setting_to_list(settings.default_settings()) == ["120", "6:00", "21:00"]
+    assert settings.basic_setting_to_list(settings.default_settings()) == ["60", "6:00", "21:00"]
     assert settings.basic_setting_to_list({**IN_FORCE, "DAILY_LIMIT_SECONDS": 90 * 60, "ALLOWED_HOURS": None}) == ["90", "", ""]
 
 
@@ -196,7 +196,7 @@ def test_the_command_line_shows_and_sets_the_basics(settings_file, tmp_path):
     script = Path(settings.__file__)
     out = tmp_path / "basics.txt"
     subprocess.run([sys.executable, script, "show", settings_file, out], check=True, cwd=script.parent)
-    assert out.read_text(encoding="utf-8") == "120\n6:00\n21:00\n"
+    assert out.read_text(encoding="utf-8") == "60\n6:00\n21:00\n"
     subprocess.run([sys.executable, script, "set", settings_file, "45", "8:00", "20:30"], check=True, cwd=script.parent)
     assert settings.settings_in_force(settings_file) == {
         **settings.default_settings(), "DAILY_LIMIT_SECONDS": 45 * 60, "ALLOWED_HOURS": ["8:00", "20:30"]

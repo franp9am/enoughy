@@ -20,6 +20,18 @@
 #define Version Trim(FileRead(FileHandle))
 #expr FileClose(FileHandle)
 
+; The settings page's defaults are settings.py's, read at build time through its
+; `show` on the bundled Python with no settings file, which is what a fresh install has.
+#define DefaultsFile SourcePath + "\build\defaults.txt"
+#if Exec(SourcePath + "\build\python\python.exe", "..\monitor\settings.py show no-such-file.json """ + DefaultsFile + """", SourcePath, 1, 0) != 0
+  #error settings.py gave no defaults
+#endif
+#define DefaultsHandle FileOpen(DefaultsFile)
+#define DefaultMinutes Trim(FileRead(DefaultsHandle))
+#define DefaultDayStarts Trim(FileRead(DefaultsHandle))
+#define DefaultNightStarts Trim(FileRead(DefaultsHandle))
+#expr FileClose(DefaultsHandle)
+
 #define MonitorDir "{commonappdata}\Enoughy"
 #define SharedDir  "{commonappdata}\EnoughyShared"
 #define PythonDir  "{commonappdata}\EnoughyPython"
@@ -208,16 +220,16 @@ function Python: String; begin Result := ExpandConstant('{#PythonDir}\python.exe
 
 // What a reinstall has, read by this release's settings.py on the Python already
 // there (the installed one may predate the `show` verb). A fresh install has no
-// Python yet and shows settings.py's defaults, repeated here.
+// Python yet and shows settings.py's defaults, read when this exe was built.
 procedure ShowBasics;
 var
   OutFile: String;
   Lines: TArrayOfString;
   Code: Integer;
 begin
-  SettingsPage.Values[0] := '120';
-  SettingsPage.Values[1] := '6:00';
-  SettingsPage.Values[2] := '21:00';
+  SettingsPage.Values[0] := '{#DefaultMinutes}';
+  SettingsPage.Values[1] := '{#DefaultDayStarts}';
+  SettingsPage.Values[2] := '{#DefaultNightStarts}';
   if not (FileExists(Python) and FileExists(ChildDataDir + '\settings.json')) then Exit;
   ExtractTemporaryFile('settings.py');
   ExtractTemporaryFile('os_tooling.py');

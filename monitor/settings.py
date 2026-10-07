@@ -49,7 +49,7 @@ def is_hours_window(value) -> bool:
 # holds what is in force, and these are only what a child starts with and falls back to.
 SETTINGS = {
     "DAILY_LIMIT_SECONDS": {
-        "default": 2 * 60 * 60,
+        "default": 1 * 60 * 60,
         "allowed": DAILY_LIMIT_RANGE
     },
     "CARRYOVER": {
