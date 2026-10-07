@@ -87,7 +87,7 @@ const
 
 var
   AccountPage: TInputOptionWizardPage;
-  ParentPage, ServerPage: TInputQueryWizardPage;
+  ParentPage, ServerPage, SettingsPage: TInputQueryWizardPage;
   NewSecret: String;   // generated on a fresh install, shown at the end
   Accounts, Sids: TArrayOfString;   // the local accounts, one per row of the account page
   IsAdmin: array of Boolean;        // per row: in Administrators
@@ -179,6 +179,56 @@ begin
   ServerPage.Add('Child token:', False);
   ServerPage.Add('Server URL:', False);
 
+  // The two settings a parent notices on the first evening; the rest, carryover and
+  // the weekday exceptions, keep their defaults until the server or settings.json
+  // changes them. The values go through settings.py, which validates them again.
+  SettingsPage := CreateInputQueryPage(ServerPage.ID, 'Time limits', 'How long a day, and until when?',
+    'The limit counts the time the child is logged in. At the night time the computer shuts down. ' +
+    'Both can be changed later on the parent''s server; the exceptions per weekday and the carryover of unused time only there.');
+  SettingsPage.Add('Minutes a day:', False);
+  SettingsPage.Add('Day starts (H:MM):', False);
+  SettingsPage.Add('Night starts (H:MM; leave both times empty for no night):', False);
+end;
+
+// "6:00" as minutes since midnight, -1 for anything else; "24:00" is the end of the day.
+function Minutes(T: String): Integer;
+var
+  P, H, M: Integer;
+begin
+  Result := -1;
+  P := Pos(':', T);
+  if (P < 2) or (P > 3) or (Length(T) <> P + 2) then Exit;
+  H := StrToIntDef(Copy(T, 1, P - 1), -1);
+  M := StrToIntDef(Copy(T, P + 1, 2), -1);
+  if (H < 0) or (M < 0) or (M > 59) or (H * 60 + M > 24 * 60) then Exit;
+  Result := H * 60 + M;
+end;
+
+function Python: String; begin Result := ExpandConstant('{#PythonDir}\python.exe'); end;
+
+// What a reinstall has, read by this release's settings.py on the Python already
+// there (the installed one may predate the `show` verb). A fresh install has no
+// Python yet and shows settings.py's defaults, repeated here.
+procedure ShowBasics;
+var
+  OutFile: String;
+  Lines: TArrayOfString;
+  Code: Integer;
+begin
+  SettingsPage.Values[0] := '120';
+  SettingsPage.Values[1] := '6:00';
+  SettingsPage.Values[2] := '21:00';
+  if not (FileExists(Python) and FileExists(ChildDataDir + '\settings.json')) then Exit;
+  ExtractTemporaryFile('settings.py');
+  ExtractTemporaryFile('os_tooling.py');
+  OutFile := ExpandConstant('{tmp}\basics.txt');
+  if Exec(Python, ExpandConstant('"{tmp}\settings.py" show "') + ChildDataDir + '\settings.json" "' + OutFile + '"',
+       ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0)
+     and LoadStringsFromFile(OutFile, Lines) and (GetArrayLength(Lines) = 3) then begin
+    SettingsPage.Values[0] := Lines[0];
+    SettingsPage.Values[1] := Lines[1];
+    SettingsPage.Values[2] := Lines[2];
+  end;
 end;
 
 function ReadFile(FileName, Default: String): String;
@@ -198,6 +248,7 @@ begin
       ReadFile(ExpandConstant('{commonappdata}\ScreenTime\data\child_token.txt'), ''));
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
   end;
+  if CurPageID = SettingsPage.ID then ShowBasics;
   if (CurPageID = wpFinished) and (NewSecret <> '') then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
       'Shared secret, needed by grant_extra_time_offline.py on your own machine (it stays in ' +
@@ -236,6 +287,17 @@ begin
   end else if (CurPageID = ParentPage.ID) and (ParentPage.Values[0] <> ParentPage.Values[1]) then begin
     MsgBox('The two passwords differ.', mbError, MB_OK);
     Result := False;
+  end;
+  if CurPageID = SettingsPage.ID then begin
+    if (StrToIntDef(Trim(SettingsPage.Values[0]), -1) < 0) or (StrToIntDef(Trim(SettingsPage.Values[0]), -1) > 1440) then begin
+      MsgBox('Minutes a day: a whole number from 0 to 1440.', mbError, MB_OK);
+      Result := False;
+    end else if not ((Trim(SettingsPage.Values[1]) = '') and (Trim(SettingsPage.Values[2]) = ''))
+        and not ((Minutes(Trim(SettingsPage.Values[1])) >= 0)
+          and (Minutes(Trim(SettingsPage.Values[1])) + 60 <= Minutes(Trim(SettingsPage.Values[2])))) then begin
+      MsgBox('The two times as H:MM, like 6:00 and 21:00, at least an hour apart. Leave both empty for no night.', mbError, MB_OK);
+      Result := False;
+    end;
   end;
 end;
 
@@ -341,6 +403,15 @@ begin
   end;
 end;
 
+// The page's three values into the child's settings.json, merged with what is there,
+// through the settings.py just installed.
+procedure WriteBasics;
+begin
+  Run(Python, ExpandConstant('"{app}\settings.py" set "') + ChildDataDir + '\settings.json" "' +
+    Trim(SettingsPage.Values[0]) + '" "' + Trim(SettingsPage.Values[1]) + '" "' + Trim(SettingsPage.Values[2]) + '"',
+    'Writing the settings');
+end;
+
 // The task runs on battery and never times out. The
 // definition comes from the Task Scheduler API, but schtasks registers it: the
 // API's register call wants a null password, which this script cannot pass.
@@ -428,6 +499,7 @@ begin
   At('locking the monitor folder');
   Run('{sys}\icacls.exe', '"{app}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {app}');
   At('writing the credentials'); WriteCredentials;
+  At('writing the settings'); WriteBasics;
   // The shared folder: every local account may write. It holds only the widget
   // and the dialog, nothing trusted; each child's folder in it is locked below.
   At('opening the shared folder');

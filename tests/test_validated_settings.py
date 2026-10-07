@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -164,3 +167,37 @@ def test_save_writes_what_is_taken_and_keeps_the_file_on_refusal(settings_file):
     assert refused == taken
     assert settings.settings_in_force(settings_file) == taken
     assert not settings_file.with_suffix(".tmp").exists()
+
+
+# --- the installer's page -----------------------------------------------------
+
+
+def test_the_basics_are_minutes_and_the_window_with_no_night_as_two_blanks():
+    assert settings.basic_setting_to_list(settings.default_settings()) == ["120", "6:00", "21:00"]
+    assert settings.basic_setting_to_list({**IN_FORCE, "DAILY_LIMIT_SECONDS": 90 * 60, "ALLOWED_HOURS": None}) == ["90", "", ""]
+
+
+def test_saving_the_basics_keeps_the_rest_and_two_blanks_mean_no_night(settings_file):
+    settings.write_settings_file(IN_FORCE, settings_file)
+    taken = settings.save_basic_settings(settings_file, 90, "7:30", "20:00")
+    assert taken == {**IN_FORCE, "DAILY_LIMIT_SECONDS": 90 * 60, "ALLOWED_HOURS": ["7:30", "20:00"]}
+    assert settings.settings_in_force(settings_file) == taken
+    assert settings.save_basic_settings(settings_file, 90, "", "")["ALLOWED_HOURS"] is None
+
+
+def test_an_off_basic_leaves_the_file_as_it_was(settings_file):
+    settings.write_settings_file(IN_FORCE, settings_file)
+    for fields in ((-1, "6:00", "21:00"), (60, "21:00", "6:00"), (60, "6:00", ""), (60, "6", "21:00")):
+        assert settings.save_basic_settings(settings_file, *fields) == IN_FORCE
+    assert settings.settings_in_force(settings_file) == IN_FORCE
+
+
+def test_the_command_line_shows_and_sets_the_basics(settings_file, tmp_path):
+    script = Path(settings.__file__)
+    out = tmp_path / "basics.txt"
+    subprocess.run([sys.executable, script, "show", settings_file, out], check=True, cwd=script.parent)
+    assert out.read_text(encoding="utf-8") == "120\n6:00\n21:00\n"
+    subprocess.run([sys.executable, script, "set", settings_file, "45", "8:00", "20:30"], check=True, cwd=script.parent)
+    assert settings.settings_in_force(settings_file) == {
+        **settings.default_settings(), "DAILY_LIMIT_SECONDS": 45 * 60, "ALLOWED_HOURS": ["8:00", "20:30"]
+    }

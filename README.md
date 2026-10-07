@@ -9,8 +9,9 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 
 1. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
-   administrator rights, which local account is the child's, and optionally for the
-   child token and URL of the parent's server. The child's account must not be an
+   administrator rights, which local account is the child's, optionally for the child
+   token and URL of the parent's server, and for the daily limit and the night time;
+   a reinstall shows the values in force. The child's account must not be an
    administrator: when it is, the installer offers to make it a standard user, and on
    a machine where it is the only account it first creates an administrator account
    named `parent` for you, with a password you choose. Run it again and pick another
@@ -59,7 +60,8 @@ is carried over to the next day, but never more than five hours of it.
 * Five minutes before the night the child sees a message; before the time runs out
   there is none, the widget turns red instead.
 
-Edit that file, or let the parent's server set the values. A value that is missing or
+The setup asks for the first and the fourth. Edit that file for the rest, or let the
+parent's server set the values. A value that is missing or
 out of range falls back to its default, so a mangled file cannot leave the machine
 unrestricted.
 

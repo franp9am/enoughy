@@ -49,7 +49,7 @@ def is_hours_window(value) -> bool:
 # holds what is in force, and these are only what a child starts with and falls back to.
 SETTINGS = {
     "DAILY_LIMIT_SECONDS": {
-        "default": 1 * 60 * 60,
+        "default": 2 * 60 * 60,
         "allowed": DAILY_LIMIT_RANGE
     },
     "CARRYOVER": {
@@ -165,3 +165,27 @@ def ensure_settings_file(settings_file: Path) -> None:
     """A child that has never had one starts from the defaults above."""
     if not settings_file.is_file():
         write_settings_file(default_settings(), settings_file)
+
+
+def basic_setting_to_list(settings: dict) -> list:
+    """The installer's fields: minutes a day, day start, night start; the times empty for no night."""
+    hours = settings["ALLOWED_HOURS"] or ["", ""]
+    return [str(settings["DAILY_LIMIT_SECONDS"] // 60), *hours]
+
+
+def save_basic_settings(settings_file: Path, limit_minutes: int, day_starts: str, night_starts: str) -> dict:
+    """Store the installer's fields like a change from the server: validated, the rest kept."""
+    hours = None if day_starts == night_starts == "" else [day_starts, night_starts]
+    return save_settings({"DAILY_LIMIT_SECONDS": limit_minutes * 60, "ALLOWED_HOURS": hours}, settings_file)
+
+
+if __name__ == "__main__":
+    # The installer's settings page: `show FILE OUT` writes the limit and the window to OUT, one per
+    # line, for the page to prefill; `set FILE MINUTES DAY NIGHT` stores them.
+    verb, settings_file, rest = sys.argv[1], Path(sys.argv[2]), sys.argv[3:]
+    if verb == "show":
+        Path(rest[0]).write_text("\n".join(basic_setting_to_list(settings_in_force(settings_file))) + "\n", encoding="utf-8")
+    elif verb == "set":
+        save_basic_settings(settings_file, int(rest[0]), rest[1], rest[2])
+    else:
+        sys.exit(f"settings.py: no such verb: {verb}")
