@@ -7,13 +7,15 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 
 ## Setup on the child's machine
 
-1. Give the child a **non-admin** Windows account.
-2. Download `enoughy-setup.exe` from the latest release,
+1. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
    administrator rights, which local account is the child's, and optionally for the
-   child token and URL of the parent's server. Run it again and pick another account to
-   add a second child.
-3. Reboot. The monitor runs from boot, the widget with the time left appears when the
+   child token and URL of the parent's server. The child's account must not be an
+   administrator: when it is, the installer offers to make it a standard user, and on
+   a machine where it is the only account it first creates an administrator account
+   named `parent` for you, with a password you choose. Run it again and pick another
+   account to add a second child.
+2. Reboot. The monitor runs from boot, the widget with the time left appears when the
    child logs in.
 
 A fresh install prints a secret at the end. It is only for the offline codes, see Extra

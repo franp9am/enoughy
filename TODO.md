@@ -25,6 +25,10 @@ the database.
     any time to a syncing child without it.
   * Maybe later: the same signed exe served under a name that carries the
     code, read by the installer to fill the field.
+* installer, admin accounts, left: an account named `parent` already there
+  fails the install at "creating the administrator account"; hiding `parent`
+  from the login screen is one registry key, not done. The uninstaller leaves
+  accounts alone.
 * monitor: send the day's whole `event_log` and the last `crash.log` entry
   with each sync, so debugging works from the server page without machine
   access; cap the crash log at 1 MB (rename to `.old`) and read only its

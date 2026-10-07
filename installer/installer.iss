@@ -83,16 +83,30 @@ Type: filesandordirs; Name: "{#PythonDir}"
 [Code]
 const
   DefaultServerUrl = 'https://marwin.pfranek.cz';   // the author's server; a child token from it is what turns syncing on
+  ParentName = 'parent';   // the administrator account made when the child's is the only one
 
 var
   AccountPage: TInputOptionWizardPage;
-  ServerPage: TInputQueryWizardPage;
+  ParentPage, ServerPage: TInputQueryWizardPage;
   NewSecret: String;   // generated on a fresh install, shown at the end
-  Accounts: TArrayOfString;   // the local account names, one per row of the account page
+  Accounts, Sids: TArrayOfString;   // the local accounts, one per row of the account page
+  IsAdmin: array of Boolean;        // per row: in Administrators
+  Demote: Boolean;   // the child leaves Administrators at the end of the install
+  ParentCreated: Boolean;
 
 function Child(Param: String): String;
 begin
   Result := Accounts[AccountPage.SelectedValueIndex];
+end;
+
+// An administrator besides the child, who can demote it without a new account.
+function OtherAdmin: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to GetArrayLength(IsAdmin) - 1 do
+    if IsAdmin[I] and (I <> AccountPage.SelectedValueIndex) then Result := True;
 end;
 
 // Not {app}: the token page reads this folder before the wizard has set {app}.
@@ -101,25 +115,37 @@ function ChildDataDir: String; begin Result := ExpandConstant('{#MonitorDir}\dat
 // One row per enabled local account, from WMI; a typed name invites a typo that
 // would leave the monitor watching an account nobody uses. Behind a Microsoft
 // account Windows puts a name like "peter_fwx12", so the row shows the person too.
+// Then which rows are administrators: the members of the group with the
+// well-known SID, as its name is localized, matched by SID, the one thing a
+// Microsoft account shares with its row.
 procedure ListAccounts;
 var
-  Locator, Service, Users, User, FullName: Variant;
-  I: Integer;
+  Locator, Service, Users, User, FullName, Groups, Group, Members: Variant;
+  I, J: Integer;
   Caption: String;
 begin
   Locator := CreateOleObject('WbemScripting.SWbemLocator');
   Service := Locator.ConnectServer('', 'root\cimv2');
-  Users := Service.ExecQuery('SELECT Name, FullName FROM Win32_UserAccount WHERE LocalAccount = TRUE AND Disabled = FALSE');
+  Users := Service.ExecQuery('SELECT Name, FullName, SID FROM Win32_UserAccount WHERE LocalAccount = TRUE AND Disabled = FALSE');
   SetArrayLength(Accounts, Users.Count);
+  SetArrayLength(Sids, Users.Count);
+  SetArrayLength(IsAdmin, Users.Count);
   for I := 0 to Users.Count - 1 do begin
     User := Users.ItemIndex(I);
     Accounts[I] := User.Name;
+    Sids[I] := User.SID;
     Caption := Accounts[I];
     FullName := User.FullName;
     if not VarIsNull(FullName) and (FullName <> '') and (CompareText(FullName, Accounts[I]) <> 0) then
       Caption := Caption + '   (' + FullName + ')';
     AccountPage.Add(Caption);
   end;
+  Groups := Service.ExecQuery('SELECT Domain, Name FROM Win32_Group WHERE LocalAccount = TRUE AND SID = ''S-1-5-32-544''');
+  Group := Groups.ItemIndex(0);
+  Members := Service.ExecQuery('ASSOCIATORS OF {Win32_Group.Domain="' + Group.Domain + '",Name="' + Group.Name + '"} WHERE AssocClass=Win32_GroupUser Role=GroupComponent');
+  for I := 0 to Members.Count - 1 do
+    for J := 0 to GetArrayLength(Sids) - 1 do
+      if Members.ItemIndex(I).SID = Sids[J] then IsAdmin[J] := True;
 end;
 
 procedure InitializeWizard;
@@ -138,11 +164,21 @@ begin
     end;
   end;
   if Candidates = 1 then AccountPage.Values[LastCandidate] := True;
+  if GetArrayLength(Accounts) = 1 then AccountPage.Values[0] := True;   // the parent is installing from the child's own machine
 
-  ServerPage := CreateInputQueryPage(AccountPage.ID, 'Parent''s server', 'Where does the monitor report to?',
+  // Only when the child is the only administrator, see ShouldSkipPage.
+  ParentPage := CreateInputQueryPage(AccountPage.ID, 'Your own account', 'Someone has to stay an administrator',
+    'The child''s account is the only administrator on this machine. The install makes it a standard user and creates ' +
+    'an administrator account named "' + ParentName + '" for you, with the password you choose here. Windows asks for it ' +
+    'whenever something needs an administrator, so write it down.');
+  ParentPage.Add('Password:', True);
+  ParentPage.Add('Password again:', True);
+
+  ServerPage := CreateInputQueryPage(ParentPage.ID, 'Parent''s server', 'Where does the monitor report to?',
     'The child token comes from add_child.py on the parent''s server. Leave it empty to run without syncing; then the server is never contacted.');
   ServerPage.Add('Child token:', False);
   ServerPage.Add('Server URL:', False);
+
 end;
 
 function ReadFile(FileName, Default: String): String;
@@ -166,6 +202,17 @@ begin
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
       'Shared secret, needed by grant_extra_time_offline.py on your own machine (it stays in ' +
       ChildDataDir + '\secret.txt here):' + #13#10 + NewSecret;
+  if (CurPageID = wpFinished) and Demote then
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
+      'After the restart ' + Child('') + ' is a standard user.';
+  if (CurPageID = wpFinished) and ParentCreated then
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + ' Your administrator account is "' + ParentName +
+      '", with the password you chose; log in as it when Windows asks for an administrator.';
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = ParentPage.ID) and not (IsAdmin[AccountPage.SelectedValueIndex] and not OtherAdmin);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -173,6 +220,21 @@ begin
   Result := True;
   if (CurPageID = AccountPage.ID) and (AccountPage.SelectedValueIndex < 0) then begin
     MsgBox('Pick the child''s account.', mbError, MB_OK);
+    Result := False;
+  end;
+  // An administrator can end the monitor and change its settings. With another
+  // administrator on the machine the parent chooses; alone, the parent page follows.
+  if (CurPageID = AccountPage.ID) and Result then begin
+    Demote := IsAdmin[AccountPage.SelectedValueIndex];
+    if Demote and OtherAdmin then
+      Demote := MsgBox(Child('') + ' is an administrator, so the limit holds only until the child finds that out. ' +
+        'Make it a standard user? The other accounts stay as they are.', mbConfirmation, MB_YESNO) = IDYES;
+  end;
+  if (CurPageID = ParentPage.ID) and (ParentPage.Values[0] = '') then begin
+    MsgBox('Choose a password.', mbError, MB_OK);
+    Result := False;
+  end else if (CurPageID = ParentPage.ID) and (ParentPage.Values[0] <> ParentPage.Values[1]) then begin
+    MsgBox('The two passwords differ.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -312,6 +374,36 @@ begin
   Run('{sys}\schtasks.exe', '/Create /TN "' + Name + '" /XML "' + XmlFile + '" /F', 'Registering the task ' + Name);
 end;
 
+function SetEnvironmentVariable(Name, Value: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+procedure PowerShell(Script, What: String);
+begin
+  Run('{sys}\WindowsPowerShell\v1.0\powershell.exe', '-NoProfile -ExecutionPolicy Bypass -Command "' + Script + '"', What);
+end;
+
+// The parent account first, in the group and seen there, and the child out of
+// it last, so a failed step never leaves the machine without an administrator.
+// The password reaches PowerShell through the environment: not on a command
+// line, not in the setup log. Never expires, or Windows would ask the parent
+// to change it after 42 days. The demotion goes by SID: a Microsoft account's
+// local name is not what the group lists.
+procedure ChangeAccounts;
+begin
+  if not Demote then Exit;
+  if not OtherAdmin then begin
+    SetEnvironmentVariable('ENOUGHY_PASSWORD', ParentPage.Values[0]);
+    PowerShell('$ErrorActionPreference = ''Stop''; ' +
+      'New-LocalUser -Name ' + ParentName + ' -Password (ConvertTo-SecureString $env:ENOUGHY_PASSWORD -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires | Out-Null; ' +
+      'Add-LocalGroupMember -SID S-1-5-32-544 -Member ' + ParentName + '; ' +
+      'Get-LocalGroupMember -SID S-1-5-32-544 -Member ' + ParentName + ' | Out-Null',
+      'Creating the administrator account ' + ParentName);
+    ParentCreated := True;
+  end;
+  PowerShell('Remove-LocalGroupMember -SID S-1-5-32-544 -Member ' + Sids[AccountPage.SelectedValueIndex] + ' -ErrorAction Stop',
+    'Making ' + Child('') + ' a standard user');
+end;
+
 var
   Step: String;   // named in the error when a post-install step fails
 
@@ -362,6 +454,7 @@ begin
     RegisterTask(WidgetTask(Names[I]), 9, Names[I], 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
       ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + Shared + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
   end;
+  At('changing the accounts'); ChangeAccounts;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
