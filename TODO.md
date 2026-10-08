@@ -25,6 +25,18 @@ the database.
     any time to a syncing child without it.
   * Maybe later: the same signed exe served under a name that carries the
     code, read by the installer to fill the field.
+* server: settings UI, a widget per setting, keyed by name (durations, hour
+  picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
+  back to the JSON box, so a monitor reporting a new setting works on day
+  one. The client stays the validator. A name's meaning never changes, new
+  meaning means new name. First the widgets for what the current monitor
+  reports; the server test that every widget name exists in the client's
+  `SETTINGS` once there is a second name. Without this a parent meets the
+  JSON box at the first change, which is where a nontechnical one stops.
+* server: the same principle for `settings_in_words`, which hardcodes the
+  five setting names: a renamed, missing or malformed setting is a 500 on
+  both `/` and `/settings` for that child. Render the compact line only when
+  the known names fit, else fall back to plain `name=value`.
 * monitor: send the day's whole `event_log` and the last `crash.log` entry
   with each sync, so debugging works from the server page without machine
   access; cap the crash log at 1 MB (rename to `.old`) and read only its
@@ -46,20 +58,10 @@ the database.
 * server: test the server against the report of each released monitor
   version, since it has to stay compatible with every one still installed
   (see `DEVELOPING.md`). Due before the first stranger installs.
-* server: `settings_in_words` hardcodes the five setting names, while the
-  rest of the settings path takes names and types from whatever the child
-  reports. A renamed, missing or malformed setting is a 500 on both `/` and
-  `/settings` for that child. Render the compact line only when the known
-  names fit, else fall back to plain `name=value`.
 * server: logging.
 * monitor: a changed time zone, which a standard user may set, moves the
   clock out of the night and rolls the date into a fresh limit. When the
   Windows zone name changes, log an event for the parent's page.
-* server: settings UI, a widget per setting, keyed by name (durations, hour
-  picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
-  back to the JSON box. The client stays the validator. A name's meaning
-  never changes, new meaning means new name; a server test checks every
-  widget name exists in the client's `SETTINGS`.
 * product: fully offline mode, with no account, for a computer that never
   syncs:
   * One static page, the same file for everybody, with the secret in the
