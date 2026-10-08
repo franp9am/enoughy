@@ -86,7 +86,9 @@ Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Param
 Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\data"
+; The whole monitor folder: besides data, what the launcher put there (UPDATE_MODE,
+; a staged release, __pycache__). The accounts stay as the install left them.
+Type: filesandordirs; Name: "{app}"
 Type: filesandordirs; Name: "{#SharedDir}"
 Type: filesandordirs; Name: "{#PythonDir}"
 
