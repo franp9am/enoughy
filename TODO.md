@@ -63,12 +63,8 @@ the database.
   clock out of the night and rolls the date into a fresh limit. When the
   Windows zone name changes, log an event for the parent's page.
 * product: fully offline mode, with no account, for a computer that never
-  syncs:
-  * One static page, the same file for everybody, with the secret in the
-    URL after `#`, which the server never sees. It makes extra-time codes
-    in the browser.
-  * The link holds the secret: the parent bookmarks it, a second parent
-    gets it. Not browser storage, which Safari clears.
+  syncs. `parent/extra_time.html` already makes the codes in the browser
+  from the secret in its address after `#`; left is the secret's direction.
   * The page generates the secret and the parent types it into the
     installer's setup code field. Longer than a setup code, so the
     installer writes it to `secret.txt` and never contacts the server.
