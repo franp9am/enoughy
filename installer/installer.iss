@@ -187,7 +187,8 @@ begin
   ParentPage.Add('Password again:', True);
 
   ServerPage := CreateInputQueryPage(ParentPage.ID, 'Parent''s server', 'Where does the monitor report to?',
-    'The child token comes from add_child.py on the parent''s server. Leave it empty to run without syncing; then the server is never contacted.');
+    'The child token comes from whoever runs the parent''s server. Leave it empty to run without syncing; then the server is never contacted ' +
+    'and extra time comes through the offline codes.');
   ServerPage.Add('Child token:', False);
   ServerPage.Add('Server URL:', False);
 
@@ -196,7 +197,7 @@ begin
   // changes them. The values go through settings.py, which validates them again.
   SettingsPage := CreateInputQueryPage(ServerPage.ID, 'Time limits', 'How long a day, and until when?',
     'The limit counts the time the child is logged in. At the night time the computer shuts down. ' +
-    'Both can be changed later on the parent''s server; the exceptions per weekday and the carryover of unused time only there.');
+    'Both can be changed later, on the parent''s server or in settings.json; the exceptions per weekday and the carryover of unused time only there.');
   SettingsPage.Add('Minutes a day:', False);
   SettingsPage.Add('Day starts (H:MM):', False);
   SettingsPage.Add('Night starts (H:MM; leave both times empty for no night):', False);
@@ -263,8 +264,8 @@ begin
   if CurPageID = SettingsPage.ID then ShowBasics;
   if (CurPageID = wpFinished) and (NewSecret <> '') then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
-      'Shared secret, needed by grant_extra_time_offline.py on your own machine (it stays in ' +
-      ChildDataDir + '\secret.txt here):' + #13#10 + NewSecret;
+      'Shared secret for the offline extra-time codes, which https://pfranek.cz/enoughy-extra-time.html makes on your own machine; ' +
+      'with a server, ignore it. It stays in ' + ChildDataDir + '\secret.txt here:' + #13#10 + NewSecret;
   if (CurPageID = wpFinished) and Demote then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
       'After the restart ' + Child('') + ' is a standard user.';

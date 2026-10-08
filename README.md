@@ -10,7 +10,8 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 1. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
    administrator rights, which local account is the child's, optionally for the child
-   token and URL of the parent's server, and for the daily limit and the night time;
+   token you got from whoever runs the parent's server and that server's URL, and for
+   the daily limit and the night time;
    a reinstall shows the values in force. The child's account must not be an
    administrator: when it is, the installer offers to make it a standard user, and on
    a machine where it is the only account it first creates an administrator account
