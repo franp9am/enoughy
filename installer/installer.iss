@@ -6,10 +6,9 @@
 ; own Python (bundled from installer\build\python, which
 ; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
 ; locks it, the widget and the "Extra time" dialog into the shared folder, with
-; one shortcut to the dialog on the shared desktop and one in the shared Start
-; menu, and for each child registers a widget task at logon, next to the monitor
-; task at boot. Running it again and picking another account adds that child
-; next to the ones there.
+; one shortcut to the dialog in the shared Start menu, and for each child
+; registers a widget task at logon, next to the monitor task at boot. Running it
+; again and picking another account adds that child next to the ones there.
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
 ;
@@ -78,9 +77,8 @@ Name: "{app}\data\{code:Child}"
 Name: "{#SharedDir}\{code:Child}"
 
 [Icons]
-; One for the whole machine: the dialog goes by the account that opens it. The
-; Start menu one is found by typing "extra", wherever the desktop is.
-Name: "{commondesktop}\Extra time";  Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{#SharedDir}\enter_code.py"""; WorkingDir: "{#SharedDir}"
+; One for the whole machine, found by typing "extra": the dialog goes by the
+; account that opens it. Nothing on the desktop; few would use it there.
 Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{#SharedDir}\enter_code.py"""; WorkingDir: "{#SharedDir}"
 
 [InstallDelete]

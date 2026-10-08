@@ -93,8 +93,8 @@ Then, each time, the page makes one of two codes:
 * **No night:** the machine stays up until midnight on that one date, and the daily
   limit still counts. It works any number of times that day, and on that day only.
 
-The child opens "Extra time" -- from the desktop, or by typing "extra" in the Start
-menu -- and pastes the code; the monitor picks it up within a minute and says so.
+The child opens "Extra time" -- by typing "extra" in the Start menu -- and pastes
+the code; the monitor picks it up within a minute and says so.
 
 ## License
 
