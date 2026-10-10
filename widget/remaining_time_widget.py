@@ -101,19 +101,16 @@ _user32.GetAsyncKeyState.restype = ctypes.c_short
 
 
 def format_remaining(seconds):
-    """Hours and minutes, short enough to sit in the corner ("2h 58 min"),
+    """Hours and minutes, short enough to sit in the corner ("2h 58m", "45 min"),
     rounded up so anything under a minute still reads as "1 min", not "0 min"."""
     seconds = max(0, seconds)
     total_minutes = math.ceil(seconds / 60)
     hours, minutes = divmod(total_minutes, 60)
 
-    parts = []
-    if hours:
-        parts.append(f"{hours}h")
+    if not hours:
+        return f"{minutes} min"
     # Skip minutes only for an exact number of hours (e.g. "2h").
-    if minutes or not hours:
-        parts.append(f"{minutes} min")
-    return " ".join(parts)
+    return f"{hours}h {minutes}m" if minutes else f"{hours}h"
 
 
 def color_for(seconds):

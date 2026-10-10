@@ -8,7 +8,7 @@ def test_whole_hours_show_no_minutes():
 
 
 def test_hours_and_minutes():
-    assert widget.format_remaining(2 * 3600 + 58 * 60) == "2h 58 min"
+    assert widget.format_remaining(2 * 3600 + 58 * 60) == "2h 58m"
 
 
 def test_under_an_hour_shows_minutes_only():
