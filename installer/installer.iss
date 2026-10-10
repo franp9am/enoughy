@@ -563,4 +563,9 @@ begin
   DeleteTask('EnoughyWidget');   // installs up to 0.7
   Names := Children;
   for I := 0 to GetArrayLength(Names) - 1 do DeleteTask(WidgetTask(Names[I]));
+  // Ending a task returns before its process is gone, and a widget started by
+  // hand is no task's; a running exe keeps its folder from being deleted.
+  TryRun('{sys}\WindowsPowerShell\v1.0\powershell.exe',
+    '-NoProfile -Command "Get-Process python, pythonw -ErrorAction SilentlyContinue | ' +
+    'Where-Object Path -like ''{#PythonDir}\*'' | Stop-Process -Force"');
 end;
