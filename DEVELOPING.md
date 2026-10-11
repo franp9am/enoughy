@@ -47,8 +47,8 @@ uv run uvicorn app:app --host 127.0.0.1
 A parent registers at `/register` and adds children on the page, which shows the token
 for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
 No email is collected, so there is no password recovery: a parent who lost theirs
-writes to the maintainer and proves the family with a child's token or secret, and
-`set_password.py <login>` sets a new one. A parent logs in at `/login` with the
+writes to the maintainer and proves the family with a child's token, the only thing
+both they and the server know, and `set_password.py <login>` sets a new one. A parent logs in at `/login` with the
 password stored as a bcrypt hash;
 a row in `sessions` and a `session` cookie keep them logged in for 90 days or until
 `/logout` deletes the row. The cookie is marked `Secure`, so the site must be https;

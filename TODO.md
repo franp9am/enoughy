@@ -46,8 +46,7 @@ the database.
   parent's page; a name typed at registration cannot tell them from a
   stranger.
 * server: a parent changes their own password on the page; until then
-  `set_password.py` by the maintainer, after proof by a child's token or
-  secret.
+  `set_password.py` by the maintainer, after proof by a child's token.
 * installer, admin accounts, left: an account named `parent` already there
   fails the install at "creating the administrator account"; hiding `parent`
   from the login screen is one registry key, not done. The uninstaller leaves
