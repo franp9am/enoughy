@@ -26,6 +26,15 @@ def test_right_password_under_another_login_names_nobody(client):
     assert auth.parent_from_credentials(connection, "petr", "correct horse") is None
 
 
+def test_parent_with_no_password_yet_cannot_log_in(client):
+    connection = db.connect()
+    add_parent.family_id(connection, "novak")
+    connection.execute("INSERT INTO parents (login, family_id, password_hash) VALUES ('anna', 1, '')")
+    connection.commit()
+    assert auth.parent_from_credentials(connection, "anna", "") is None
+    assert auth.parent_from_credentials(connection, "anna", "anything") is None
+
+
 def test_short_password_is_refused(client):
     connection = db.connect()
     with pytest.raises(ValueError):
