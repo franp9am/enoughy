@@ -10,7 +10,10 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS families (
     id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE,
+    -- 16 random bytes as hex, for life; each child's key is derived from it.
+    -- NULL for a family from before it existed, until it first adds a child.
+    secret TEXT
 );
 CREATE TABLE IF NOT EXISTS parents (
     id INTEGER PRIMARY KEY,
@@ -28,9 +31,6 @@ CREATE TABLE IF NOT EXISTS children (
     family_id INTEGER NOT NULL REFERENCES families(id),
     name TEXT NOT NULL,
     token TEXT NOT NULL UNIQUE,
-    -- the key of the offline extra-time codes, hex, as in the install's
-    -- secret.txt; NULL when the server does not know it
-    secret TEXT,
     UNIQUE (family_id, name)
 );
 CREATE TABLE IF NOT EXISTS grants (

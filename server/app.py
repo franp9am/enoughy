@@ -345,24 +345,30 @@ def synced_children(connection: sqlite3.Connection, family_id: int) -> list[sqli
     ).fetchall()
 
 
-def children_with_codes(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
+def family_secret(connection: sqlite3.Connection, family_id: int) -> str | None:
     return connection.execute(
-        "SELECT id, name FROM children WHERE family_id = :family_id AND secret IS NOT NULL"
-        " ORDER BY id",
-        {"family_id": family_id},
-    ).fetchall()
+        "SELECT secret FROM families WHERE id = ?", (family_id,)
+    ).fetchone()["secret"]
+
+
+def child_key(family_secret_hex: str, child_name: str) -> str:
+    """The key in the child's secret.txt: 16 bytes of HMAC-SHA256(family secret, name),
+    as hex. A child who reads it off their machine learns nothing about a sibling's.
+    The name is part of the key, so a child's name never changes."""
+    mac = hmac.new(bytes.fromhex(family_secret_hex), child_name.encode(), hashlib.sha256)
+    return mac.hexdigest()[:32]
 
 
 # Mirror of handle_redeem_file in monitor/monitor.py and of the signing in
 # parent/extra_time.html: a code is <date>:<seconds>:<signature> for extra time
 # or <date>:nonight:<signature> for no night that day, HMAC-SHA256 under the
-# child's secret, cut to SIGNATURE_CHARS, which must equal monitor/config.py.
+# child's key, cut to SIGNATURE_CHARS, which must equal monitor/config.py.
 SIGNATURE_CHARS = 4
 
 
-def extra_time_code(secret_hex: str, date: str, what: str) -> str:
+def extra_time_code(key_hex: str, date: str, what: str) -> str:
     payload = f"{date}:{what}"
-    signature = hmac.new(bytes.fromhex(secret_hex), payload.encode(), hashlib.sha256).hexdigest()
+    signature = hmac.new(bytes.fromhex(key_hex), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}:{signature[:SIGNATURE_CHARS]}"
 
 
@@ -537,7 +543,7 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
         status = last_seen(connection, selected_child["id"])
         week = last_week(connection, selected_child["id"])
         settings = settings_view(connection, selected_child["id"])
-    has_codes = bool(children_with_codes(connection, parent.family_id))
+    has_codes = family_secret(connection, parent.family_id) is not None
     connection.close()
     return templates.TemplateResponse(
         request,
@@ -604,10 +610,13 @@ def logout(request: Request) -> RedirectResponse:
 def codes_page(request: Request) -> HTMLResponse:
     parent = current_parent(request)
     connection = db.connect()
-    children = children_with_codes(connection, parent.family_id)
+    children = children_in_family(connection, parent.family_id)
+    has_secret = family_secret(connection, parent.family_id) is not None
     connection.close()
     return templates.TemplateResponse(
-        request, "codes.html", {"parent": parent, "children": children, "code": None}
+        request,
+        "codes.html",
+        {"parent": parent, "children": children if has_secret else [], "code": None},
     )
 
 
@@ -623,23 +632,22 @@ async def make_code(request: Request) -> HTMLResponse:
         raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers")
     connection = db.connect()
     try:
-        require_child_in_family(connection, child_id, parent.family_id)
-        secret = connection.execute(
-            "SELECT secret FROM children WHERE id = ?", (child_id,)
-        ).fetchone()["secret"]
+        child = require_child_in_family(connection, child_id, parent.family_id)
+        secret = family_secret(connection, parent.family_id)
         if secret is None:
-            raise HTTPException(status_code=404, detail="no secret for this child")
-        children = children_with_codes(connection, parent.family_id)
+            raise HTTPException(status_code=404, detail="this family has no secret yet")
+        children = children_in_family(connection, parent.family_id)
     finally:
         connection.close()
     today = datetime.now(DISPLAY_TIMEZONE).date().isoformat()
+    code = extra_time_code(child_key(secret, child["name"]), today, what)
     return templates.TemplateResponse(
         request,
         "codes.html",
         {
             "parent": parent,
             "children": children,
-            "code": {"child_id": child_id, "text": extra_time_code(secret, today, what)},
+            "code": {"child_id": child_id, "text": code},
         },
     )
 
