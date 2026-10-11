@@ -55,6 +55,15 @@ a row in `sessions` and a `session` cookie keep them logged in for 90 days or un
 browsers make an exception for `127.0.0.1`, which is how the server runs locally. The
 reverse proxy in front only forwards.
 
+Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
+older marwin.pfranek.cz, one certificate for all five: the clone in `~/enoughy`, the
+database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
+port 8000 with rate limits. A cookie belongs to one host name, so each name is its own
+login. A deploy is `git pull` and `sudo systemctl restart enoughy`; the unit runs
+`uv run`, which installs a new dependency by itself. A new column goes into the live
+database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF NOT
+EXISTS` never touches an existing table.
+
 The server stays compatible with every monitor version still installed: it accepts an
 old report and sends back only what that version understands.
 
