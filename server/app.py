@@ -368,7 +368,9 @@ def parent_for_login(connection: sqlite3.Connection, login: str, password: str) 
         "SELECT id, login, family_id, password_hash FROM parents WHERE login = :login",
         {"login": login},
     ).fetchone()
-    if row is None or not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+    if row is None or not row["password_hash"]:
+        return None  # a parent without a password yet cannot log in
+    if not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
         return None
     return Parent(id=row["id"], login=row["login"], family_id=row["family_id"])
 
