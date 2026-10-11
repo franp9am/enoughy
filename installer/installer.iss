@@ -94,7 +94,7 @@ Type: filesandordirs; Name: "{#PythonDir}"
 
 [Code]
 const
-  DefaultServerUrl = 'https://marwin.pfranek.cz';   // the author's server; a child token from it is what turns syncing on
+  DefaultServerUrl = 'https://enoughy.com';   // the author's server; a child token from it is what turns syncing on
   ParentName = 'parent';   // the administrator account made when the child's is the only one
 
 var

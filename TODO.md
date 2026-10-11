@@ -74,6 +74,12 @@ the database.
   * Maybe later: the installer makes the secret and shows the link as a QR
     code, so nothing is typed.
 
+* site: enoughy.com is the address since 2026-10-11; enoughy.cz, www and the
+  old marwin.pfranek.cz answer too. Once the description exists, `/` shows it
+  to a stranger and the overview to a parent, the extra-time page is served
+  there, and the other names redirect the page paths only: installed monitors
+  sync to marwin.pfranek.cz, and urllib turns a redirected POST into a GET.
+
 ## Someday / maybe
 
 * Delay a time zone change, if the events show anyone using the trick: count
