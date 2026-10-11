@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Screen time</title>
+<title>Enoughy</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -46,23 +46,11 @@
 </head>
 <body>
   <div class="page">
-    <!-- Logging out of basic auth means making the browser forget the password
-         it cached, and the only way to do that is to hand it a different one.
-         The credentials below are bogus on purpose; /logout is the one path
-         nginx checks against an htpasswd that contains nothing else, so they
-         are accepted there and take the place of the real password. It then
-         redirects to /, which 401s -- and because that URL carries no
-         credentials of its own, the login box it opens is one that can
-         actually be answered. Sending the bogus pair straight to / instead
-         would log the parent out and then refuse every password they type,
-         since credentials in the address bar beat anything typed into the
-         prompt. Scheme is hardcoded because a redirect from http would drop
-         them. -->
-    <h1>Screen time<a class="whoami" href="https://{{ logout_login }}:{{ logout_login }}@{{ request.url.hostname }}/logout" title="Sign out">
+    <h1>Enoughy{% if parent %}<a class="whoami" href="{{ url_for('logout') }}" title="Sign out">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="8" r="3.6"></circle>
         <path d="M4.8 20c0-3.7 3.2-5.6 7.2-5.6s7.2 1.9 7.2 5.6"></path>
-      </svg>{{ parent.login }}</a></h1>
+      </svg>{{ parent.login }}</a>{% endif %}</h1>
 
     {% block content %}{% endblock %}
   </div>

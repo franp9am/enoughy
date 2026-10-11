@@ -2,12 +2,14 @@ import csv
 import io
 import json
 import re
+import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import bcrypt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -19,9 +21,8 @@ import db
 # rendered times must not depend on the server process's own timezone.
 DISPLAY_TIMEZONE = ZoneInfo("Europe/Prague")
 
-# The account that exists only to be the wrong password, in nginx's htpasswd for
-# /logout and nowhere else. No parent may use this login.
-LOGOUT_LOGIN = "logout"
+SESSION_COOKIE = "session"
+SESSION_DAYS = 90
 
 
 class SettingsChangeOutcome(BaseModel):
@@ -352,24 +353,40 @@ app = FastAPI()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-def current_parent(request: Request) -> Parent:
-    """The only place that knows how a person proves who they are.
+class NotLoggedIn(Exception):
+    pass
 
-    nginx does the authenticating and passes the name it verified; swapping it
-    for a session cookie or an identity provider means rewriting this function
-    and nothing else. The app must therefore never be reachable except through
-    the proxy, which overwrites the header on every request.
-    """
-    login = request.headers.get("x-remote-user", "")
-    if not login:
-        raise HTTPException(status_code=403, detail="request did not come through the proxy")
+
+@app.exception_handler(NotLoggedIn)
+def send_to_login(request: Request, error: NotLoggedIn) -> RedirectResponse:
+    return RedirectResponse("/login", status_code=303)
+
+
+def parent_for_login(connection: sqlite3.Connection, login: str, password: str) -> Parent | None:
+    """The parent with this login and password, or None."""
+    row = connection.execute(
+        "SELECT id, login, family_id, password_hash FROM parents WHERE login = :login",
+        {"login": login},
+    ).fetchone()
+    if row is None or not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
+        return None
+    return Parent(id=row["id"], login=row["login"], family_id=row["family_id"])
+
+
+def current_parent(request: Request) -> Parent:
+    """The only place that knows how a person proves who they are: by the
+    cookie that /login set. Swapping it for an identity provider means
+    rewriting this function and nothing else."""
     connection = db.connect()
     parent = connection.execute(
-        "SELECT id, login, family_id FROM parents WHERE login = :login", {"login": login}
+        "SELECT parents.id, login, family_id FROM sessions"
+        " JOIN parents ON parents.id = sessions.parent_id"
+        " WHERE sessions.id = :session",
+        {"session": request.cookies.get(SESSION_COOKIE, "")},
     ).fetchone()
     connection.close()
     if parent is None:
-        raise HTTPException(status_code=403, detail=f"no parent for {login}")
+        raise NotLoggedIn()
     return Parent(id=parent["id"], login=parent["login"], family_id=parent["family_id"])
 
 
@@ -498,41 +515,53 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
             "last_seen": status,
             "settings": settings,
             "week": week,
-            "logout_login": LOGOUT_LOGIN,
         },
     )
 
 
+@app.get("/login")
+def login_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "login.html", {"error": None})
+
+
+@app.post("/login")
+async def login(request: Request) -> Response:
+    form = await request.form()
+    connection = db.connect()
+    parent = parent_for_login(connection, form.get("login", ""), form.get("password", ""))
+    if parent is None:
+        connection.close()
+        return templates.TemplateResponse(
+            request, "login.html", {"error": "Wrong login or password."}, status_code=401
+        )
+    session_id = secrets.token_urlsafe(32)
+    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with connection:
+        connection.execute(
+            "INSERT INTO sessions (id, parent_id, created_at) VALUES (?, ?, ?)",
+            (session_id, parent.id, created_at),
+        )
+    connection.close()
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE, session_id, max_age=SESSION_DAYS * 24 * 3600,
+        httponly=True, secure=True, samesite="lax",
+    )
+    return response
+
+
 @app.get("/logout")
 def logout(request: Request) -> RedirectResponse:
-    """Signs the parent out by handing the browser a useless password.
-
-    The logout/logout account is real on the /logout endpoint:
-    nginx checks this one path against an htpasswd file of its own that holds
-    nothing else, so the login here succeeds.
-
-    A browser keeps only one password per site, so it drops the
-    parent's real one and keeps the junk one. We then send it back to /,
-    where the junk password is refused and the login box opens.
-
-    The check below is there because nginx has to be the one asking for the
-    password. If it stops guarding this path, the browser is never asked, so
-    nothing replaces the real password and the parent stays logged in.
-
-    The redirect has to name the address in full. The parent gets here from
-    https://logout:logout@<host>/logout, and a bare "/" would tell the browser
-    to reuse everything in front of it -- logout:logout included. It would
-    arrive back at / still carrying the junk password, and a password in the
-    address always wins over one typed into the login box.
-
-    TODO: replace all of this with a session cookie and a login form, where
-    signing out simply deletes the cookie.
-    """
-    login = request.headers.get("x-remote-user", "")
-    if login != LOGOUT_LOGIN:
-        raise HTTPException(status_code=403, detail="/logout was not password-protected")
-    host = request.headers.get("host", "")
-    return RedirectResponse(f"https://{host}/", status_code=302)
+    """Deletes the session, so the cookie is worthless even if the browser keeps it."""
+    connection = db.connect()
+    with connection:
+        connection.execute(
+            "DELETE FROM sessions WHERE id = ?", (request.cookies.get(SESSION_COOKIE, ""),)
+        )
+    connection.close()
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 @app.post("/grants")
@@ -583,7 +612,6 @@ def settings_page(request: Request, child_id: int) -> HTMLResponse:
             "child": child,
             "settings": view,
             "fields": fields,
-            "logout_login": LOGOUT_LOGIN,
         },
     )
 

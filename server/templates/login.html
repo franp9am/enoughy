@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block style %}
+<style>
+  .login-form { display: grid; gap: .6rem; }
+  .login-form input {
+    padding: .55rem .6rem; border-radius: 6px;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+  }
+  .login-form input:focus { outline: none; border-color: #888; }
+  .login-form button {
+    justify-self: end; padding: .55rem 1.4rem; border-radius: 6px;
+    border: 1px solid #1a1a1a; cursor: pointer;
+    background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
+  }
+  .error { margin: 0; color: #b00020; font-size: .9rem; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card plain">
+  <div class="section">
+    <form class="login-form" method="post" action="{{ url_for('login') }}">
+      <input type="text" name="login" placeholder="Login" autocomplete="username" autofocus required>
+      <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

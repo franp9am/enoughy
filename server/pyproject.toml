@@ -3,11 +3,15 @@ name = "child-control-server"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+    "bcrypt",
     "fastapi",
     "jinja2>=3.1.6",
     "python-multipart>=0.0.32",
     "uvicorn",
 ]
+
+[dependency-groups]
+dev = ["pytest", "httpx2", "tzdata"]
 
 [build-system]
 requires = ["hatchling"]

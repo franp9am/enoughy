@@ -41,15 +41,17 @@ and grants queue until the next sync.
 ```
 cd server
 uv sync
-uv run python add_parent.py <login> <family>   # prints the htpasswd line to run next
+uv run python add_parent.py <login> <family>   # asks for the parent's password
 uv run python add_child.py <family> <name>     # prints the child token for the setup
 uv run uvicorn app:app --host 127.0.0.1
 ```
 
-Authentication lives entirely in the reverse proxy in front of it, which checks the
-password and passes the login in an `X-Remote-User` header. So keep the app on
-`127.0.0.1`, and the proxy must blank that header on anything it does not authenticate,
-or a client could name any parent it likes.
+A parent logs in at `/login` with the password `add_parent.py` stored as a bcrypt hash;
+a row in `sessions` and a `session` cookie keep them logged in for 90 days or until
+`/logout` deletes the row. The cookie is marked `Secure`, so the site must be https;
+browsers make an exception for `127.0.0.1`, which is how the server runs locally
+(`--with tzdata` on Windows, which has no time zone database of its own). The reverse
+proxy in front only forwards.
 
 The server stays compatible with every monitor version still installed: it accepts an
 old report and sends back only what that version understands.
@@ -66,7 +68,10 @@ under `data\`, which only the setup creates. For an install older than 0.5,
 
 ## Tests
 
-    uv run --with pytest python -m pytest tests -q
+    uv run --project server pytest -q
+
+The server's environment runs the whole suite, since the server tests drive the
+app in-process and need its packages; the monitor tests need none.
 
 Untested on purpose: `os_tooling` (needs real Windows sessions), `main()` and the
 widget's Tk part.

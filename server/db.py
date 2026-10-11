@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 DB_PATH = Path(
-    os.environ.get("CHILD_CONTROL_DB") or Path(__file__).parent / "data" / "child_control.sqlite"
+    os.environ.get("ENOUGHY_DB") or Path(__file__).parent / "data" / "enoughy.sqlite"
 )
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -15,7 +15,13 @@ CREATE TABLE IF NOT EXISTS families (
 CREATE TABLE IF NOT EXISTS parents (
     id INTEGER PRIMARY KEY,
     login TEXT NOT NULL UNIQUE,
-    family_id INTEGER NOT NULL REFERENCES families(id)
+    family_id INTEGER NOT NULL REFERENCES families(id),
+    password_hash TEXT NOT NULL  -- bcrypt
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,  -- the cookie's value
+    parent_id INTEGER NOT NULL REFERENCES parents(id),
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS children (
     id INTEGER PRIMARY KEY,

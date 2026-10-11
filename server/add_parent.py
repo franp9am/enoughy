@@ -1,5 +1,8 @@
+import getpass
 import sqlite3
 import sys
+
+import bcrypt
 
 import db
 
@@ -14,29 +17,37 @@ def family_id(connection: sqlite3.Connection, family_name: str) -> int:
     ).fetchone()["id"]
 
 
+def add_parent(
+    connection: sqlite3.Connection, login: str, family_name: str, password: str
+) -> None:
+    if not password:
+        raise ValueError("empty password")
+    # Work factor 10 is about 100 ms per check: slow enough that a stolen
+    # database does not give the passwords up, fast enough for a login form.
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=10))
+    with connection:
+        connection.execute(
+            "INSERT INTO parents (login, family_id, password_hash) VALUES (?, ?, ?)",
+            (login, family_id(connection, family_name), password_hash.decode()),
+        )
+
+
 def main() -> None:
     if len(sys.argv) != 3:
         sys.exit("usage: python add_parent.py <login> <family>")
     login, family_name = sys.argv[1], sys.argv[2]
+    password = getpass.getpass(f"password for {login}: ")
     db.create_schema()
     connection = db.connect()
     try:
-        with connection:
-            connection.execute(
-                "INSERT INTO parents (login, family_id) VALUES (?, ?)",
-                (login, family_id(connection, family_name)),
-            )
+        add_parent(connection, login, family_name, password)
     except sqlite3.IntegrityError:
         sys.exit(f"parent {login!r} already exists")
+    except ValueError as error:
+        sys.exit(str(error))
     finally:
         connection.close()
     print(f"{login} added to family {family_name}")
-    # The htpasswd file is the other half of an account: this row says which
-    # family the login belongs to, that file says how the login is proved.
-    # -B -C 10 is bcrypt at a work factor of about 100 ms per check: plain
-    # htpasswd still defaults to MD5, which a stolen file gives up in minutes.
-    print(f"now give them a password: sudo htpasswd -B -C 10 /etc/nginx/htpasswd {login}")
-    print("(add -c if /etc/nginx/htpasswd does not exist yet -- it truncates the file)")
 
 
 if __name__ == "__main__":
