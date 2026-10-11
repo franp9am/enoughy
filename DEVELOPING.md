@@ -46,6 +46,8 @@ uv run uvicorn app:app --host 127.0.0.1
 
 A parent registers at `/register` and adds children on the page, which shows the token
 for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
+With `ENOUGHY_INVITE` set in the service's environment, `/register` opens only from a
+link that carries it, `/register?invitation=<value>`; unset, registration is open.
 No email is collected, so there is no password recovery: a parent who lost theirs
 writes to the maintainer and proves the family with a child's token, the only thing
 both they and the server know, and `set_password.py <login>` sets a new one. A parent logs in at `/login` with the

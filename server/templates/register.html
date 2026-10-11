@@ -23,13 +23,18 @@
 {% block content %}
 <div class="card plain">
   <div class="section">
+    {% if closed %}
+    <p class="note">Registration is by invitation. Write to the maintainer for a link.</p>
+    {% else %}
     <form class="login-form" method="post" action="{{ url_for('register') }}">
+      <input type="hidden" name="invitation" value="{{ invitation }}">
       <input type="text" name="login" placeholder="Login" autocomplete="username" autofocus required>
       <input type="password" name="password" placeholder="Password, 8 characters or more" autocomplete="new-password" minlength="8" required>
       <p class="note">We ask for no email, so there is no password recovery. Write it down.</p>
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
       <button type="submit">Register</button>
     </form>
+    {% endif %}
     <p class="aside">Already registered? <a href="{{ url_for('login_form') }}">Sign in</a></p>
   </div>
 </div>

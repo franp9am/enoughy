@@ -33,3 +33,26 @@ def test_set_password_changes_it_and_logs_the_parent_out(anna_logged_in, monkeyp
     assert anna_logged_in.get("/", follow_redirects=False).headers["location"] == "/login"
     answer = anna_logged_in.post("/login", data={"login": "anna", "password": "a new password"})
     assert answer.status_code == 200
+
+
+def test_with_an_invite_set_the_form_needs_the_link(client, monkeypatch):
+    monkeypatch.setenv("ENOUGHY_INVITE", "friends-only")
+    closed = client.get("/register")
+    assert closed.status_code == 403
+    assert 'name="login"' not in closed.text
+    opened = client.get("/register?invitation=friends-only")
+    assert opened.status_code == 200
+    assert 'name="login"' in opened.text
+
+
+def test_with_an_invite_set_registering_needs_it_too(client, monkeypatch):
+    monkeypatch.setenv("ENOUGHY_INVITE", "friends-only")
+    refused = client.post("/register", data={"login": "anna", "password": "correct horse"})
+    assert refused.status_code == 403
+    assert "session" not in client.cookies
+    accepted = client.post(
+        "/register",
+        data={"login": "anna", "password": "correct horse", "invitation": "friends-only"},
+    )
+    assert accepted.status_code == 200
+    assert "session" in client.cookies

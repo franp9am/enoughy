@@ -6,6 +6,7 @@ import tempfile
 # db.py reads this when it is imported and app.py creates the schema there at
 # once; sending that to a temp folder keeps the import away from server/data.
 os.environ["ENOUGHY_DB"] = os.path.join(tempfile.mkdtemp(), "import.sqlite")
+os.environ.pop("ENOUGHY_INVITE", None)  # registration is open in the tests unless one sets it
 
 import pytest
 from fastapi.testclient import TestClient

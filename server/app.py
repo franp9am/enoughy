@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import io
 import json
+import os
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -527,13 +528,31 @@ async def login(request: Request) -> Response:
 
 
 @app.get("/register")
-def register_form(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "register.html", {"error": None})
+def register_form(request: Request, invitation: str = "") -> HTMLResponse:
+    if not invited(invitation):
+        return by_invitation_only(request)
+    return templates.TemplateResponse(
+        request, "register.html", {"error": None, "invitation": invitation}
+    )
+
+
+def invited(invitation: str) -> bool:
+    """Registration is open while ENOUGHY_INVITE is unset; otherwise the link
+    handed out by the maintainer carries the value, and the form passes it on."""
+    wanted = os.environ.get("ENOUGHY_INVITE")
+    return not wanted or hmac.compare_digest(invitation, wanted)
+
+
+def by_invitation_only(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "register.html", {"closed": True}, status_code=403)
 
 
 @app.post("/register")
 async def register(request: Request) -> Response:
     form = await request.form()
+    invitation = form.get("invitation", "")
+    if not invited(invitation):
+        return by_invitation_only(request)
     login = form.get("login", "").strip()
     connection = db.connect()
     try:
@@ -541,12 +560,18 @@ async def register(request: Request) -> Response:
     except ValueError as error:
         connection.close()
         return templates.TemplateResponse(
-            request, "register.html", {"error": str(error).capitalize() + "."}, status_code=400
+            request,
+            "register.html",
+            {"error": str(error).capitalize() + ".", "invitation": invitation},
+            status_code=400,
         )
     except sqlite3.IntegrityError:
         connection.close()
         return templates.TemplateResponse(
-            request, "register.html", {"error": f"{login} is taken."}, status_code=400
+            request,
+            "register.html",
+            {"error": f"{login} is taken.", "invitation": invitation},
+            status_code=400,
         )
     response = start_session(connection, parent_id)
     connection.close()
