@@ -41,17 +41,19 @@ and grants queue until the next sync.
 ```
 cd server
 uv sync
-uv run python add_parent.py <login> <family>   # asks for the parent's password
-uv run python add_child.py <family> <name>     # prints the child token for the setup
 uv run uvicorn app:app --host 127.0.0.1
 ```
 
-A parent logs in at `/login` with the password `add_parent.py` stored as a bcrypt hash;
+A parent registers at `/register` and adds children on the page, which shows the token
+for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
+No email is collected, so there is no password recovery: a parent who lost theirs
+writes to the maintainer and proves the family with a child's token or secret, and
+`set_password.py <login>` sets a new one. A parent logs in at `/login` with the
+password stored as a bcrypt hash;
 a row in `sessions` and a `session` cookie keep them logged in for 90 days or until
 `/logout` deletes the row. The cookie is marked `Secure`, so the site must be https;
-browsers make an exception for `127.0.0.1`, which is how the server runs locally
-(`--with tzdata` on Windows, which has no time zone database of its own). The reverse
-proxy in front only forwards.
+browsers make an exception for `127.0.0.1`, which is how the server runs locally. The
+reverse proxy in front only forwards.
 
 The server stays compatible with every monitor version still installed: it accepts an
 old report and sends back only what that version understands.

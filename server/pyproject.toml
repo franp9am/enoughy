@@ -7,11 +7,12 @@ dependencies = [
     "fastapi",
     "jinja2>=3.1.6",
     "python-multipart>=0.0.32",
+    "tzdata",  # Windows has no time zone database of its own
     "uvicorn",
 ]
 
 [dependency-groups]
-dev = ["pytest", "httpx2", "tzdata"]
+dev = ["pytest", "httpx2"]
 
 [build-system]
 requires = ["hatchling"]

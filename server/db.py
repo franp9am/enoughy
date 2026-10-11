@@ -10,7 +10,10 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS families (
     id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE,
+    -- 16 random bytes as hex, for life; each child's key is derived from it.
+    -- NULL for a family from before it existed, until it first adds a child.
+    secret TEXT
 );
 CREATE TABLE IF NOT EXISTS parents (
     id INTEGER PRIMARY KEY,

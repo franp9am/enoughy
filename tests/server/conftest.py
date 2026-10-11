@@ -23,3 +23,10 @@ def client(tmp_path, monkeypatch):
     db.create_schema()
     # https, or the client would drop the session cookie, which is marked Secure
     return TestClient(app.app, base_url="https://testserver")
+
+
+@pytest.fixture
+def anna_logged_in(client):
+    """Anna has just registered, so she is logged in and has no children yet."""
+    client.post("/register", data={"login": "anna", "password": "correct horse"})
+    return client

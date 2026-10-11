@@ -2,27 +2,27 @@ import csv
 import io
 import json
 import re
-import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import bcrypt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+import add_child
+import add_parent
 import db
+from auth import (
+    NotLoggedIn, current_parent, end_session, parent_from_credentials, start_session,
+)
 
 # The page is read by the family, not by whoever happens to host it, so the
 # rendered times must not depend on the server process's own timezone.
 DISPLAY_TIMEZONE = ZoneInfo("Europe/Prague")
-
-SESSION_COOKIE = "session"
-SESSION_DAYS = 90
 
 
 class SettingsChangeOutcome(BaseModel):
@@ -58,13 +58,6 @@ class SettingsChange(BaseModel):
 class SyncResponse(BaseModel):
     pending_grants: list[PendingGrant]
     settings_change: SettingsChange | None = None
-
-
-@dataclass
-class Parent:
-    id: int
-    login: str
-    family_id: int
 
 
 @dataclass
@@ -329,7 +322,7 @@ def export_filename(child_name: str, table: str) -> str:
 
 def children_in_family(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
     return connection.execute(
-        "SELECT id, name FROM children WHERE family_id = :family_id ORDER BY id",
+        "SELECT id, name, token FROM children WHERE family_id = :family_id ORDER BY id",
         {"family_id": family_id},
     ).fetchall()
 
@@ -353,55 +346,9 @@ app = FastAPI()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-class NotLoggedIn(Exception):
-    pass
-
-
 @app.exception_handler(NotLoggedIn)
 def send_to_login(request: Request, error: NotLoggedIn) -> RedirectResponse:
     return RedirectResponse("/login", status_code=303)
-
-
-def parent_for_login(connection: sqlite3.Connection, login: str, password: str) -> Parent | None:
-    """The parent with this login and password, or None."""
-    row = connection.execute(
-        "SELECT id, login, family_id, password_hash FROM parents WHERE login = :login",
-        {"login": login},
-    ).fetchone()
-    if row is None or not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
-        return None
-    return Parent(id=row["id"], login=row["login"], family_id=row["family_id"])
-
-
-def current_parent(request: Request) -> Parent:
-    """The only place that knows how a person proves who they are: by the
-    cookie that /login set. Swapping it for an identity provider means
-    rewriting this function and nothing else."""
-    connection = db.connect()
-    parent = connection.execute(
-        "SELECT parents.id, login, family_id FROM sessions"
-        " JOIN parents ON parents.id = sessions.parent_id"
-        " WHERE sessions.id = :session",
-        {"session": request.cookies.get(SESSION_COOKIE, "")},
-    ).fetchone()
-    connection.close()
-    if parent is None:
-        raise NotLoggedIn()
-    return Parent(id=parent["id"], login=parent["login"], family_id=parent["family_id"])
-
-
-def authenticated_child_id(authorization: str) -> int:
-    scheme, _, token = authorization.partition(" ")
-    if scheme != "Bearer" or not token:
-        raise HTTPException(status_code=401, detail="missing bearer token")
-    connection = db.connect()
-    child = connection.execute(
-        "SELECT id FROM children WHERE token = :token", {"token": token}
-    ).fetchone()
-    connection.close()
-    if child is None:
-        raise HTTPException(status_code=401, detail="unknown token")
-    return child["id"]
 
 
 @app.post("/api/sync")
@@ -528,40 +475,78 @@ def login_form(request: Request) -> HTMLResponse:
 async def login(request: Request) -> Response:
     form = await request.form()
     connection = db.connect()
-    parent = parent_for_login(connection, form.get("login", ""), form.get("password", ""))
+    parent = parent_from_credentials(connection, form.get("login", ""), form.get("password", ""))
     if parent is None:
         connection.close()
         return templates.TemplateResponse(
             request, "login.html", {"error": "Wrong login or password."}, status_code=401
         )
-    session_id = secrets.token_urlsafe(32)
-    created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    with connection:
-        connection.execute(
-            "INSERT INTO sessions (id, parent_id, created_at) VALUES (?, ?, ?)",
-            (session_id, parent.id, created_at),
-        )
+    response = start_session(connection, parent.id)
     connection.close()
-    response = RedirectResponse("/", status_code=303)
-    response.set_cookie(
-        SESSION_COOKIE, session_id, max_age=SESSION_DAYS * 24 * 3600,
-        httponly=True, secure=True, samesite="lax",
-    )
+    return response
+
+
+@app.get("/register")
+def register_form(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "register.html", {"error": None})
+
+
+@app.post("/register")
+async def register(request: Request) -> Response:
+    form = await request.form()
+    login = form.get("login", "").strip()
+    connection = db.connect()
+    try:
+        parent_id = add_parent.add_parent(connection, login, form.get("password", ""))
+    except ValueError as error:
+        connection.close()
+        return templates.TemplateResponse(
+            request, "register.html", {"error": str(error).capitalize() + "."}, status_code=400
+        )
+    except sqlite3.IntegrityError:
+        connection.close()
+        return templates.TemplateResponse(
+            request, "register.html", {"error": f"{login} is taken."}, status_code=400
+        )
+    response = start_session(connection, parent_id)
+    connection.close()
     return response
 
 
 @app.get("/logout")
 def logout(request: Request) -> RedirectResponse:
-    """Deletes the session, so the cookie is worthless even if the browser keeps it."""
     connection = db.connect()
-    with connection:
-        connection.execute(
-            "DELETE FROM sessions WHERE id = ?", (request.cookies.get(SESSION_COOKIE, ""),)
-        )
+    response = end_session(connection, request)
     connection.close()
-    response = RedirectResponse("/login", status_code=303)
-    response.delete_cookie(SESSION_COOKIE)
     return response
+
+
+@app.get("/children")
+def children_page(request: Request) -> HTMLResponse:
+    parent = current_parent(request)
+    connection = db.connect()
+    children = children_in_family(connection, parent.family_id)
+    connection.close()
+    return templates.TemplateResponse(
+        request, "children.html", {"parent": parent, "children": children}
+    )
+
+
+@app.post("/children")
+async def create_child(request: Request) -> RedirectResponse:
+    parent = current_parent(request)
+    form = await request.form()
+    name = form.get("name", "").strip()
+    connection = db.connect()
+    try:
+        add_child.add_child(connection, parent.family_id, name)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail=f"you already have a child named {name}")
+    finally:
+        connection.close()
+    return RedirectResponse("/children", status_code=303)
 
 
 @app.post("/grants")
