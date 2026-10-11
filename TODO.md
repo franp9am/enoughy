@@ -17,6 +17,10 @@ the database.
   * The parent types the code into the installer, which fetches the token
     and the secret. The monitor does not change, and the login password is
     never typed on the child's computer.
+  * The code is the only way a parent connects a machine: the page stops
+    showing the token, the installer stops asking for one, and an old
+    installer is replaced by downloading the current one. In front of a
+    parent there is one path; a second one is confusion, not a fallback.
   * Offline extra-time codes: `/codes` makes them on the server under the key
     derived from the family secret and the child's name, which the setup code
     will write into `secret.txt`; until then by hand. `extra_time.html` stays
