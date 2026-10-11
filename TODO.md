@@ -19,13 +19,10 @@ the database.
   * The parent types the code into the installer, which fetches the token
     and the secret. The monitor does not change, and the login password is
     never typed on the child's computer.
-  * Offline extra-time codes: a `/codes` page makes them on the server for
-    every child with a secret in a new nullable `children.secret`, signed the
-    way `extra_time.html` signs in the browser, which stays for families
-    without an account. The dashboard then lists only children that have
-    synced; `/children` lists all. First use: a child from an offline install,
-    its secret put into the column by hand, a second parent added by CLI. A
-    phone app later keeps the secret and makes them itself.
+  * Offline extra-time codes: `/codes` makes them on the server for every
+    child with a `children.secret`, which the setup code will fill; until then
+    by hand. `extra_time.html` stays for families without an account. A phone
+    app later keeps the secret and makes them itself.
   * The price: the server knows the secret. Small, since it already grants
     any time to a syncing child without it.
   * Maybe later: the same signed exe served under a name that carries the

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block heading %}Extra time codes{% endblock %}
+{% block style %}
+<style>
+  .child h2 { margin-bottom: .6rem; }
+  .code-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .code-form input[type="number"] {
+    width: 4.5rem; padding: .55rem .6rem; border-radius: 6px; text-align: right;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .code-form input:focus { outline: none; border-color: #888; }
+  .code-form input::-webkit-inner-spin-button,
+  .code-form input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .unit { font-size: .9rem; color: #888; }
+  .code-form button {
+    padding: .55rem 1rem; border-radius: 6px; cursor: pointer;
+    font-size: .95rem; font-family: inherit;
+    border: 1px solid #1a1a1a; background: #1a1a1a; color: #fff;
+  }
+  .code-form button.plain { border-color: #ccc; background: #fff; color: #444; }
+  .code-form button.plain:hover { border-color: #999; color: #1a1a1a; }
+  .code {
+    display: block; margin-top: .8rem; padding: .6rem .8rem; border-radius: 6px;
+    background: #f2f2f2; font-size: 1.15rem; letter-spacing: .03em; user-select: all;
+  }
+  .hint { margin: .5rem 0 0; font-size: .85rem; color: #888; }
+  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
+  .aside a { color: #888; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card plain">
+  {% for child in children %}
+  <div class="section child">
+    <h2>{{ child.name }}</h2>
+    <form class="code-form" method="post" action="{{ url_for('make_code') }}">
+      <input type="hidden" name="child_id" value="{{ child.id }}">
+      <input type="number" name="minutes" step="1" min="1" value="60" required>
+      <span class="unit">minutes</span>
+      <button type="submit" name="kind" value="time">Code</button>
+      <button type="submit" name="kind" value="nonight" class="plain">No night today</button>
+    </form>
+    {% if code and code.child_id == child.id %}
+    <code class="code">{{ code.text }}</code>
+    <p class="hint">The child types it into the Extra time dialog. It works once, today's codes only.</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="section"><p class="empty">No child here has a secret the server knows.</p></div>
+  {% endfor %}
+</div>
+<p class="aside"><a href="{{ url_for('index') }}">Back</a></p>
+{% endblock %}

@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS children (
     family_id INTEGER NOT NULL REFERENCES families(id),
     name TEXT NOT NULL,
     token TEXT NOT NULL UNIQUE,
+    -- the key of the offline extra-time codes, hex, as in the install's
+    -- secret.txt; NULL when the server does not know it
+    secret TEXT,
     UNIQUE (family_id, name)
 );
 CREATE TABLE IF NOT EXISTS grants (

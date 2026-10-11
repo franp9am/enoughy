@@ -53,6 +53,11 @@ browsers make an exception for `127.0.0.1`, which is how the server runs locally
 (`--with tzdata` on Windows, which has no time zone database of its own). The reverse
 proxy in front only forwards.
 
+The dashboard lists the children whose machine has synced at least once. `/codes`
+makes offline extra-time codes for the children whose `secret` the database holds, the
+same signing as `parent/extra_time.html`; a secret from an offline install goes into
+that column by hand until the setup code fills it.
+
 The server stays compatible with every monitor version still installed: it accepts an
 old report and sends back only what that version understands.
 
