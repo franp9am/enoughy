@@ -607,16 +607,28 @@ def logout(request: Request) -> RedirectResponse:
 
 
 @app.get("/codes")
-def codes_page(request: Request) -> HTMLResponse:
+def codes_page(request: Request, child_id: int | None = None) -> HTMLResponse:
     parent = current_parent(request)
     connection = db.connect()
     children = children_in_family(connection, parent.family_id)
     has_secret = family_secret(connection, parent.family_id) is not None
     connection.close()
+    if not has_secret:
+        children = []
+    selected_child = next(
+        (child for child in children if child["id"] == child_id),
+        children[0] if children else None,
+    )
     return templates.TemplateResponse(
         request,
         "codes.html",
-        {"parent": parent, "children": children if has_secret else [], "code": None},
+        {
+            "parent": parent,
+            "children": children,
+            "selected_child": selected_child,
+            "minutes": 60,
+            "code": None,
+        },
     )
 
 
@@ -625,10 +637,14 @@ async def make_code(request: Request) -> HTMLResponse:
     """A code for today, signed here so the secret stays on the server."""
     parent = current_parent(request)
     form = await request.form()
+    kind = "nonight" if form.get("kind") == "nonight" else "time"
     try:
         child_id = int(form["child_id"])
-        what = "nonight" if form.get("kind") == "nonight" else str(int(form["minutes"]) * 60)
-    except (KeyError, ValueError):
+        # a preset button and the number field share the name; the button's value comes first
+        minutes = int(form.getlist("minutes")[0]) if kind == "time" else 0
+        if kind == "time" and minutes < 1:
+            raise ValueError
+    except (KeyError, ValueError, IndexError):
         raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers")
     connection = db.connect()
     try:
@@ -640,6 +656,7 @@ async def make_code(request: Request) -> HTMLResponse:
     finally:
         connection.close()
     today = datetime.now(DISPLAY_TIMEZONE).date().isoformat()
+    what = "nonight" if kind == "nonight" else str(minutes * 60)
     code = extra_time_code(child_key(secret, child["name"]), today, what)
     return templates.TemplateResponse(
         request,
@@ -647,7 +664,9 @@ async def make_code(request: Request) -> HTMLResponse:
         {
             "parent": parent,
             "children": children,
-            "code": {"child_id": child_id, "text": code},
+            "selected_child": child,
+            "minutes": minutes or 60,
+            "code": {"kind": kind, "text": code},
         },
     )
 

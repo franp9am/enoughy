@@ -101,3 +101,10 @@ def test_a_family_without_a_secret_has_no_codes(anna):
     assert "Elias" not in anna.get("/codes").text
     answer = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": 30})
     assert answer.status_code == 404
+
+
+def test_a_preset_button_sets_the_minutes(anna, tmp_path):
+    # the browser sends the pressed preset and the number field, in that order
+    page = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": ["15", "60"]}).text
+    result = accepted_by_the_monitor(code_on(page), "Elias", tmp_path)
+    assert result["extra_time_sec"] == 900
