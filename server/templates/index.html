@@ -70,6 +70,8 @@
     font-size: .85rem;
   }
   .export a:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
+  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
+  .aside a { color: #888; }
 </style>
 {% endblock %}
 {% block content %}
@@ -165,10 +167,11 @@
         </div>
       </div>
     </div>
-    <p class="aside"><a href="{{ url_for('children_page') }}">Children</a></p>
     {% else %}
-    <p class="empty">No children yet. <a href="{{ url_for('children_page') }}">Add one</a>.</p>
+    <p class="empty">No child's computer has synced yet.</p>
     {% endif %}
+    <p class="aside"><a href="{{ url_for('children_page') }}">Children</a>{% if has_codes %}
+      &middot; <a href="{{ url_for('codes_page') }}">Extra time codes</a>{% endif %}</p>
 {% endblock %}
 {% block script %}
   <script>

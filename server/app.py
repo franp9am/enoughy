@@ -1,4 +1,6 @@
 import csv
+import hashlib
+import hmac
 import io
 import json
 import re
@@ -327,6 +329,36 @@ def children_in_family(connection: sqlite3.Connection, family_id: int) -> list[s
     ).fetchall()
 
 
+def synced_children(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
+    """The children the dashboard is about: those whose machine has reported at least once."""
+    return connection.execute(
+        "SELECT id, name FROM children WHERE family_id = :family_id"
+        " AND EXISTS (SELECT 1 FROM status WHERE status.child_id = children.id) ORDER BY id",
+        {"family_id": family_id},
+    ).fetchall()
+
+
+def children_with_codes(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
+    return connection.execute(
+        "SELECT id, name FROM children WHERE family_id = :family_id AND secret IS NOT NULL"
+        " ORDER BY id",
+        {"family_id": family_id},
+    ).fetchall()
+
+
+# Mirror of handle_redeem_file in monitor/monitor.py and of the signing in
+# parent/extra_time.html: a code is <date>:<seconds>:<signature> for extra time
+# or <date>:nonight:<signature> for no night that day, HMAC-SHA256 under the
+# child's secret, cut to SIGNATURE_CHARS, which must equal monitor/config.py.
+SIGNATURE_CHARS = 4
+
+
+def extra_time_code(secret_hex: str, date: str, what: str) -> str:
+    payload = f"{date}:{what}"
+    signature = hmac.new(bytes.fromhex(secret_hex), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}:{signature[:SIGNATURE_CHARS]}"
+
+
 def require_child_in_family(
     connection: sqlite3.Connection, child_id: int, family_id: int
 ) -> sqlite3.Row:
@@ -438,7 +470,7 @@ def health() -> dict[str, str]:
 def index(request: Request, child_id: int | None = None) -> HTMLResponse:
     parent = current_parent(request)
     connection = db.connect()
-    children = children_in_family(connection, parent.family_id)
+    children = synced_children(connection, parent.family_id)
     selected_child = next(
         (child for child in children if child["id"] == child_id),
         children[0] if children else None,
@@ -450,6 +482,7 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
         status = last_seen(connection, selected_child["id"])
         week = last_week(connection, selected_child["id"])
         settings = settings_view(connection, selected_child["id"])
+    has_codes = bool(children_with_codes(connection, parent.family_id))
     connection.close()
     return templates.TemplateResponse(
         request,
@@ -462,6 +495,7 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
             "last_seen": status,
             "settings": settings,
             "week": week,
+            "has_codes": has_codes,
         },
     )
 
@@ -547,6 +581,50 @@ async def create_child(request: Request) -> RedirectResponse:
     finally:
         connection.close()
     return RedirectResponse("/children", status_code=303)
+
+
+@app.get("/codes")
+def codes_page(request: Request) -> HTMLResponse:
+    parent = current_parent(request)
+    connection = db.connect()
+    children = children_with_codes(connection, parent.family_id)
+    connection.close()
+    return templates.TemplateResponse(
+        request, "codes.html", {"parent": parent, "children": children, "code": None}
+    )
+
+
+@app.post("/codes")
+async def make_code(request: Request) -> HTMLResponse:
+    """A code for today, signed here so the secret stays on the server."""
+    parent = current_parent(request)
+    form = await request.form()
+    try:
+        child_id = int(form["child_id"])
+        what = "nonight" if form.get("kind") == "nonight" else str(int(form["minutes"]) * 60)
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers")
+    connection = db.connect()
+    try:
+        require_child_in_family(connection, child_id, parent.family_id)
+        secret = connection.execute(
+            "SELECT secret FROM children WHERE id = ?", (child_id,)
+        ).fetchone()["secret"]
+        if secret is None:
+            raise HTTPException(status_code=404, detail="no secret for this child")
+        children = children_with_codes(connection, parent.family_id)
+    finally:
+        connection.close()
+    today = datetime.now(DISPLAY_TIMEZONE).date().isoformat()
+    return templates.TemplateResponse(
+        request,
+        "codes.html",
+        {
+            "parent": parent,
+            "children": children,
+            "code": {"child_id": child_id, "text": extra_time_code(secret, today, what)},
+        },
+    )
 
 
 @app.post("/grants")

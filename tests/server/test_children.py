@@ -27,9 +27,11 @@ def test_adding_a_child_needs_a_login(client):
     assert answer.headers["location"] == "/login"
 
 
-def test_the_dashboard_shows_the_child_but_not_the_token(anna_logged_in):
+def test_a_new_child_is_on_the_children_page_not_the_dashboard(anna_logged_in):
     anna_logged_in.post("/children", data={"name": "Tom"})
     token = db.connect().execute("SELECT token FROM children").fetchone()["token"]
-    page = anna_logged_in.get("/")
-    assert "Tom" in page.text
-    assert token not in page.text
+    dashboard = anna_logged_in.get("/").text
+    assert "Tom" not in dashboard  # nothing has synced for him yet
+    assert token not in dashboard
+    children = anna_logged_in.get("/children").text
+    assert "Tom" in children and token in children

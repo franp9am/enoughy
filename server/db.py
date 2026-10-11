@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS children (
     family_id INTEGER NOT NULL REFERENCES families(id),
     name TEXT NOT NULL,
     token TEXT NOT NULL UNIQUE,
+    -- the child's key for the offline extra-time codes, hex, what the install
+    -- keeps in secret.txt: HMAC(family secret, name) once the setup code makes
+    -- it, by hand for an install that made its own; NULL when unknown here
+    secret TEXT,
     UNIQUE (family_id, name)
 );
 CREATE TABLE IF NOT EXISTS grants (

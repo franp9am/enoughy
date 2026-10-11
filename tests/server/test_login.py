@@ -61,13 +61,14 @@ def test_a_new_family_gets_a_secret(client):
 
 @pytest.fixture
 def anna(client):
-    """Anna, with a password and a child, not yet logged in."""
+    """Anna, with a password and a child whose machine has synced, not yet logged in."""
     connection = db.connect()
     add_parent.add_parent(connection, "anna", password="correct horse")
-    connection.execute(
-        "INSERT INTO children (family_id, name, token) VALUES (1, 'Tom', 'tom-token')"
-    )
-    connection.commit()
+    connection.executescript("""
+        INSERT INTO children (id, family_id, name, token) VALUES (1, 1, 'Tom', 'tom-token');
+        INSERT INTO status (child_id, date, time_spent_sec, remaining_sec, updated_at)
+            VALUES (1, '2026-10-11', 600, 3000, '2026-10-11T10:00:00+00:00');
+    """)
     connection.close()
 
 
