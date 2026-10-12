@@ -6,6 +6,7 @@ import tempfile
 # db.py reads this when it is imported and app.py creates the schema there at
 # once; sending that to a temp folder keeps the import away from server/data.
 os.environ["ENOUGHY_DB"] = os.path.join(tempfile.mkdtemp(), "import.sqlite")
+os.environ.pop("ENOUGHY_INVITE", None)  # registration is open in the tests unless one sets it
 
 import pytest
 from fastapi.testclient import TestClient
@@ -23,3 +24,10 @@ def client(tmp_path, monkeypatch):
     db.create_schema()
     # https, or the client would drop the session cookie, which is marked Secure
     return TestClient(app.app, base_url="https://testserver")
+
+
+@pytest.fixture
+def anna_logged_in(client):
+    """Anna has just registered, so she is logged in and has no children yet."""
+    client.post("/register", data={"login": "anna", "password": "correct horse"})
+    return client

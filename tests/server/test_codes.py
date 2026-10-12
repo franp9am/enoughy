@@ -26,7 +26,7 @@ def key_on_the_machine(child_name: str) -> bytes:
 def anna(client):
     """Anna, logged in, family secret set, with Tom (syncs) and Elias (offline install)."""
     connection = db.connect()
-    add_parent.add_parent(connection, "anna", "novak", password="correct horse")
+    add_parent.add_parent(connection, "anna", password="correct horse")
     connection.executescript(f"""
         UPDATE families SET secret = '{FAMILY_SECRET}';
         INSERT INTO children (id, family_id, name, token) VALUES
@@ -84,7 +84,7 @@ def test_a_siblings_code_is_refused_on_the_other_machine(anna, tmp_path):
 
 def test_no_code_for_another_familys_child(anna):
     connection = db.connect()
-    add_parent.add_parent(connection, "petr", "svoboda", password="correct horse")
+    add_parent.add_parent(connection, "petr", password="correct horse")
     connection.execute(
         "INSERT INTO children (id, family_id, name, token) VALUES (9, 2, 'Jan', 'jan')"
     )

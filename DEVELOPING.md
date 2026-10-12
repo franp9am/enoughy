@@ -41,17 +41,30 @@ and grants queue until the next sync.
 ```
 cd server
 uv sync
-uv run python add_parent.py <login> <family>   # asks for the parent's password
-uv run python add_child.py <family> <name>     # prints the child token for the setup
 uv run uvicorn app:app --host 127.0.0.1
 ```
 
-A parent logs in at `/login` with the password `add_parent.py` stored as a bcrypt hash;
+A parent registers at `/register` and adds children on the page, which shows the token
+for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
+With `ENOUGHY_INVITE` set in the service's environment, `/register` opens only from a
+link that carries it, `/register?invitation=<value>`; unset, registration is open.
+No email is collected, so there is no password recovery: a parent who lost theirs
+writes to the maintainer and proves the family with a child's token, the only thing
+both they and the server know, and `set_password.py <login>` sets a new one. A parent logs in at `/login` with the
+password stored as a bcrypt hash;
 a row in `sessions` and a `session` cookie keep them logged in for 90 days or until
 `/logout` deletes the row. The cookie is marked `Secure`, so the site must be https;
-browsers make an exception for `127.0.0.1`, which is how the server runs locally
-(`--with tzdata` on Windows, which has no time zone database of its own). The reverse
-proxy in front only forwards.
+browsers make an exception for `127.0.0.1`, which is how the server runs locally. The
+reverse proxy in front only forwards.
+
+Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
+older marwin.pfranek.cz, one certificate for all five: the clone in `~/enoughy`, the
+database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
+port 8000 with rate limits. A cookie belongs to one host name, so each name is its own
+login. A deploy is `git pull` and `sudo systemctl restart enoughy`; the unit runs
+`uv run`, which installs a new dependency by itself. A new column goes into the live
+database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF NOT
+EXISTS` never touches an existing table.
 
 The dashboard lists the children whose machine has synced at least once. `/codes`
 makes offline extra-time codes with the same signing as `parent/extra_time.html`, under

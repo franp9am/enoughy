@@ -8,10 +8,8 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* server: real login, a session cookie and a login form in place of
-  BasicAuth.
-* server: registration on the site. A parent creates the account and the
-  family, with a password or an emailed login link.
+* server: a parent deletes the family and everything under it from the
+  page, since the server holds a child's usage by name.
 * server + installer: one setup code instead of token and secret; the
   parent's only credential is the login:
   * The parent adds a child on the page. The server makes the token and the
@@ -19,6 +17,10 @@ the database.
   * The parent types the code into the installer, which fetches the token
     and the secret. The monitor does not change, and the login password is
     never typed on the child's computer.
+  * The code is the only way a parent connects a machine: the page stops
+    showing the token, the installer stops asking for one, and an old
+    installer is replaced by downloading the current one. In front of a
+    parent there is one path; a second one is confusion, not a fallback.
   * Offline extra-time codes: `/codes` makes them on the server under the key
     derived from the family secret and the child's name, which the setup code
     will write into `secret.txt`; until then by hand. `extra_time.html` stays
@@ -47,6 +49,11 @@ the database.
 
 ## Later
 
+* server: a second parent joins the family by an invite link from the first
+  parent's page; a name typed at registration cannot tell them from a
+  stranger.
+* server: a parent changes their own password on the page; until then
+  `set_password.py` by the maintainer, after proof by a child's token.
 * installer, admin accounts, left: an account named `parent` already there
   fails the install at "creating the administrator account"; hiding `parent`
   from the login screen is one registry key, not done. The uninstaller leaves

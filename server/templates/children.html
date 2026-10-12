@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block heading %}Children{% endblock %}
+{% block style %}
+<style>
+  .child h2 { margin-bottom: .4rem; }
+  .token { margin: 0; font-size: .9rem; color: #555; }
+  .token code { display: block; margin-top: .3rem; font-size: .95rem; color: #1a1a1a; user-select: all; }
+  .add-child { display: flex; gap: .5rem; }
+  .add-child input {
+    flex: 1; padding: .55rem .6rem; border-radius: 6px;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+  }
+  .add-child input:focus { outline: none; border-color: #888; }
+  .add-child button {
+    padding: .55rem 1.4rem; border-radius: 6px; border: 1px solid #1a1a1a; cursor: pointer;
+    background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
+  }
+  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
+  .aside a { color: #888; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card plain">
+  {% for child in children %}
+  <div class="section child">
+    <h2>{{ child.name }}</h2>
+    <p class="token">Token for the setup on {{ child.name }}'s computer:
+      <code>{{ child.token }}</code></p>
+  </div>
+  {% endfor %}
+  <div class="section">
+    <form class="add-child" method="post" action="{{ url_for('create_child') }}">
+      <input type="text" name="name" placeholder="{% if children %}Another child's name{% else %}The child's name{% endif %}" required>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+</div>
+<p class="aside"><a href="{{ url_for('index') }}">Back</a></p>
+{% endblock %}

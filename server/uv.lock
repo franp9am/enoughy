@@ -117,6 +117,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "jinja2" },
     { name = "python-multipart" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -124,7 +125,6 @@ dependencies = [
 dev = [
     { name = "httpx2" },
     { name = "pytest" },
-    { name = "tzdata" },
 ]
 
 [package.metadata]
@@ -133,6 +133,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -140,7 +141,6 @@ requires-dist = [
 dev = [
     { name = "httpx2" },
     { name = "pytest" },
-    { name = "tzdata" },
 ]
 
 [[package]]

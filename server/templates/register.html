@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block heading %}Parent registration{% endblock %}
+{% block style %}
+<style>
+  .login-form { display: grid; gap: .6rem; }
+  .login-form input {
+    padding: .55rem .6rem; border-radius: 6px;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+  }
+  .login-form input:focus { outline: none; border-color: #888; }
+  .login-form button {
+    justify-self: end; padding: .55rem 1.4rem; border-radius: 6px;
+    border: 1px solid #1a1a1a; cursor: pointer;
+    background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
+  }
+  .error { margin: 0; color: #b00020; font-size: .9rem; }
+  .note { margin: 0; font-size: .9rem; color: #888; }
+  .aside { margin: 1rem 0 0; font-size: .9rem; color: #888; }
+  .aside a { color: #555; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card plain">
+  <div class="section">
+    {% if closed %}
+    <p class="note">Registration is by invitation. Write to the maintainer for a link.</p>
+    {% else %}
+    <form class="login-form" method="post" action="{{ url_for('register') }}">
+      <input type="hidden" name="invitation" value="{{ invitation }}">
+      <input type="text" name="login" placeholder="Login" autocomplete="username" autofocus required>
+      <input type="password" name="password" placeholder="Password, 8 characters or more" autocomplete="new-password" minlength="8" required>
+      <p class="note">We ask for no email, so there is no password recovery. Write it down.</p>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit">Register</button>
+    </form>
+    {% endif %}
+    <p class="aside">Already registered? <a href="{{ url_for('login_form') }}">Sign in</a></p>
+  </div>
+</div>
+{% endblock %}

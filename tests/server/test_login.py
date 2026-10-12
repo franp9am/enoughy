@@ -2,28 +2,28 @@
 import pytest
 
 import add_parent
-import app
+import auth
 import db
 
 
 def test_right_password_names_the_parent(client):
     connection = db.connect()
-    add_parent.add_parent(connection, "anna", "novak", password="correct horse")
-    parent = app.parent_for_login(connection, "anna", "correct horse")
+    add_parent.add_parent(connection, "anna", password="correct horse")
+    parent = auth.parent_from_credentials(connection, "anna", "correct horse")
     assert parent is not None
     assert parent.login == "anna"
 
 
 def test_wrong_password_names_nobody(client):
     connection = db.connect()
-    add_parent.add_parent(connection, "anna", "novak", password="correct horse")
-    assert app.parent_for_login(connection, "anna", "wrong") is None
+    add_parent.add_parent(connection, "anna", password="correct horse")
+    assert auth.parent_from_credentials(connection, "anna", "wrong") is None
 
 
 def test_right_password_under_another_login_names_nobody(client):
     connection = db.connect()
-    add_parent.add_parent(connection, "anna", "novak", password="correct horse")
-    assert app.parent_for_login(connection, "petr", "correct horse") is None
+    add_parent.add_parent(connection, "anna", password="correct horse")
+    assert auth.parent_from_credentials(connection, "petr", "correct horse") is None
 
 
 def test_parent_with_no_password_yet_cannot_log_in(client):
@@ -31,21 +31,39 @@ def test_parent_with_no_password_yet_cannot_log_in(client):
     add_parent.family_id(connection, "novak")
     connection.execute("INSERT INTO parents (login, family_id, password_hash) VALUES ('anna', 1, '')")
     connection.commit()
-    assert app.parent_for_login(connection, "anna", "") is None
-    assert app.parent_for_login(connection, "anna", "anything") is None
+    assert auth.parent_from_credentials(connection, "anna", "") is None
+    assert auth.parent_from_credentials(connection, "anna", "anything") is None
 
 
-def test_empty_password_is_refused(client):
+def test_short_password_is_refused(client):
     connection = db.connect()
     with pytest.raises(ValueError):
-        add_parent.add_parent(connection, "anna", "novak", password="")
+        add_parent.add_parent(connection, "anna", password="short")
+
+
+def test_a_new_parent_gets_a_family_named_after_them(client):
+    connection = db.connect()
+    add_parent.add_parent(connection, "anna", password="correct horse")
+    family = connection.execute(
+        "SELECT families.name FROM parents JOIN families ON families.id = family_id"
+        " WHERE login = 'anna'"
+    ).fetchone()
+    assert family["name"] == "anna"
+
+
+def test_a_new_family_gets_a_secret(client):
+    connection = db.connect()
+    add_parent.add_parent(connection, "anna", password="correct horse")
+    secret = connection.execute("SELECT secret FROM families").fetchone()["secret"]
+    assert len(secret) == 32
+    bytes.fromhex(secret)  # hex, as the extra-time page expects
 
 
 @pytest.fixture
 def anna(client):
     """Anna, with a password and a child whose machine has synced, not yet logged in."""
     connection = db.connect()
-    add_parent.add_parent(connection, "anna", "novak", password="correct horse")
+    add_parent.add_parent(connection, "anna", password="correct horse")
     connection.executescript("""
         INSERT INTO children (id, family_id, name, token) VALUES (1, 1, 'Tom', 'tom-token');
         INSERT INTO status (child_id, date, time_spent_sec, remaining_sec, updated_at)
