@@ -20,7 +20,8 @@ import add_child
 import add_parent
 import db
 from auth import (
-    NotLoggedIn, current_parent, end_session, parent_from_credentials, start_session,
+    NotLoggedIn, authenticated_child_id, current_parent, end_session,
+    parent_from_credentials, start_session,
 )
 
 # The page is read by the family, not by whoever happens to host it, so the

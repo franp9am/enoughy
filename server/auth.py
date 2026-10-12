@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import bcrypt
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 import db
@@ -95,3 +95,18 @@ def end_session(connection: sqlite3.Connection, request: Request) -> RedirectRes
     response.delete_cookie(SESSION_COOKIE)
     return response
 
+
+
+def authenticated_child_id(authorization: str) -> int:
+    """The child behind a monitor's request, proved by its bearer token."""
+    scheme, _, token = authorization.partition(" ")
+    if scheme != "Bearer" or not token:
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    connection = db.connect()
+    child = connection.execute(
+        "SELECT id FROM children WHERE token = :token", {"token": token}
+    ).fetchone()
+    connection.close()
+    if child is None:
+        raise HTTPException(status_code=401, detail="unknown token")
+    return child["id"]
