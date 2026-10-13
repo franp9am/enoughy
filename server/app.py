@@ -9,6 +9,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
@@ -20,7 +21,7 @@ import add_child
 import add_parent
 import db
 from auth import (
-    NotLoggedIn, authenticated_child_id, current_parent, end_session,
+    NotLoggedIn, authenticated_child_id, current_parent, end_session, local_path,
     parent_from_credentials, start_session,
 )
 
@@ -388,7 +389,13 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 @app.exception_handler(NotLoggedIn)
 def send_to_login(request: Request, error: NotLoggedIn) -> RedirectResponse:
-    return RedirectResponse("/login", status_code=303)
+    """To the login page, which brings the browser back here once logged in."""
+    if request.method != "GET":
+        return RedirectResponse("/login", status_code=303)
+    next_path = request.url.path
+    if request.url.query:
+        next_path += "?" + request.url.query
+    return RedirectResponse("/login?" + urlencode({"next": next_path}), status_code=303)
 
 
 @app.post("/api/sync")
@@ -510,7 +517,10 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
 
 @app.get("/login")
 def login_form(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "login.html", {"error": None})
+    next_path = request.query_params.get("next", "/")
+    return templates.TemplateResponse(
+        request, "login.html", {"error": None, "next": local_path(next_path)}
+    )
 
 
 @app.post("/login")
@@ -521,9 +531,12 @@ async def login(request: Request) -> Response:
     if parent is None:
         connection.close()
         return templates.TemplateResponse(
-            request, "login.html", {"error": "Wrong login or password."}, status_code=401
+            request,
+            "login.html",
+            {"error": "Wrong login or password.", "next": local_path(form.get("next", "/"))},
+            status_code=401,
         )
-    response = start_session(connection, parent.id)
+    response = start_session(connection, parent.id, form.get("next", "/"))
     connection.close()
     return response
 
@@ -555,6 +568,13 @@ async def register(request: Request) -> Response:
     if not invited(invitation):
         return by_invitation_only(request)
     login = form.get("login", "").strip()
+    if form.get("password", "") != form.get("password_again", ""):
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {"error": "The two passwords differ.", "invitation": invitation},
+            status_code=400,
+        )
     connection = db.connect()
     try:
         parent_id = add_parent.add_parent(connection, login, form.get("password", ""))
@@ -649,8 +669,7 @@ async def make_code(request: Request) -> HTMLResponse:
     kind = "nonight" if form.get("kind") == "nonight" else "time"
     try:
         child_id = int(form["child_id"])
-        # a preset button and the number field share the name; the button's value comes first
-        minutes = int(form.getlist("minutes")[0]) if kind == "time" else 0
+        minutes = int(form.get("minutes", "")) if kind == "time" else 0
         if kind == "time" and minutes < 1:
             raise ValueError
     except (KeyError, ValueError, IndexError):

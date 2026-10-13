@@ -64,8 +64,17 @@ def current_parent(request: Request) -> Parent:
     return Parent(id=parent["id"], login=parent["login"], family_id=parent["family_id"])
 
 
-def start_session(connection: sqlite3.Connection, parent_id: int) -> RedirectResponse:
-    """A new session for the parent, and the browser sent to the page with its cookie."""
+def local_path(candidate: str) -> str:
+    """The page to return to after login: a path on this site, or the front page."""
+    if candidate.startswith("/") and not candidate.startswith("//"):
+        return candidate
+    return "/"
+
+
+def start_session(
+    connection: sqlite3.Connection, parent_id: int, next_path: str = "/"
+) -> RedirectResponse:
+    """A new session for the parent, and the browser sent to `next_path` with its cookie."""
     session_id = secrets.token_urlsafe(32)
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with connection:
@@ -73,7 +82,7 @@ def start_session(connection: sqlite3.Connection, parent_id: int) -> RedirectRes
             "INSERT INTO sessions (id, parent_id, created_at) VALUES (?, ?, ?)",
             (session_id, parent_id, created_at),
         )
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse(local_path(next_path), status_code=303)
     response.set_cookie(
         key=SESSION_COOKIE,
         value=session_id,

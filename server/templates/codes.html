@@ -34,9 +34,16 @@
   }
   .row .dark:active { transform: translateY(1px); }
   .code {
-    display: block; margin-top: .8rem; padding: .6rem .8rem; border-radius: 6px;
-    background: #f6f6f6; font-size: 1.15rem; letter-spacing: .03em; user-select: all;
+    display: flex; align-items: center; gap: .6rem; margin-top: .8rem;
+    padding: .4rem .4rem .4rem .8rem; border-radius: 6px; background: #f6f6f6;
   }
+  .code code { flex: 1; font-size: 1.15rem; letter-spacing: .03em; user-select: all; }
+  .code .copy {
+    display: flex; padding: .4rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid #ccc; background: #fff; color: #444;
+  }
+  .code .copy:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
+  .code .copy.done { border-color: #1a1a1a; color: #1a1a1a; }
   .hint { margin: .5rem 0 0; font-size: .85rem; color: #888; }
   .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
   .aside a { color: #888; }
@@ -58,10 +65,10 @@
       <input type="hidden" name="child_id" value="{{ selected_child.id }}">
       <input type="hidden" name="kind" value="time">
       <div class="presets">
-        <button type="submit" name="minutes" value="15">15 min</button>
-        <button type="submit" name="minutes" value="30">30 min</button>
-        <button type="submit" name="minutes" value="60">1 hour</button>
-        <button type="submit" name="minutes" value="120">2 hours</button>
+        <button type="button" onclick="preset(this, 15)">15 min</button>
+        <button type="button" onclick="preset(this, 30)">30 min</button>
+        <button type="button" onclick="preset(this, 60)">1 hour</button>
+        <button type="button" onclick="preset(this, 120)">2 hours</button>
       </div>
       <div class="row">
         <input type="number" name="minutes" step="1" min="1" value="{{ minutes }}" required>
@@ -70,7 +77,7 @@
       </div>
     </form>
     {% if code and code.kind == "time" %}
-    <code class="code">{{ code.text }}</code>
+    <div class="code"><code>{{ code.text }}</code><button type="button" class="copy" title="Copy" onclick="copy(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
     {% endif %}
     <p class="hint">The child pastes the code into "Extra time". A code works once.</p>
   </div>
@@ -84,7 +91,7 @@
       <button type="submit" class="dark">Make code</button>
     </form>
     {% if code and code.kind == "nonight" %}
-    <code class="code">{{ code.text }}</code>
+    <div class="code"><code>{{ code.text }}</code><button type="button" class="copy" title="Copy" onclick="copy(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
     {% endif %}
   </div>
 </div>
@@ -92,4 +99,16 @@
 <p class="empty">This family has no secret yet, so no codes.</p>
 {% endif %}
 <p class="aside"><a href="{{ url_for('index') }}">Back</a></p>
+<script>
+  function preset(button, minutes) {
+    button.form.minutes.value = minutes;
+    button.form.requestSubmit();
+  }
+  function copy(button) {
+    navigator.clipboard.writeText(button.previousElementSibling.textContent).then(() => {
+      button.classList.add("done");
+      setTimeout(() => button.classList.remove("done"), 1500);
+    });
+  }
+</script>
 {% endblock %}
