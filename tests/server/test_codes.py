@@ -125,8 +125,8 @@ def test_a_child_added_on_the_page_gets_a_secret_of_its_own(anna):
     assert mia not in secrets[:-1]
 
 
-def test_a_preset_button_sets_the_minutes(anna, tmp_path):
-    # the browser sends the pressed preset and the number field, in that order
-    page = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": ["15", "60"]}).text
+def test_the_page_keeps_the_typed_minutes(anna, tmp_path):
+    page = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": "45"}).text
+    assert 'name="minutes" step="1" min="1" value="45"' in page
     result = accepted_by_the_monitor(code_on(page), "Elias", tmp_path)
-    assert result["extra_time_sec"] == 900
+    assert result["extra_time_sec"] == 2700

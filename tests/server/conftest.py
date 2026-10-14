@@ -29,5 +29,5 @@ def client(tmp_path, monkeypatch):
 @pytest.fixture
 def anna_logged_in(client):
     """Anna has just registered, so she is logged in and has no children yet."""
-    client.post("/register", data={"login": "anna", "password": "correct horse"})
+    client.post("/register", data={"login": "anna", "password": "correct horse", "password_again": "correct horse"})
     return client

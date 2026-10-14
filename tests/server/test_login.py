@@ -67,7 +67,25 @@ def anna(client):
 def test_without_login_the_page_sends_to_the_form(client, anna):
     answer = client.get("/", follow_redirects=False)
     assert answer.status_code == 303
-    assert answer.headers["location"] == "/login"
+    assert answer.headers["location"] == "/login?next=%2F"
+
+
+def test_login_returns_to_the_page_asked_for(client, anna):
+    sent_away = client.get("/children", follow_redirects=False)
+    assert sent_away.headers["location"] == "/login?next=%2Fchildren"
+    answer = client.post(
+        "/login", data={"login": "anna", "password": "correct horse", "next": "/children"},
+        follow_redirects=False,
+    )
+    assert answer.headers["location"] == "/children"
+
+
+def test_login_never_sends_to_another_site(client, anna):
+    answer = client.post(
+        "/login", data={"login": "anna", "password": "correct horse", "next": "https://evil.example/"},
+        follow_redirects=False,
+    )
+    assert answer.headers["location"] == "/"
 
 
 def test_wrong_password_shows_the_form_again(client, anna):
@@ -95,10 +113,10 @@ def test_logout_ends_the_session(client, anna):
     client.post("/login", data={"login": "anna", "password": "correct horse"})
     client.get("/logout")
     answer = client.get("/", follow_redirects=False)
-    assert answer.headers["location"] == "/login"
+    assert answer.headers["location"] == "/login?next=%2F"
 
 
 def test_made_up_cookie_is_no_login(client, anna):
     client.cookies.set("session", "a-value-the-server-never-issued")
     answer = client.get("/", follow_redirects=False)
-    assert answer.headers["location"] == "/login"
+    assert answer.headers["location"] == "/login?next=%2F"
