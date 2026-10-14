@@ -341,18 +341,13 @@ def synced_children(connection: sqlite3.Connection, family_id: int) -> list[sqli
     ).fetchall()
 
 
-def family_secret(connection: sqlite3.Connection, family_id: int) -> str | None:
+def children_with_codes(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
+    """The children /codes is about: those whose key the server knows."""
     return connection.execute(
-        "SELECT secret FROM families WHERE id = ?", (family_id,)
-    ).fetchone()["secret"]
-
-
-def child_key(family_secret_hex: str, child_name: str) -> str:
-    """The key in the child's secret.txt: 16 bytes of HMAC-SHA256(family secret, name),
-    as hex. A child who reads it off their machine learns nothing about a sibling's.
-    The name is part of the key, so a child's name never changes."""
-    mac = hmac.new(bytes.fromhex(family_secret_hex), child_name.encode(), hashlib.sha256)
-    return mac.hexdigest()[:32]
+        "SELECT id, name FROM children WHERE family_id = :family_id AND secret IS NOT NULL"
+        " ORDER BY id",
+        {"family_id": family_id},
+    ).fetchall()
 
 
 # Mirror of read_redeem_file in monitor/monitor.py and of the signing in
@@ -374,7 +369,7 @@ def require_child_in_family(
 ) -> sqlite3.Row:
     """A child belonging to another family is indistinguishable from one that does not exist."""
     child = connection.execute(
-        "SELECT id, name FROM children WHERE id = :child_id AND family_id = :family_id",
+        "SELECT id, name, secret FROM children WHERE id = :child_id AND family_id = :family_id",
         {"child_id": child_id, "family_id": family_id},
     ).fetchone()
     if child is None:
@@ -498,7 +493,7 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
         status = last_seen(connection, selected_child["id"])
         week = last_week(connection, selected_child["id"])
         settings = settings_view(connection, selected_child["id"])
-    has_codes = family_secret(connection, parent.family_id) is not None
+    has_codes = bool(children_with_codes(connection, parent.family_id))
     connection.close()
     return templates.TemplateResponse(
         request,
@@ -640,11 +635,8 @@ async def create_child(request: Request) -> RedirectResponse:
 def codes_page(request: Request, child_id: int | None = None) -> HTMLResponse:
     parent = current_parent(request)
     connection = db.connect()
-    children = children_in_family(connection, parent.family_id)
-    has_secret = family_secret(connection, parent.family_id) is not None
+    children = children_with_codes(connection, parent.family_id)
     connection.close()
-    if not has_secret:
-        children = []
     selected_child = next(
         (child for child in children if child["id"] == child_id),
         children[0] if children else None,
@@ -682,14 +674,13 @@ async def make_code(request: Request) -> HTMLResponse:
     connection = db.connect()
     try:
         child = require_child_in_family(connection, child_id, parent.family_id)
-        secret = family_secret(connection, parent.family_id)
-        if secret is None:
-            raise HTTPException(status_code=404, detail="this family has no secret yet")
-        children = children_in_family(connection, parent.family_id)
+        if child["secret"] is None:
+            raise HTTPException(status_code=404, detail="no secret for this child")
+        children = children_with_codes(connection, parent.family_id)
     finally:
         connection.close()
     what = "nn" if kind == "nonight" else str(minutes)
-    code = extra_time_code(child_key(secret, child["name"]), date, what)
+    code = extra_time_code(child["secret"], date, what)
     return templates.TemplateResponse(
         request,
         "codes.html",

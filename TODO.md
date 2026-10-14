@@ -21,9 +21,9 @@ the database.
     showing the token, the installer stops asking for one, and an old
     installer is replaced by downloading the current one. In front of a
     parent there is one path; a second one is confusion, not a fallback.
-  * Offline extra-time codes: `/codes` makes them on the server under the key
-    derived from the family secret and the child's name, which the setup code
-    will write into `secret.txt`; until then by hand. `extra_time.html` stays
+  * Offline extra-time codes: `/codes` makes them on the server under the
+    child's own secret, which the setup code will write into `secret.txt`;
+    until then by hand. `extra_time.html` stays
     for families without an account. A phone app later keeps the secret and
     makes them itself.
   * The price: the server knows the secret. Small, since it already grants

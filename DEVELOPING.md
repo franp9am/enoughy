@@ -70,10 +70,9 @@ EXISTS` never touches an existing table.
 
 The dashboard lists the children whose machine has synced at least once. `/codes`
 makes offline extra-time codes with the same signing as `parent/extra_time.html`, under
-a key the server derives from the family's secret and the child's name (`child_key`),
-which is why a child's name never changes. The install must hold that same key in
-`secret.txt`: the setup code will put it there; until then by hand, for a family whose
-`secret` was set by hand too.
+the child's `secret`, random and made with the child. The install must hold that same
+key in `secret.txt`: the setup code will put it there; until then by hand, and a child
+from before the column has it copied the other way, from the install into the row.
 
 The server stays compatible with every monitor version still installed: it accepts an
 old report and sends back only what that version understands.

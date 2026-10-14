@@ -1,7 +1,5 @@
-"""Offline extra-time codes made on the server, under a key derived from the
-family's secret and the child's name."""
-import hashlib
-import hmac
+"""Offline extra-time codes made on the server, under the child's own secret."""
+import re
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -11,27 +9,23 @@ import add_parent
 import db
 import monitor
 
-FAMILY_SECRET = "0102030405060708090a0b0c0d0e0f10"
+SECRETS = {"Tom": "0102030405060708090a0b0c0d0e0f10", "Elias": "101112131415161718191a1b1c1d1e1f"}
 
 
 def key_on_the_machine(child_name: str) -> bytes:
-    """What the install keeps in secret.txt, computed here on its own so the
-    test does not trust the server's derivation."""
-    return bytes.fromhex(
-        hmac.new(bytes.fromhex(FAMILY_SECRET), child_name.encode(), hashlib.sha256).hexdigest()[:32]
-    )
+    """What the install keeps in secret.txt."""
+    return bytes.fromhex(SECRETS[child_name])
 
 
 @pytest.fixture
 def anna(client):
-    """Anna, logged in, family secret set, with Tom (syncs) and Elias (offline install)."""
+    """Anna, logged in, with Tom (syncs) and Elias (offline install), both with a secret."""
     connection = db.connect()
     add_parent.add_parent(connection, "anna", password="correct horse")
     connection.executescript(f"""
-        UPDATE families SET secret = '{FAMILY_SECRET}';
-        INSERT INTO children (id, family_id, name, token) VALUES
-            (1, 1, 'Tom', 'tom-token'),
-            (3, 1, 'Elias', 'elias-token');
+        INSERT INTO children (id, family_id, name, token, secret) VALUES
+            (1, 1, 'Tom', 'tom-token', '{SECRETS["Tom"]}'),
+            (3, 1, 'Elias', 'elias-token', '{SECRETS["Elias"]}');
         INSERT INTO status (child_id, date, time_spent_sec, remaining_sec, updated_at) VALUES
             (1, '2026-10-11', 600, 3000, '2026-10-11T10:00:00+00:00');
     """)
@@ -105,14 +99,30 @@ def test_no_code_for_another_familys_child(anna):
     assert answer.status_code == 404
 
 
-def test_a_family_without_a_secret_has_no_codes(anna):
+def test_a_child_whose_secret_the_server_does_not_know_has_no_codes(anna):
     connection = db.connect()
-    connection.execute("UPDATE families SET secret = NULL")
+    connection.execute("UPDATE children SET secret = NULL WHERE name = 'Elias'")
+    connection.commit()
+    page = anna.get("/codes").text
+    assert "Tom" in page and "Elias" not in page
+    answer = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": 30})
+    assert answer.status_code == 404
+
+
+def test_without_any_secret_the_dashboard_offers_no_codes(anna):
+    connection = db.connect()
+    connection.execute("UPDATE children SET secret = NULL")
     connection.commit()
     assert "Extra time codes" not in anna.get("/").text
     assert "Elias" not in anna.get("/codes").text
-    answer = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": 30})
-    assert answer.status_code == 404
+
+
+def test_a_child_added_on_the_page_gets_a_secret_of_its_own(anna):
+    anna.post("/children", data={"name": "Mia"})
+    secrets = [row["secret"] for row in db.connect().execute("SELECT secret FROM children")]
+    mia = secrets[-1]
+    assert re.fullmatch(r"[0-9a-f]{32}", mia)
+    assert mia not in secrets[:-1]
 
 
 def test_a_preset_button_sets_the_minutes(anna, tmp_path):

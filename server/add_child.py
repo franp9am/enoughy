@@ -11,7 +11,8 @@ MIN_TOKEN_CHARS = 16
 def add_child(
     connection: sqlite3.Connection, family_id: int, name: str, token: str | None = None
 ) -> str:
-    """Adds the child and returns the token its monitor will sync with."""
+    """Adds the child, with a secret of its own for the offline codes, and
+    returns the token its monitor will sync with."""
     if not name:
         raise ValueError("a name is needed")
     if token is None:
@@ -20,8 +21,8 @@ def add_child(
         raise ValueError(f"the token needs at least {MIN_TOKEN_CHARS} characters")
     with connection:
         connection.execute(
-            "INSERT INTO children (family_id, name, token) VALUES (?, ?, ?)",
-            (family_id, name, token),
+            "INSERT INTO children (family_id, name, token, secret) VALUES (?, ?, ?, ?)",
+            (family_id, name, token, secrets.token_hex(16)),
         )
     return token
 

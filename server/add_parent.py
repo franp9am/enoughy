@@ -1,5 +1,4 @@
 import getpass
-import secrets
 import sqlite3
 import sys
 
@@ -10,10 +9,7 @@ import db
 
 def family_id(connection: sqlite3.Connection, family_name: str) -> int:
     """Families are created on first use: the first parent of a family makes it exist."""
-    connection.execute(
-        "INSERT OR IGNORE INTO families (name, secret) VALUES (?, ?)",
-        (family_name, secrets.token_hex(16)),
-    )
+    connection.execute("INSERT OR IGNORE INTO families (name) VALUES (?)", (family_name,))
     return connection.execute(
         "SELECT id FROM families WHERE name = ?", (family_name,)
     ).fetchone()["id"]

@@ -51,14 +51,6 @@ def test_a_new_parent_gets_a_family_named_after_them(client):
     assert family["name"] == "anna"
 
 
-def test_a_new_family_gets_a_secret(client):
-    connection = db.connect()
-    add_parent.add_parent(connection, "anna", password="correct horse")
-    secret = connection.execute("SELECT secret FROM families").fetchone()["secret"]
-    assert len(secret) == 32
-    bytes.fromhex(secret)  # hex, as the extra-time page expects
-
-
 @pytest.fixture
 def anna(client):
     """Anna, with a password and a child whose machine has synced, not yet logged in."""
