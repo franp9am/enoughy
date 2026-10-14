@@ -11,7 +11,6 @@ from typing import Optional
 import os_tooling
 import remote_sync
 from config import (
-    CHECK_DATE_IN_REDEEM_CODES,
     CHECK_INTERVAL_SECONDS,
     CRASH_LOG_FILE,
     DATA_DIR,
@@ -107,6 +106,7 @@ def load_data(datafile):
         "carryover_sec": 0,
         "granted_sec": 0,
         "no_night": False,
+        "redeemed_codes": [],
         "event_log": [],
     }
     try:
@@ -123,51 +123,34 @@ def save_data(data, datafile):
     os_tooling.write_atomically(datafile, json.dumps(data, indent=2))
 
 
-def load_used_codes(used_codes_file: Path) -> set:
-    """Codes are not tied to a date, so used ones are tracked across days:
-    one code per line, and a line cut short by a crash matches no code."""
-    try:
-        return set(used_codes_file.read_text(encoding="utf-8").split())
-    except OSError:
-        return set()
-
-
-def record_used_code(code: str, used_codes_file: Path):
-    with open(used_codes_file, "a", encoding="utf-8") as f:
-        f.write(code + "\n")
-
-
-def redeem_unused_code(redeem: dict, used_codes_file: Path) -> int:
-    """Seconds granted by a checked code: zero unless it is valid and has never
-    been used, in which case it is entered in the ledger before its seconds
-    are handed out."""
-    if redeem["status"] != "valid":
-        return 0
-    if redeem["redeem_code"] in load_used_codes(used_codes_file):
-        return 0
-    record_used_code(redeem["redeem_code"], used_codes_file)
-    return redeem["extra_time_sec"]
-
-
 def redeem_code(data, datafile, now, child: str, secret: bytes):
-    """Applies the code waiting in the child's redeem file, if there is one.
-    A `nonight` code lifts the night of its date, once: the day's data
-    remembers, as the file may hold another code by then, and since the date
-    is the one day the code is good there is no ledger -- pasting it twice
-    changes nothing. Seconds are added once, through the ledger."""
+    """Applies the code waiting in the child's redeem file, if there is one:
+    a no-night code lifts today's night, an extra-time code adds its seconds.
+    A code is judged once: it leaves the file whatever the verdict, since one
+    left behind would be tried again under every later date, each a 1 in
+    16**SIGNATURE_CHARS lottery; and the day's list of redeemed codes makes
+    a valid one work once, saved with what the code did, in one write."""
+    redeem_file = SHARED_DIR / child / "extra_time.txt"
+    redeem = read_redeem_file(redeem_file, secret, now.date())
+    if redeem["redeem_code"] is not None:  # there was a code, and it was judged
+        try:
+            redeem_file.write_text("", encoding="utf-8")
+        except OSError:
+            pass
+    if redeem["status"] != "valid" or redeem["redeem_code"] in data["redeemed_codes"]:
+        return
     now_str = now.strftime(TIMESTAMP_FORMAT)
-    redeem = handle_redeem_file(SHARED_DIR / child / "extra_time.txt", secret, now.date())
-    if redeem["nonight"] and not data["no_night"]:
+    data["redeemed_codes"].append(redeem["redeem_code"])
+    if redeem["nonight"]:
         data["no_night"] = True
         data["event_log"].append(f"no night code {now_str}")
         os_tooling.notify("no night today", child)
-        save_data(data, datafile)
-    extra_time = redeem_unused_code(redeem, DATA_DIR / child / "used_redeem_codes.txt")
-    if extra_time:
-        data["event_log"].append(f"redeem code {extra_time} {now_str}")
+    else:
+        extra_time = redeem["extra_time_sec"]
         data["granted_sec"] += extra_time
+        data["event_log"].append(f"redeem code {extra_time} {now_str}")
         os_tooling.notify(f"extra time {extra_time}", child)
-        save_data(data, datafile)
+    save_data(data, datafile)
 
 
 def daily_limit_seconds(date: datetime.date, settings) -> int:
@@ -219,10 +202,12 @@ def verify(msg: bytes, sig_hex: str, secret: bytes) -> bool:
     return expected == sig_hex
 
 
-def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
-    """Checks the code in the redeem file: `<date>:<seconds>:<signature>` for
-    extra time, or `<date>:nonight:<signature>` for no night on that date,
-    which is `nonight` in the result."""
+def read_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
+    """Checks the code in the redeem file: `<minutes>:<signature>` is extra
+    time and `nn:<signature>` no night, both for today. The signature is of
+    `<date>:<minutes>` or `<date>:nn` with today's date, which the child
+    never types, so a code is good on its day only. The result carries the
+    code whenever the file held one, judged either way."""
     if not len(secret):  # if secret is not loaded, program should not break
         return {
             "status": "cannot load secret",
@@ -269,7 +254,6 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "extra_time_sec": 0,
             "nonight": False,
         }
-
     if not isinstance(redeem_content, str):
         return {
             "status": "cannot read file",
@@ -279,8 +263,7 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
         }
 
     parts = redeem_content.split(":")
-    # we expect three parts in the format: date:extra_time:signature
-    if not len(parts) == 3:
+    if len(parts) != 2:
         return {
             "status": "invalid format",
             "redeem_code": redeem_content,
@@ -288,13 +271,12 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "nonight": False,
         }
 
-    req_date = parts[0]
-    # date:nonight:signature lifts the night of that date and carries no time
-    nonight = parts[1] == "nonight"
-    req_extra_time = 0
+    what, req_sig = parts
+    nonight = what == "nn"
+    req_minutes = 0
     if not nonight:
         try:
-            req_extra_time = int(parts[1])  # trying to convert to integer
+            req_minutes = int(what)
         except Exception:
             return {
                 "status": "invalid format",
@@ -303,16 +285,10 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
                 "nonight": False,
             }
 
-    req_sig = parts[2]
-    # Normalized, so variants like "0600", "+600" or " 600" (all accepted by
-    # int()) sign as, and count in the used-codes ledger as, the same code.
-    what = "nonight" if nonight else req_extra_time
-    # For extra time the date is a signed nonce that keeps otherwise-identical
-    # codes distinct; unless the config says so it is not checked against the
-    # calendar, and a code has no expiry date.
-    extracted_payload = f"{req_date}:{what}".encode()
-
-    if not verify(extracted_payload, req_sig, secret):
+    # Normalized, so variants like "060", "+60" or " 60" (all accepted by
+    # int()) sign as, and count in the day's list as, the same code.
+    what = "nn" if nonight else str(req_minutes)
+    if not verify(f"{today.isoformat()}:{what}".encode(), req_sig, secret):
         return {
             "status": "invalid signature",
             "redeem_code": redeem_content,
@@ -320,21 +296,10 @@ def handle_redeem_file(redeem_file: Path, secret: bytes, today: datetime.date):
             "nonight": False,
         }
 
-    # After the signature, so the date cannot be probed; before the ledger, so
-    # a code pasted on the wrong day is not used up. A no-night code's date is
-    # no nonce but the one day without a night, checked whatever the config says.
-    if (nonight or CHECK_DATE_IN_REDEEM_CODES) and req_date != today.isoformat():
-        return {
-            "status": "wrong date",
-            "redeem_code": redeem_content,
-            "extra_time_sec": 0,
-            "nonight": False,
-        }
-
     return {
         "status": "valid",
-        "redeem_code": f"{req_date}:{what}:{req_sig}",
-        "extra_time_sec": req_extra_time,
+        "redeem_code": f"{what}:{req_sig}",
+        "extra_time_sec": req_minutes * 60,
         "nonight": nonight,
     }
 

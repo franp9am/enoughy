@@ -2,7 +2,7 @@
 family's secret and the child's name."""
 import hashlib
 import hmac
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -51,15 +51,15 @@ def test_the_codes_page_lists_every_child(anna):
     assert "Tom" in page and "Elias" in page
 
 
-def accepted_by_the_monitor(code: str, child_name: str, tmp_path):
+def accepted_by_the_monitor(code: str, child_name: str, tmp_path, today=None):
     redeem_file = tmp_path / "extra_time.txt"
     redeem_file.write_text(code)
-    today = datetime.now(ZoneInfo("Europe/Prague")).date()
-    return monitor.handle_redeem_file(redeem_file, key_on_the_machine(child_name), today)
+    today = today or datetime.now(ZoneInfo("Europe/Prague")).date()
+    return monitor.read_redeem_file(redeem_file, key_on_the_machine(child_name), today)
 
 
 def code_on(page: str) -> str:
-    return page.split('<code class="code">')[1].split("</code>")[0]
+    return page.split('<div class="code"><code>')[1].split("</code>")[0]
 
 
 def test_an_extra_time_code_is_one_the_monitor_accepts(anna, tmp_path):
@@ -74,6 +74,18 @@ def test_a_no_night_code_is_one_the_monitor_accepts(anna, tmp_path):
     result = accepted_by_the_monitor(code_on(page), "Elias", tmp_path)
     assert result["status"] == "valid"
     assert result["nonight"] is True
+
+
+def test_a_code_for_another_day_is_good_on_that_day_only(anna, tmp_path):
+    page = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": 30, "date": "2026-12-24"}).text
+    code = code_on(page)
+    assert accepted_by_the_monitor(code, "Elias", tmp_path, date(2026, 12, 24))["status"] == "valid"
+    assert accepted_by_the_monitor(code, "Elias", tmp_path)["status"] == "invalid signature"
+
+
+def test_a_day_that_is_no_day_is_refused(anna):
+    answer = anna.post("/codes", data={"child_id": 3, "kind": "time", "minutes": 30, "date": "christmas"})
+    assert answer.status_code == 400
 
 
 def test_a_siblings_code_is_refused_on_the_other_machine(anna, tmp_path):

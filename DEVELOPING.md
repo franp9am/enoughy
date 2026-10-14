@@ -26,8 +26,10 @@ is in `C:\ProgramData\EnoughyShared`.
   that is missing or out of range falls back to its default.
 * A grant carries no date: it is applied on the day the machine next syncs. A negative
   one takes at most that day's limit and carryover; the rest is dropped.
-* The date in an extra-time code is only a nonce, unless `CHECK_DATE_IN_REDEEM_CODES` in
-  `config.py` is on. The date in a no-night code is always checked.
+* A code (`60:ab12`, `nn:ab12`) carries no date: the signature is of today's date and
+  the code, so it is good on the day it was made only. The monitor empties
+  `extra_time.txt` at every check, so a code is judged once; the day's json lists the
+  codes it granted.
 * The shutdown waits three minutes after "time up" and after "Night time"; more time,
   or a later night, arriving in them calls it off.
 * The secret for the codes is in `data\<child>\secret.txt`. An administrator can

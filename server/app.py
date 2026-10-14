@@ -355,17 +355,18 @@ def child_key(family_secret_hex: str, child_name: str) -> str:
     return mac.hexdigest()[:32]
 
 
-# Mirror of handle_redeem_file in monitor/monitor.py and of the signing in
-# parent/extra_time.html: a code is <date>:<seconds>:<signature> for extra time
-# or <date>:nonight:<signature> for no night that day, HMAC-SHA256 under the
-# child's key, cut to SIGNATURE_CHARS, which must equal monitor/config.py.
+# Mirror of read_redeem_file in monitor/monitor.py and of the signing in
+# parent/extra_time.html: a code is <minutes>:<signature> for extra time or
+# nn:<signature> for no night, good on the day it was made: the signature is
+# HMAC-SHA256 of <date>:<minutes> or <date>:nn under the child's key, cut to
+# SIGNATURE_CHARS, which must equal monitor/config.py.
 SIGNATURE_CHARS = 4
 
 
 def extra_time_code(key_hex: str, date: str, what: str) -> str:
     payload = f"{date}:{what}"
     signature = hmac.new(bytes.fromhex(key_hex), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}:{signature[:SIGNATURE_CHARS]}"
+    return f"{what}:{signature[:SIGNATURE_CHARS]}"
 
 
 def require_child_in_family(
@@ -655,6 +656,7 @@ def codes_page(request: Request, child_id: int | None = None) -> HTMLResponse:
             "parent": parent,
             "children": children,
             "selected_child": selected_child,
+            "date": datetime.now(DISPLAY_TIMEZONE).date().isoformat(),
             "minutes": 60,
             "code": None,
         },
@@ -663,7 +665,8 @@ def codes_page(request: Request, child_id: int | None = None) -> HTMLResponse:
 
 @app.post("/codes")
 async def make_code(request: Request) -> HTMLResponse:
-    """A code for today, signed here so the secret stays on the server."""
+    """A code for the day in the form, today unless the parent picked one,
+    signed here so the secret stays on the server."""
     parent = current_parent(request)
     form = await request.form()
     kind = "nonight" if form.get("kind") == "nonight" else "time"
@@ -672,8 +675,10 @@ async def make_code(request: Request) -> HTMLResponse:
         minutes = int(form.get("minutes", "")) if kind == "time" else 0
         if kind == "time" and minutes < 1:
             raise ValueError
+        date = form.get("date", "").strip() or datetime.now(DISPLAY_TIMEZONE).date().isoformat()
+        date = datetime.fromisoformat(date).date().isoformat()
     except (KeyError, ValueError, IndexError):
-        raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers")
+        raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers, date a day")
     connection = db.connect()
     try:
         child = require_child_in_family(connection, child_id, parent.family_id)
@@ -683,9 +688,8 @@ async def make_code(request: Request) -> HTMLResponse:
         children = children_in_family(connection, parent.family_id)
     finally:
         connection.close()
-    today = datetime.now(DISPLAY_TIMEZONE).date().isoformat()
-    what = "nonight" if kind == "nonight" else str(minutes * 60)
-    code = extra_time_code(child_key(secret, child["name"]), today, what)
+    what = "nn" if kind == "nonight" else str(minutes)
+    code = extra_time_code(child_key(secret, child["name"]), date, what)
     return templates.TemplateResponse(
         request,
         "codes.html",
@@ -693,6 +697,7 @@ async def make_code(request: Request) -> HTMLResponse:
             "parent": parent,
             "children": children,
             "selected_child": child,
+            "date": date,
             "minutes": minutes or 60,
             "code": {"kind": kind, "text": code},
         },

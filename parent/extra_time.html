@@ -55,12 +55,17 @@
     background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
   }
   .row .dark:active { transform: translateY(1px); }
-  .code-row { margin-top: .8rem; }
-  .code-row input {
-    flex: 1; background: #f6f6f6;
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem;
+  .code {
+    display: flex; align-items: center; gap: .6rem; margin-top: .8rem;
+    padding: .4rem .4rem .4rem .8rem; border-radius: 6px; background: #f6f6f6;
   }
-  .code-row .dark { margin-left: 0; }
+  .code code { flex: 1; font-size: 1.15rem; letter-spacing: .03em; user-select: all; }
+  .code .copy {
+    display: flex; padding: .4rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid #ccc; background: #fff; color: #444;
+  }
+  .code .copy:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
+  .code .copy.done { border-color: #1a1a1a; color: #1a1a1a; }
   .hint { margin: .7rem 0 0; font-size: .85rem; color: #888; }
   .setup label { display: block; margin-bottom: .7rem; font-size: .85rem; color: #333; }
   .setup input { width: 100%; margin-top: .3rem; }
@@ -75,17 +80,18 @@
   </div>
 
 <script>
-// Mirror of handle_redeem_file in monitor/monitor.py: a code is
-// <date>:<seconds>:<signature> for extra time or <date>:nonight:<signature>
-// for no night that day, signed with HMAC-SHA256 under the child's secret.
+// Mirror of read_redeem_file in monitor/monitor.py: a code is
+// <minutes>:<signature> for extra time or nn:<signature> for no night, good
+// on the day it was made: the signature is HMAC-SHA256 of <date>:<minutes>
+// or <date>:nn under the child's secret, and the child never types the date.
 const SIGNATURE_CHARS = 4;  // must equal SIGNATURE_CHARS in monitor/config.py
 
-async function sign(secretHex, payload) {
+async function sign(secretHex, date, what) {
   const secret = Uint8Array.from(secretHex.match(/../g), h => parseInt(h, 16));
   const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${date}:${what}`));
   const hex = Array.from(new Uint8Array(mac), b => b.toString(16).padStart(2, "0")).join("");
-  return payload + ":" + hex.slice(0, SIGNATURE_CHARS);
+  return what + ":" + hex.slice(0, SIGNATURE_CHARS);
 }
 
 function today() {
@@ -99,6 +105,7 @@ function today() {
 const children = () => [...new URLSearchParams(location.hash.slice(1))];
 
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const CODE_BOX = `<div class="code" hidden><code></code><button type="button" class="copy" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>`;
 const tabs = document.getElementById("tabs"), card = document.getElementById("card");
 let selected = 0;  // index into children(); one past the end is "add a child"
 
@@ -131,40 +138,36 @@ function renderChild(secret) {
         <span class="unit">minutes</span>
         <button class="dark">Make code</button>
       </form>
-      <div class="row code-row" hidden><input type="text" readonly><button class="dark">Copy</button></div>
-      <p class="hint">The child pastes the code into "Extra time". A code works once.</p>
+      ${CODE_BOX}
+      <p class="hint">The child pastes the code into "Extra time". A code works once, on the day it was made.</p>
     </div>
     <div class="section">
       <h2>No night</h2>
       <form class="row">
-        <span class="unit">Today the machine stays on until midnight; the daily limit still counts.</span>
+        <span class="unit">That day the machine stays on until midnight; the daily limit still counts.</span>
         <button class="dark">Make code</button>
       </form>
-      <div class="row code-row" hidden><input type="text" readonly><button class="dark">Copy</button></div>
+      ${CODE_BOX}
     </div>`;
   const [day, time, night] = card.querySelectorAll(".section");
   const date = day.querySelector("input"), minutes = time.querySelector("input[name=minutes]");
   const show = async (section, what) => {
-    const row = section.querySelector(".code-row");
-    row.querySelector("input").value = await sign(secret, `${date.value.trim().replace(/:/g, "") || today()}:${what}`);
-    row.hidden = false;
+    const box = section.querySelector(".code");
+    box.querySelector("code").textContent = await sign(secret, date.value.trim().replace(/:/g, "") || today(), what);
+    box.hidden = false;
   };
-  date.oninput = () => card.querySelectorAll(".code-row").forEach(row => row.hidden = true);
+  date.oninput = () => card.querySelectorAll(".code").forEach(box => box.hidden = true);
   time.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
     minutes.value = b.dataset.min;
-    show(time, b.dataset.min * 60);
+    show(time, b.dataset.min);
   });
-  time.querySelector("form").onsubmit = e => { e.preventDefault(); show(time, minutes.value * 60); };
-  night.querySelector("form").onsubmit = e => { e.preventDefault(); show(night, "nonight"); };
-  card.querySelectorAll(".code-row").forEach(row => {
-    const input = row.querySelector("input"), button = row.querySelector("button");
-    input.onclick = () => input.select();
-    button.onclick = async () => {
-      input.select();
-      try { await navigator.clipboard.writeText(input.value); } catch { document.execCommand("copy"); }
-      button.textContent = "Copied";
-      setTimeout(() => button.textContent = "Copy", 1200);
-    };
+  time.querySelector("form").onsubmit = e => { e.preventDefault(); show(time, String(+minutes.value)); };
+  night.querySelector("form").onsubmit = e => { e.preventDefault(); show(night, "nn"); };
+  card.querySelectorAll(".code .copy").forEach(button => button.onclick = () => {
+    navigator.clipboard.writeText(button.previousElementSibling.textContent).then(() => {
+      button.classList.add("done");
+      setTimeout(() => button.classList.remove("done"), 1500);
+    });
   });
 }
 

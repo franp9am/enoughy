@@ -78,7 +78,6 @@ def files(tmp_path, monkeypatch):
         "today": data_dir / f"{TODAY.isoformat()}.json",
         "redeem": shared / "extra_time.txt",
         "remaining": shared / "remaining_time.txt",
-        "used_codes": data_dir / "used_redeem_codes.txt",
         "settings": data_dir / "settings.json",
         "server_url": data_dir / "server_url.txt",
         "token": data_dir / "child_token.txt",
@@ -113,16 +112,15 @@ def remaining_shown(files) -> int:
     return int(files["remaining"].read_text(encoding="utf-8"))
 
 
-def redeem_code(seconds, date="2026-09-14") -> str:
-    payload = f"{date}:{seconds}"
-    sign = hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
-    return f"{payload}:{sign}"
+def redeem_code(minutes, date="2026-09-14") -> str:
+    """What the child types: the minutes, and the signature of the date and minutes."""
+    sign = hmac.new(SECRET, f"{date}:{minutes}".encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
+    return f"{minutes}:{sign}"
 
 
 def no_night_code(date="2026-09-14", secret=SECRET) -> str:
-    payload = f"{date}:nonight"
-    sign = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
-    return f"{payload}:{sign}"
+    sign = hmac.new(secret, f"{date}:nn".encode(), hashlib.sha256).hexdigest()[:SIGNATURE_CHARS]
+    return f"nn:{sign}"
 
 
 def tick(now):
@@ -228,21 +226,32 @@ def test_a_logged_out_child_is_not_shut_down_at_night(machine, files):
 
 
 def test_a_redeem_code_adds_its_time_once(machine, files):
-    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+    files["redeem"].write_text(redeem_code(10), encoding="utf-8")
     write_day(files, spent=600)
 
     tick(at(8, 0))
-    tick(at(8, 1))  # the code is still in the file
+    assert files["redeem"].read_text(encoding="utf-8") == ""  # taken out once judged
+    files["redeem"].write_text(redeem_code(10), encoding="utf-8")  # typed again
+    tick(at(8, 1))
 
     data = today_data(files)
     assert data["granted_sec"] == 600
     assert machine.notifications == ["extra time 600"]
     assert data["event_log"] == ["redeem code 600 2026-09-14 08:00:00"]
-    assert redeem_code(600) in files["used_codes"].read_text(encoding="utf-8")
+    assert data["redeemed_codes"] == [redeem_code(10)]
+
+
+def test_a_code_from_another_day_is_refused_and_taken_out_of_the_file(machine, files):
+    files["redeem"].write_text(redeem_code(10, date="2026-09-13"), encoding="utf-8")
+
+    tick(at(8, 0))
+
+    assert today_data(files)["granted_sec"] == 0
+    assert files["redeem"].read_text(encoding="utf-8") == ""
 
 
 def test_a_redeem_code_saves_a_machine_whose_time_is_up(machine, files):
-    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+    files["redeem"].write_text(redeem_code(10), encoding="utf-8")
     write_day(files, spent=HOUR)
 
     tick(at(8, 0))
@@ -253,7 +262,7 @@ def test_a_redeem_code_saves_a_machine_whose_time_is_up(machine, files):
 
 def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files, monkeypatch):
     write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
-    code = redeem_code(600)
+    code = redeem_code(10)
     monkeypatch.setattr(time, "sleep", lambda seconds: files["redeem"].write_text(code, encoding="utf-8"))
 
     tick(at(8, 0))
@@ -270,7 +279,7 @@ def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files
 
 def test_a_redeem_code_too_small_for_the_debt_does_not_call_the_shutdown_off(machine, files, monkeypatch):
     write_day(files, spent=HOUR + 600)
-    code = redeem_code(300)
+    code = redeem_code(5)
     monkeypatch.setattr(time, "sleep", lambda seconds: files["redeem"].write_text(code, encoding="utf-8"))
 
     tick(at(8, 0))
@@ -284,7 +293,7 @@ def test_a_no_night_code_keeps_the_machine_up_at_night(machine, files):
     write_day(files, spent=600)
 
     tick(at(NIGHT_HOUR))
-    tick(at(NIGHT_HOUR, 1))  # the code is still in the file
+    tick(at(NIGHT_HOUR, 1))  # the file is empty by now; the day remembers
 
     assert machine.shutdowns == []
     assert machine.notifications == ["no night today"]
@@ -297,7 +306,7 @@ def test_a_no_night_code_keeps_the_machine_up_at_night(machine, files):
 def test_the_day_remembers_its_no_night_code_when_the_file_holds_another(machine, files):
     files["redeem"].write_text(no_night_code(), encoding="utf-8")
     tick(at(20, 0))
-    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+    files["redeem"].write_text(redeem_code(10), encoding="utf-8")
 
     tick(at(NIGHT_HOUR))
 
@@ -363,7 +372,7 @@ def test_a_no_night_code_in_the_grace_period_calls_the_night_shutdown_off(machin
 
 def test_an_extra_time_code_at_night_is_consumed_and_does_not_help(machine, files):
     # the price of one redeem step for both codes; carryover keeps the time for tomorrow
-    files["redeem"].write_text(redeem_code(600), encoding="utf-8")
+    files["redeem"].write_text(redeem_code(10), encoding="utf-8")
 
     tick(at(NIGHT_HOUR))
 

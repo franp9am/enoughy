@@ -9,6 +9,7 @@ DEFAULTS = {
     "carryover_sec": 0,
     "granted_sec": 0,
     "no_night": False,
+    "redeemed_codes": [],
     "event_log": [],
 }
 

@@ -88,9 +88,9 @@ address after `#`, and a second parent gets the same bookmark.
 
 Then, each time, the page makes one of two codes:
 
-* **Extra time:** pick the minutes and get a code such as `2026-07-23:3600:a184`. It
-  never expires and works once. The same day and minutes always give the same code, so
-  for a second one change the minutes or the day.
+* **Extra time:** pick the minutes and get a code such as `60:a184`. It works once, on
+  the day it was made. The same day and minutes always give the same code, so for a
+  second one change the minutes.
 * **No night:** the machine stays up until midnight on that one date, and the daily
   limit still counts. It works any number of times that day, and on that day only.
 
