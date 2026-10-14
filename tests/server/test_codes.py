@@ -109,11 +109,10 @@ def test_a_child_whose_secret_the_server_does_not_know_has_no_codes(anna):
     assert answer.status_code == 404
 
 
-def test_without_any_secret_the_dashboard_offers_no_codes(anna):
+def test_without_any_secret_the_codes_page_lists_no_child(anna):
     connection = db.connect()
     connection.execute("UPDATE children SET secret = NULL")
     connection.commit()
-    assert "Extra time codes" not in anna.get("/").text
     assert "Elias" not in anna.get("/codes").text
 
 

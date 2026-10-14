@@ -493,7 +493,6 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
         status = last_seen(connection, selected_child["id"])
         week = last_week(connection, selected_child["id"])
         settings = settings_view(connection, selected_child["id"])
-    has_codes = bool(children_with_codes(connection, parent.family_id))
     connection.close()
     return templates.TemplateResponse(
         request,
@@ -506,7 +505,6 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
             "last_seen": status,
             "settings": settings,
             "week": week,
-            "has_codes": has_codes,
         },
     )
 

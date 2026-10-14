@@ -62,8 +62,7 @@
   .day .weekday { font-size: .75rem; color: #888; padding-top: .35rem; }
   .day.today .bar { background: #1a1a1a; }
   .day.today .weekday, .day.today .spent { color: #1a1a1a; font-weight: 600; }
-  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
-  .aside a, .empty a { color: #888; }
+  .empty a { color: #888; }
   .export { display: flex; gap: .5rem; }
   .export a {
     flex: 1; padding: .55rem .6rem; border-radius: 6px; text-align: center;
@@ -71,8 +70,6 @@
     font-size: .85rem;
   }
   .export a:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
-  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
-  .aside a { color: #888; }
 </style>
 {% endblock %}
 {% block content %}
@@ -171,8 +168,6 @@
     {% else %}
     <p class="empty">No child's computer has synced yet.</p>
     {% endif %}
-    <p class="aside"><a href="{{ url_for('children_page') }}">Children</a>{% if has_codes %}
-      &middot; <a href="{{ url_for('codes_page') }}">Extra time codes</a>{% endif %}</p>
 {% endblock %}
 {% block script %}
   <script>
