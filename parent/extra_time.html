@@ -139,7 +139,7 @@ function renderChild(secret) {
         <button class="dark">Make code</button>
       </form>
       ${CODE_BOX}
-      <p class="hint">The child pastes the code into "Extra time". A code works once, on the day it was made.</p>
+      <p class="hint">The child pastes the code into "Extra time". A code works once, only on <span class="day">${today()}</span>.</p>
     </div>
     <div class="section">
       <h2>No night</h2>
@@ -156,7 +156,10 @@ function renderChild(secret) {
     box.querySelector("code").textContent = await sign(secret, date.value.trim().replace(/:/g, "") || today(), what);
     box.hidden = false;
   };
-  date.oninput = () => card.querySelectorAll(".code").forEach(box => box.hidden = true);
+  date.oninput = () => {
+    card.querySelectorAll(".code").forEach(box => box.hidden = true);
+    card.querySelector(".day").textContent = date.value.trim() || today();
+  };
   time.querySelectorAll(".presets button").forEach(b => b.onclick = () => {
     minutes.value = b.dataset.min;
     show(time, b.dataset.min);

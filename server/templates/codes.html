@@ -89,7 +89,7 @@
     {% if code and code.kind == "time" %}
     <div class="code"><code>{{ code.text }}</code><button type="button" class="copy" title="Copy" onclick="copy(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
     {% endif %}
-    <p class="hint">The child pastes the code into "Extra time". A code works once, on the day it was made.</p>
+    <p class="hint">The child pastes the code into "Extra time". A code works once, only on <span class="day">{{ date }}</span>.</p>
   </div>
 
   <div class="section">
@@ -111,9 +111,11 @@
 {% endif %}
 <p class="aside"><a href="{{ url_for('index') }}">Back</a></p>
 <script>
-  // one day for both forms: the field on top feeds their hidden date
-  document.getElementById("date").oninput = e =>
+  // one day for both forms: the field on top feeds their hidden date and the hint
+  document.getElementById("date").oninput = e => {
     document.querySelectorAll("input[name=date]").forEach(d => d.value = e.target.value);
+    document.querySelectorAll(".day").forEach(s => s.textContent = e.target.value);
+  };
   function preset(button, minutes) {
     button.form.minutes.value = minutes;
     button.form.requestSubmit();
