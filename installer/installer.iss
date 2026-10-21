@@ -94,13 +94,15 @@ Type: filesandordirs; Name: "{#PythonDir}"
 
 [Code]
 const
-  DefaultServerUrl = 'https://enoughy.com';   // the author's server; a child token from it is what turns syncing on
+  DefaultServerUrl = 'https://enoughy.com';   // the author's server; a setup code from it is what turns syncing on
+  CodesPage = 'https://pfranek.cz/enoughy-extra-time.html';   // makes the offline codes; the child and secret go after '#'
   ParentName = 'parent';   // the administrator account made when the child's is the only one
 
 var
   AccountPage: TInputOptionWizardPage;
   ParentPage, ServerPage, SettingsPage: TInputQueryWizardPage;
-  NewSecret: String;   // generated on a fresh install, shown at the end
+  Token, Secret: String;   // what the setup code was traded for; empty when there was none
+  NewSecret: String;   // generated on a fresh install without a server, shown at the end
   Accounts, Sids: TArrayOfString;   // the local accounts, one per row of the account page
   IsAdmin: array of Boolean;        // per row: in Administrators
   Demote: Boolean;   // the child leaves Administrators at the end of the install
@@ -121,7 +123,7 @@ begin
     if IsAdmin[I] and (I <> AccountPage.SelectedValueIndex) then Result := True;
 end;
 
-// Not {app}: the token page reads this folder before the wizard has set {app}.
+// Not {app}: the server page reads this folder before the wizard has set {app}.
 function ChildDataDir: String; begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
 
 // One row per enabled local account, from WMI; a typed name invites a typo that
@@ -187,10 +189,11 @@ begin
   ParentPage.Add('Password again:', True);
 
   ServerPage := CreateInputQueryPage(ParentPage.ID, 'Parent''s server', 'Where does the monitor report to?',
-    'The child token comes from whoever runs the parent''s server. Leave it empty to run without syncing; then the server is never contacted ' +
-    'and extra time comes through the offline codes.');
-  ServerPage.Add('Child token:', False);
-  ServerPage.Add('Server URL:', False);
+    'Add the child on the parent''s server and type the setup code it shows, which is good for an hour. ' +
+    'Leave it empty to run without an account: then the server is never contacted and extra time comes through ' +
+    'the offline codes. A reinstall with an empty code keeps the connection it has.');
+  ServerPage.Add('Setup code:', False);
+  ServerPage.Add('Server:', False);
 
   // The two settings a parent notices on the first evening; the rest, carryover and
   // the weekday exceptions, keep their defaults until the server or settings.json
@@ -252,20 +255,29 @@ begin
   if LoadStringFromFile(FileName, S) and (Trim(S) <> '') then Result := Trim(S);
 end;
 
+// The child's name as the label on the codes page, when the address can carry
+// it as it is; a name with other characters would need encoding the page undoes.
+function CodesPageLabel: String;
+var
+  I: Integer;
+begin
+  Result := Child('');
+  for I := 1 to Length(Result) do
+    if Pos(Result[I], 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.') = 0 then begin
+      Result := 'child';
+      Exit;
+    end;
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  // A reinstall shows what it has; Enter keeps it. Over a ScreenTime install,
-  // which is still there at this page, its token is the one shown.
-  if CurPageID = ServerPage.ID then begin
-    ServerPage.Values[0] := ReadFile(ChildDataDir + '\child_token.txt',
-      ReadFile(ExpandConstant('{commonappdata}\ScreenTime\data\child_token.txt'), ''));
+  if CurPageID = ServerPage.ID then
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
-  end;
   if CurPageID = SettingsPage.ID then ShowBasics;
   if (CurPageID = wpFinished) and (NewSecret <> '') then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
-      'Shared secret for the offline extra-time codes, which https://pfranek.cz/enoughy-extra-time.html makes on your own machine; ' +
-      'with a server, ignore it. It stays in ' + ChildDataDir + '\secret.txt here:' + #13#10 + NewSecret;
+      'Extra time comes through the offline codes. Open this address on your own phone or computer and bookmark it; ' +
+      'the page makes the codes there and sends nothing anywhere:' + #13#10 + CodesPage + '#' + CodesPageLabel + '=' + NewSecret;
   if (CurPageID = wpFinished) and Demote then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
       'After the restart ' + Child('') + ' is a standard user.';
@@ -277,6 +289,53 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := (PageID = ParentPage.ID) and not (IsAdmin[AccountPage.SelectedValueIndex] and not OtherAdmin);
+end;
+
+// The value of a string key in a flat JSON object, '' when absent. Enough for
+// the server's answer, whose values are hex with nothing to escape.
+function JsonString(Json, Key: String): String;
+var
+  P: Integer;
+begin
+  P := Pos('"' + Key + '"', Json);
+  if P = 0 then Exit;
+  Json := Copy(Json, P + Length(Key) + 2, Length(Json));
+  P := Pos('"', Json);   // opens the value
+  if P = 0 then Exit;
+  Json := Copy(Json, P + 1, Length(Json));
+  P := Pos('"', Json);   // closes it
+  if P > 0 then Result := Copy(Json, 1, P - 1);
+end;
+
+// Trades the setup code at the server for the child's token and secret, into
+// Token and Secret. Says what went wrong and returns False otherwise, so the
+// parent can correct the code on the page.
+function FetchCredentials(Server, Code: String): Boolean;
+var
+  Http: Variant;
+begin
+  Result := False;
+  try
+    Http := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+    Http.Open('POST', Server + '/api/setup', False);
+    Http.SetRequestHeader('Content-Type', 'application/json');
+    Http.Send('{"code": "' + Code + '"}');
+  except
+    MsgBox('Could not reach ' + Server + ': ' + GetExceptionMessage, mbError, MB_OK);
+    Exit;
+  end;
+  if Http.Status = 401 then begin
+    MsgBox('The server does not know this code; it may be over an hour old. Make a new one on the page.', mbError, MB_OK);
+    Exit;
+  end;
+  if Http.Status <> 200 then begin
+    MsgBox(Server + ' answered ' + IntToStr(Http.Status) + '.', mbError, MB_OK);
+    Exit;
+  end;
+  Token := JsonString(Http.ResponseText, 'token');
+  Secret := JsonString(Http.ResponseText, 'secret');
+  Result := (Token <> '') and (Secret <> '');
+  if not Result then MsgBox('The server''s answer had no token and secret in it.', mbError, MB_OK);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -300,6 +359,12 @@ begin
   end else if (CurPageID = ParentPage.ID) and (ParentPage.Values[0] <> ParentPage.Values[1]) then begin
     MsgBox('The two passwords differ.', mbError, MB_OK);
     Result := False;
+  end;
+  if CurPageID = ServerPage.ID then begin
+    Token := '';
+    Secret := '';
+    if Trim(ServerPage.Values[0]) <> '' then
+      Result := FetchCredentials(Trim(ServerPage.Values[1]), Trim(ServerPage.Values[0]));
   end;
   if CurPageID = SettingsPage.ID then begin
     if (StrToIntDef(Trim(SettingsPage.Values[0]), -1) < 0) or (StrToIntDef(Trim(SettingsPage.Values[0]), -1) > 1440) then begin
@@ -350,6 +415,7 @@ begin
   DeleteFile(ReadFile(Old + '\data\link_path.txt', ''));
   ForceDirectories(ChildDataDir);
   FileCopy(Old + '\data\settings.json', ChildDataDir + '\settings.json', True);
+  FileCopy(Old + '\data\child_token.txt', ChildDataDir + '\child_token.txt', True);
   DelTree(Old, True, True, True);
   DelTree(Old + 'Shared', True, True, True);
 end;
@@ -395,23 +461,25 @@ begin
   for I := 1 to 16 do Result := Result + Format('%.2x', [Ord(Buffer[I])]);
 end;
 
-// Both credentials go to files in the locked data folder. A fresh install gets
-// a random secret for signing extra-time codes; a reinstall keeps the one it has.
+// The credentials go to files in the locked data folder: what the setup code
+// was traded for, over whatever a reinstall has. Without a code, a fresh install
+// gets a random secret for signing extra-time codes; a reinstall keeps the one it has.
 procedure WriteCredentials;
 var
-  Token, UpdateMode: String;
+  UpdateMode: String;
 begin
-  if not FileExists(ChildDataDir + '\secret.txt') then begin
+  if Secret <> '' then
+    SaveStringToFile(ChildDataDir + '\secret.txt', Secret, False)
+  else if not FileExists(ChildDataDir + '\secret.txt') then begin
     NewSecret := RandomHex;
     SaveStringToFile(ChildDataDir + '\secret.txt', NewSecret, False);
   end;
-  Token := Trim(ServerPage.Values[0]);
   if Token <> '' then SaveStringToFile(ChildDataDir + '\child_token.txt', Token, False);
   SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
   // `auto` fetches releases at boot, `manual` stays as installed; the default is
   // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
   if not FileExists(ExpandConstant('{app}\UPDATE_MODE')) then begin
-    if Token <> '' then UpdateMode := 'auto' else UpdateMode := 'manual';
+    if FileExists(ChildDataDir + '\child_token.txt') then UpdateMode := 'auto' else UpdateMode := 'manual';
     SaveStringToFile(ExpandConstant('{app}\UPDATE_MODE'), UpdateMode, False);
   end;
 end;

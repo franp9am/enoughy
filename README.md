@@ -9,9 +9,9 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 
 1. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
-   administrator rights, which local account is the child's, optionally for the child
-   token the parent's server shows after you add the child there and that server's
-   URL, and for the daily limit and the night time;
+   administrator rights, which local account is the child's, optionally for the setup
+   code the parent's server shows after you add the child there, and for the daily
+   limit and the night time;
    a reinstall shows the values in force. The child's account must not be an
    administrator: when it is, the installer offers to make it a standard user, and on
    a machine where it is the only account it first creates an administrator account
@@ -20,8 +20,8 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 2. Reboot. The monitor runs from boot, the widget with the time left appears when the
    child logs in.
 
-A fresh install prints a secret at the end. It is only for the offline codes, see Extra
-time; with a server, ignore it. A reinstall keeps it.
+An install without a setup code prints the address of the offline codes page at the
+end, see Extra time. A reinstall keeps the secret behind it.
 
 To remove everything, uninstall enoughy in Apps & Features. That removes the tasks,
 the folders and the usage history.
@@ -81,10 +81,10 @@ never outlive the day. For a longer evening, set a later night in the settings t
 
 The parent makes a code on their own machine and the child types it in.
 
-Once: open https://pfranek.cz/enoughy-extra-time.html on the parent's machine. The page
-makes the codes in the browser and sends nothing anywhere. Add the child with the
-secret from the install, then bookmark the page: name and secret are kept in its
-address after `#`, and a second parent gets the same bookmark.
+Once: open the address the install printed, https://pfranek.cz/enoughy-extra-time.html
+with the child and the secret after `#`, on the parent's phone or machine and bookmark
+it. The page makes the codes in the browser and sends nothing anywhere; a second
+parent gets the same bookmark, and `+` adds a child with the secret from its install.
 
 Then, each time, the page makes one of two codes:
 
