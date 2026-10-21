@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import secrets
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,11 @@ from auth import (
 # rendered times must not depend on the server process's own timezone.
 DISPLAY_TIMEZONE = ZoneInfo("Europe/Prague")
 
+# A setup code, the six digits the installer trades for a child's token and
+# secret, lasts this long after the page shows it: from the page to the
+# child's computer, with the download and the account pages in between.
+SETUP_CODE_LIFETIME = timedelta(hours=1)
+
 
 class SettingsChangeOutcome(BaseModel):
     id: int  # of the settings change
@@ -48,6 +54,15 @@ class SyncRequest(BaseModel):
     # of the last change delivered to the child; None before any
     settings_change_outcome: SettingsChangeOutcome | None = None
     monitor_version: str | None = None
+
+
+class SetupRequest(BaseModel):
+    code: str
+
+
+class SetupResponse(BaseModel):
+    token: str
+    secret: str
 
 
 class PendingGrant(BaseModel):
@@ -467,6 +482,38 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
         pending_grants=[PendingGrant(id=row["id"], seconds=row["seconds"]) for row in pending],
         settings_change=change_to_send,
     )
+
+
+@app.post("/api/setup")
+def setup(request: SetupRequest) -> SetupResponse:
+    """The installer trades the setup code for the child's token and secret.
+    The code is gone with the trade, so it works once; one past its lifetime
+    is as unknown as a wrong one. A child from before secrets gets one here,
+    since the installer is about to write what the server says. The code is
+    the only credential, and what keeps it from being guessed is the rate
+    limit in front of the server."""
+    oldest = (datetime.now(timezone.utc) - SETUP_CODE_LIFETIME).isoformat(timespec="seconds")
+    connection = db.connect()
+    with connection:
+        child = connection.execute(
+            """SELECT children.id, token, secret FROM setup_codes
+               JOIN children ON children.id = child_id
+               WHERE code = :code AND created_at > :oldest""",
+            {"code": request.code.strip(), "oldest": oldest},
+        ).fetchone()
+        if child is not None:
+            secret = child["secret"] or secrets.token_hex(16)
+            connection.execute(
+                "UPDATE children SET secret = :secret WHERE id = :child_id",
+                {"secret": secret, "child_id": child["id"]},
+            )
+            connection.execute(
+                "DELETE FROM setup_codes WHERE child_id = :child_id", {"child_id": child["id"]}
+            )
+    connection.close()
+    if child is None:
+        raise HTTPException(status_code=401, detail="unknown or expired code")
+    return SetupResponse(token=child["token"], secret=secret)
 
 
 @app.get("/health")

@@ -62,7 +62,8 @@ reverse proxy in front only forwards.
 Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
 older marwin.pfranek.cz, one certificate for all five: the clone in `~/enoughy`, the
 database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
-port 8000 with rate limits. A cookie belongs to one host name, so each name is its own
+port 8000 with rate limits, which are also all that stands between a guesser and
+`/login` or `/api/setup`. A cookie belongs to one host name, so each name is its own
 login. A deploy is `git pull` and `sudo systemctl restart enoughy`; the unit runs
 `uv run`, which installs a new dependency by itself. A new column goes into the live
 database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF NOT
