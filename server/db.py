@@ -34,6 +34,16 @@ CREATE TABLE IF NOT EXISTS children (
     secret TEXT,
     UNIQUE (family_id, name)
 );
+-- A setup code: the six digits the page shows when a child is added and
+-- the parent types into the installer, which trades it for the child's
+-- token and secret. A child has one at a time, a new one replaces it, and
+-- it is deleted when used or expired. Codes are looked up by `code` alone,
+-- so the pending ones are unique across families.
+CREATE TABLE IF NOT EXISTS setup_codes (
+    child_id INTEGER PRIMARY KEY REFERENCES children(id),
+    code TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS grants (
     id INTEGER PRIMARY KEY,
     child_id INTEGER NOT NULL REFERENCES children(id),
