@@ -340,11 +340,45 @@ def export_filename(child_name: str, table: str) -> str:
     return f"{re.sub(r'[^A-Za-z0-9]+', '-', child_name).strip('-') or 'child'}-{table}.csv"
 
 
-def children_in_family(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
-    return connection.execute(
-        "SELECT id, name, token FROM children WHERE family_id = :family_id ORDER BY id",
-        {"family_id": family_id},
+def children_in_family(connection: sqlite3.Connection, family_id: int, now: datetime) -> list[dict]:
+    """Each child with its setup code and the local time the code is good
+    until, both None once it is used or past its lifetime."""
+    lifetime_ago = (now - SETUP_CODE_LIFETIME).isoformat(timespec="seconds")
+    rows = connection.execute(
+        """SELECT children.id, name, code, created_at FROM children
+           LEFT JOIN setup_codes ON child_id = children.id AND created_at > :lifetime_ago
+           WHERE family_id = :family_id ORDER BY children.id""",
+        {"family_id": family_id, "lifetime_ago": lifetime_ago},
     ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "code": row["code"],
+            "good_until": row["code"] and formatted_local_time(
+                (datetime.fromisoformat(row["created_at"]) + SETUP_CODE_LIFETIME).isoformat()
+            ),
+        }
+        for row in rows
+    ]
+
+
+def make_setup_code(connection: sqlite3.Connection, child_id: int, now: datetime) -> str:
+    """A fresh six-digit code for the child, in place of the one it had.
+    Codes are unique while pending, so a collision with another child's,
+    one in a million, is simply drawn again."""
+    with connection:
+        connection.execute("DELETE FROM setup_codes WHERE child_id = :child_id", {"child_id": child_id})
+        while True:
+            code = f"{secrets.randbelow(1_000_000):06}"
+            try:
+                connection.execute(
+                    "INSERT INTO setup_codes (child_id, code, created_at) VALUES (?, ?, ?)",
+                    (child_id, code, now.isoformat(timespec="seconds")),
+                )
+                return code
+            except sqlite3.IntegrityError:
+                continue
 
 
 def synced_children(connection: sqlite3.Connection, family_id: int) -> list[sqlite3.Row]:
@@ -492,14 +526,14 @@ def setup(request: SetupRequest) -> SetupResponse:
     since the installer is about to write what the server says. The code is
     the only credential, and what keeps it from being guessed is the rate
     limit in front of the server."""
-    oldest = (datetime.now(timezone.utc) - SETUP_CODE_LIFETIME).isoformat(timespec="seconds")
+    lifetime_ago = (datetime.now(timezone.utc) - SETUP_CODE_LIFETIME).isoformat(timespec="seconds")
     connection = db.connect()
     with connection:
         child = connection.execute(
             """SELECT children.id, token, secret FROM setup_codes
                JOIN children ON children.id = child_id
-               WHERE code = :code AND created_at > :oldest""",
-            {"code": request.code.strip(), "oldest": oldest},
+               WHERE code = :code AND created_at > :lifetime_ago""",
+            {"code": request.code.strip(), "lifetime_ago": lifetime_ago},
         ).fetchone()
         if child is not None:
             secret = child["secret"] or secrets.token_hex(16)
@@ -652,10 +686,12 @@ def logout(request: Request) -> RedirectResponse:
 def children_page(request: Request) -> HTMLResponse:
     parent = current_parent(request)
     connection = db.connect()
-    children = children_in_family(connection, parent.family_id)
+    children = children_in_family(connection, parent.family_id, datetime.now(timezone.utc))
     connection.close()
     return templates.TemplateResponse(
-        request, "children.html", {"parent": parent, "children": children}
+        request,
+        "children.html",
+        {"parent": parent, "children": children, "lifetime_hours": SETUP_CODE_LIFETIME // timedelta(hours=1)},
     )
 
 
@@ -667,10 +703,26 @@ async def create_child(request: Request) -> RedirectResponse:
     connection = db.connect()
     try:
         add_child.add_child(connection, parent.family_id, name)
+        child_id = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
+        make_setup_code(connection, child_id, datetime.now(timezone.utc))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=400, detail=f"you already have a child named {name}")
+    finally:
+        connection.close()
+    return RedirectResponse("/children", status_code=303)
+
+
+@app.post("/children/setup-code")
+async def new_setup_code(request: Request) -> RedirectResponse:
+    """For a code that was let expire, or a reinstall of an existing child."""
+    parent = current_parent(request)
+    form = await request.form()
+    connection = db.connect()
+    try:
+        child = require_child_in_family(connection, int(form.get("child_id", 0)), parent.family_id)
+        make_setup_code(connection, child["id"], datetime.now(timezone.utc))
     finally:
         connection.close()
     return RedirectResponse("/children", status_code=303)

@@ -6,11 +6,11 @@ import db
 
 
 def code_made(code: str, age: timedelta = timedelta(0)) -> None:
-    """The one code Tom has, as the page will make it."""
+    """The one code Tom has, in place of the one the page made with him."""
     created_at = (datetime.now(timezone.utc) - age).isoformat(timespec="seconds")
     with db.connect() as connection:
         connection.execute(
-            "INSERT INTO setup_codes (child_id, code, created_at) VALUES (1, ?, ?)",
+            "UPDATE setup_codes SET code = ?, created_at = ? WHERE child_id = 1",
             (code, created_at),
         )
 

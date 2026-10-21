@@ -3,8 +3,14 @@
 {% block style %}
 <style>
   .child h2 { margin-bottom: .4rem; }
-  .token { margin: 0; font-size: .9rem; color: #555; }
-  .token code { display: block; margin-top: .3rem; font-size: .95rem; color: #1a1a1a; user-select: all; }
+  .setup { margin: 0; font-size: .9rem; color: #555; }
+  .setup code { font-size: 1.3rem; letter-spacing: .15em; color: #1a1a1a; user-select: all; }
+  .setup form { display: inline; }
+  .setup button {
+    padding: .2rem .7rem; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;
+    background: #fff; color: #444; font-size: .85rem; font-family: inherit;
+  }
+  .setup button:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
   .add-child { display: flex; gap: .5rem; }
   .add-child input {
     flex: 1; padding: .55rem .6rem; border-radius: 6px;
@@ -25,8 +31,18 @@
   {% for child in children %}
   <div class="section child">
     <h2>{{ child.name }}</h2>
-    <p class="token">Token for the setup on {{ child.name }}'s computer:
-      <code>{{ child.token }}</code></p>
+    <p class="setup">
+      {% if child.code %}
+      Setup code for {{ child.name }}'s computer: <code>{{ child.code }}</code>,
+      good until {{ child.good_until }}.
+      {% else %}
+      <form method="post" action="{{ url_for('new_setup_code') }}">
+        <input type="hidden" name="child_id" value="{{ child.id }}">
+        <button type="submit">Setup code</button>
+      </form>
+      for {{ child.name }}'s computer, good for {{ lifetime_hours }} hour{{ 's' if lifetime_hours != 1 }}.
+      {% endif %}
+    </p>
   </div>
   {% endfor %}
   <div class="section">
