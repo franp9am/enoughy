@@ -235,8 +235,8 @@ begin
   CodesText.Parent := CodesPage.Surface;
   CodesText.WordWrap := True;
   CodesText.AutoSize := False;
-  CodesText.Caption := 'Your computer is not synchronized with any remote server. All data about your child stays local.' +
-    #13#10#13#10 + 'If you ever need to grant extra time to your child, use this page. Scan it with your phone, ' +
+  CodesText.Caption := 'Your computer is not synchronized with any remote server. All data about your child stays local.' + #13#10#13#10 +
+    'If you ever need to grant extra time to your child, use this page. Scan it with your phone, ' +
     'bookmark it and KEEP IT SECRET from the child.';
   CodesImage := TBitmapImage.Create(CodesPage);
   CodesImage.Parent := CodesPage.Surface;
@@ -337,10 +337,18 @@ begin
     CodesImage.Height := CodesImage.Bitmap.Height;
     Log('enoughy: QR code ' + IntToStr(CodesImage.Width) + ' px');
   end;
-  // The code at the right, the text beside it, the address along the bottom.
-  CodesImage.Left := CodesPage.SurfaceWidth - CodesImage.Width;
-  CodesText.Width := CodesImage.Left - ScaleX(12);
+  // The text first; the code under it when the page is tall enough, else at its
+  // right; the address along the bottom.
+  CodesText.Top := ScaleY(12);
+  CodesText.Width := CodesPage.SurfaceWidth;
   WizardForm.AdjustLabelHeight(CodesText);
+  CodesImage.Top := CodesText.Top + CodesText.Height + ScaleY(12);
+  if CodesImage.Top + CodesImage.Height + CodesAddress.Height + ScaleY(12) > CodesPage.SurfaceHeight then begin
+    CodesImage.Top := CodesText.Top;
+    CodesImage.Left := CodesPage.SurfaceWidth - CodesImage.Width;
+    CodesText.Width := CodesImage.Left - ScaleX(12);
+    WizardForm.AdjustLabelHeight(CodesText);
+  end;
   CodesAddress.Top := CodesImage.Top + CodesImage.Height + ScaleY(12);
   if CodesText.Top + CodesText.Height + ScaleY(12) > CodesAddress.Top then
     CodesAddress.Top := CodesText.Top + CodesText.Height + ScaleY(12);
