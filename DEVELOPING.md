@@ -14,7 +14,8 @@ For whoever changes the code, runs the server or makes a release.
   https://pfranek.cz/enoughy-extra-time.html. Its `SIGNATURE_CHARS` must match `config.py`.
 * `server/` -- the optional web page for the parent.
 * `installer/` -- the Inno Setup script and `build-python.ps1`, which fetches the Python
-  the setup bundles.
+  the setup bundles. `qrcodegen.py` is Project Nayuki's QR encoder, v1.8.0, vendored as it
+  is; `qr_bmp.py` draws the codes page's QR with it on that Python, at the end of an install.
 
 On the child's machine the monitor is in `C:\ProgramData\Enoughy`, which the child
 cannot read, with a folder per child account under `data\`. What the child may touch

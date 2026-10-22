@@ -69,6 +69,9 @@ Source: "..\monitor\launcher.ps1";    DestDir: "{app}"
 Source: "..\monitor\release_key.cer"; DestDir: "{app}"
 Source: "..\widget\remaining_time_widget.py"; DestDir: "{#SharedDir}"
 Source: "..\widget\enter_code.py";            DestDir: "{#SharedDir}"
+; Only run at the end of the install, for the QR code of the codes page; never installed.
+Source: "qrcodegen.py"; Flags: dontcopy
+Source: "qr_bmp.py";    Flags: dontcopy
 ; A running monitor holds the DLLs; Setup closes it, or replaces them at the reboot.
 Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignoreversion restartreplace
 
@@ -95,14 +98,17 @@ Type: filesandordirs; Name: "{#PythonDir}"
 [Code]
 const
   DefaultServerUrl = 'https://enoughy.com';   // the author's server; a setup code from it is what turns syncing on
-  CodesPage = 'https://pfranek.cz/enoughy-extra-time.html';   // makes the offline codes; the child and secret go after '#'
   ParentName = 'parent';   // the administrator account made when the child's is the only one
 
 var
   AccountPage: TInputOptionWizardPage;
   ParentPage, ServerPage, SettingsPage: TInputQueryWizardPage;
+  NoSync: TNewCheckBox;   // on the server page: no account, the server is never contacted
+  CodesPage: TWizardPage;   // after the install without a server: where the extra-time codes come from
+  CodesText: TNewStaticText;
+  CodesAddress: TNewEdit;
+  CodesImage: TBitmapImage;
   Token, Secret: String;   // what the setup code was traded for; empty when there was none
-  NewSecret: String;   // generated on a fresh install without a server, shown at the end
   Accounts, Sids: TArrayOfString;   // the local accounts, one per row of the account page
   IsAdmin: array of Boolean;        // per row: in Administrators
   Demote: Boolean;   // the child leaves Administrators at the end of the install
@@ -162,6 +168,17 @@ begin
       if Members.ItemIndex(I).SID = Sids[J] then IsAdmin[J] := True;
 end;
 
+// The code and server fields have nothing to say when the box is ticked.
+procedure NoSyncClick(Sender: TObject);
+var
+  I: Integer;
+begin
+  for I := 0 to 1 do begin
+    ServerPage.Edits[I].Enabled := not NoSync.Checked;
+    ServerPage.PromptLabels[I].Enabled := not NoSync.Checked;
+  end;
+end;
+
 procedure InitializeWizard;
 var
   I, Candidates, LastCandidate: Integer;
@@ -189,11 +206,17 @@ begin
   ParentPage.Add('Password again:', True);
 
   ServerPage := CreateInputQueryPage(ParentPage.ID, 'Parent''s server', 'Where does the monitor report to?',
-    'Add the child on the parent''s server and type the setup code it shows, which is good for an hour. ' +
-    'Leave it empty to run without an account: then the server is never contacted and extra time comes through ' +
-    'the offline codes. A reinstall with an empty code keeps the connection it has.');
+    'Enter the 6-digit code you have from enoughy.com. If you don''t want the server dashboard for the parent, ' +
+    'click "No server".');
   ServerPage.Add('Setup code:', False);
   ServerPage.Add('Server:', False);
+  NoSync := TNewCheckBox.Create(ServerPage);
+  NoSync.Parent := ServerPage.Surface;
+  NoSync.Caption := 'No server';
+  NoSync.Top := ServerPage.Edits[1].Top + ServerPage.Edits[1].Height + ScaleY(16);
+  NoSync.Width := ServerPage.SurfaceWidth;
+  NoSync.Height := ScaleY(17);
+  NoSync.OnClick := @NoSyncClick;
 
   // The two settings a parent notices on the first evening; the rest, carryover and
   // the weekday exceptions, keep their defaults until the server or settings.json
@@ -204,6 +227,23 @@ begin
   SettingsPage.Add('Minutes a day:', False);
   SettingsPage.Add('Day starts (H:MM):', False);
   SettingsPage.Add('Night starts (H:MM; leave both times empty for no night):', False);
+
+  // After the install, without a server: the address of the codes page with the
+  // child's key, and its QR code. ShowCodesPage fills and lays it out.
+  CodesPage := CreateCustomPage(wpInfoAfter, 'Extra time codes', '');
+  CodesText := TNewStaticText.Create(CodesPage);
+  CodesText.Parent := CodesPage.Surface;
+  CodesText.WordWrap := True;
+  CodesText.AutoSize := False;
+  CodesText.Caption := 'Your computer is not synchronized with any remote server. All data about your child stays local.' +
+    #13#10#13#10 + 'If you ever need to grant extra time to your child, use this page. Scan it with your phone, ' +
+    'bookmark it and KEEP IT SECRET from the child.';
+  CodesImage := TBitmapImage.Create(CodesPage);
+  CodesImage.Parent := CodesPage.Surface;
+  CodesAddress := TNewEdit.Create(CodesPage);
+  CodesAddress.Parent := CodesPage.Surface;
+  CodesAddress.ReadOnly := True;
+  CodesAddress.Width := CodesPage.SurfaceWidth;
 end;
 
 // "6:00" as minutes since midnight, -1 for anything else; "24:00" is the end of the day.
@@ -269,26 +309,77 @@ begin
     end;
 end;
 
-procedure CurPageChanged(CurPageID: Integer);
+// The address with the child's key into the box, and its QR code, drawn by the
+// Python just installed; when that fails the page still has the address.
+procedure ShowCodesPage;
+var
+  Address, Bmp: String;
+  Code: Integer;
 begin
-  if CurPageID = ServerPage.ID then
+  Address := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl) + '/extra-time-codes#' +
+    CodesPageLabel + '=' + ReadFile(ChildDataDir + '\secret.txt', '');
+  CodesAddress.Text := Address;
+  // The key reaches Python by file, not on the command line, which other users can read.
+  SaveStringToFile(ExpandConstant('{tmp}\address.txt'), Address, False);
+  ExtractTemporaryFile('qrcodegen.py');
+  ExtractTemporaryFile('qr_bmp.py');
+  Bmp := ExpandConstant('{tmp}\qr.bmp');
+  CodesImage.Width := 0;
+  CodesImage.Height := 0;
+  if not Exec(Python, ExpandConstant('"{tmp}\qr_bmp.py" "{tmp}\address.txt" "') + Bmp + '"',
+       ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Code) then
+    Log('enoughy: could not start ' + Python)
+  else if (Code <> 0) or not FileExists(Bmp) then
+    Log('enoughy: qr_bmp.py exit code ' + IntToStr(Code) + ', image there: ' + IntToStr(Ord(FileExists(Bmp))))
+  else begin
+    CodesImage.Bitmap.LoadFromFile(Bmp);
+    CodesImage.Width := CodesImage.Bitmap.Width;
+    CodesImage.Height := CodesImage.Bitmap.Height;
+    Log('enoughy: QR code ' + IntToStr(CodesImage.Width) + ' px');
+  end;
+  // The code at the right, the text beside it, the address along the bottom.
+  CodesImage.Left := CodesPage.SurfaceWidth - CodesImage.Width;
+  CodesText.Width := CodesImage.Left - ScaleX(12);
+  WizardForm.AdjustLabelHeight(CodesText);
+  CodesAddress.Top := CodesImage.Top + CodesImage.Height + ScaleY(12);
+  if CodesText.Top + CodesText.Height + ScaleY(12) > CodesAddress.Top then
+    CodesAddress.Top := CodesText.Top + CodesText.Height + ScaleY(12);
+  Log('enoughy: codes page text ' + IntToStr(CodesText.Width) + 'x' + IntToStr(CodesText.Height) + ' at ' + IntToStr(CodesText.Top) +
+    ', address at ' + IntToStr(CodesAddress.Top) + ', surface ' + IntToStr(CodesPage.SurfaceWidth) + 'x' + IntToStr(CodesPage.SurfaceHeight));
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Grown: Integer;
+begin
+  if CurPageID = ServerPage.ID then begin
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
+    // A reinstall of an install without an account starts with the box ticked.
+    NoSync.Checked := FileExists(ChildDataDir + '\secret.txt') and not FileExists(ChildDataDir + '\child_token.txt');
+    NoSyncClick(NoSync);
+  end;
   if CurPageID = SettingsPage.ID then ShowBasics;
-  if (CurPageID = wpFinished) and (NewSecret <> '') then
-    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
-      'Extra time comes through the offline codes. Open this address on your own phone or computer and bookmark it; ' +
-      'the page makes the codes there and sends nothing anywhere:' + #13#10 + CodesPage + '#' + CodesPageLabel + '=' + NewSecret;
+  if CurPageID = CodesPage.ID then ShowCodesPage;
   if (CurPageID = wpFinished) and Demote then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
       'After the restart ' + Child('') + ' is a standard user.';
   if (CurPageID = wpFinished) and ParentCreated then
     WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + ' Your administrator account is "' + ParentName +
       '", with the password you chose; log in as it when Windows asks for an administrator.';
+  if CurPageID = wpFinished then begin
+    // Inno sized the label and placed the restart question under it before the
+    // lines above were added; without this they fall below its edge, unseen.
+    Grown := WizardForm.AdjustLabelHeight(WizardForm.FinishedLabel);
+    if Grown > 0 then Grown := Grown + ScaleY(12);   // and a gap before the question
+    WizardForm.YesRadio.Top := WizardForm.YesRadio.Top + Grown;
+    WizardForm.NoRadio.Top := WizardForm.NoRadio.Top + Grown;
+  end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := (PageID = ParentPage.ID) and not (IsAdmin[AccountPage.SelectedValueIndex] and not OtherAdmin);
+  Result := ((PageID = ParentPage.ID) and not (IsAdmin[AccountPage.SelectedValueIndex] and not OtherAdmin))
+    or ((PageID = CodesPage.ID) and not NoSync.Checked);
 end;
 
 // The value of a string key in a flat JSON object, '' when absent. Enough for
@@ -363,8 +454,14 @@ begin
   if CurPageID = ServerPage.ID then begin
     Token := '';
     Secret := '';
-    if Trim(ServerPage.Values[0]) <> '' then
-      Result := FetchCredentials(Trim(ServerPage.Values[1]), Trim(ServerPage.Values[0]));
+    if not NoSync.Checked then begin
+      if Trim(ServerPage.Values[0]) <> '' then
+        Result := FetchCredentials(Trim(ServerPage.Values[1]), Trim(ServerPage.Values[0]))
+      else if not FileExists(ChildDataDir + '\child_token.txt') then begin
+        MsgBox('Enter the code, or click "No server".', mbError, MB_OK);
+        Result := False;
+      end;
+    end;
   end;
   if CurPageID = SettingsPage.ID then begin
     if (StrToIntDef(Trim(SettingsPage.Values[0]), -1) < 0) or (StrToIntDef(Trim(SettingsPage.Values[0]), -1) > 1440) then begin
@@ -470,11 +567,10 @@ var
 begin
   if Secret <> '' then
     SaveStringToFile(ChildDataDir + '\secret.txt', Secret, False)
-  else if not FileExists(ChildDataDir + '\secret.txt') then begin
-    NewSecret := RandomHex;
-    SaveStringToFile(ChildDataDir + '\secret.txt', NewSecret, False);
-  end;
+  else if not FileExists(ChildDataDir + '\secret.txt') then
+    SaveStringToFile(ChildDataDir + '\secret.txt', RandomHex, False);
   if Token <> '' then SaveStringToFile(ChildDataDir + '\child_token.txt', Token, False);
+  if NoSync.Checked then DeleteFile(ChildDataDir + '\child_token.txt');   // a reinstall that gives up its account
   SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
   // `auto` fetches releases at boot, `manual` stays as installed; the default is
   // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
