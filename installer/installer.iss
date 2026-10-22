@@ -339,7 +339,7 @@ begin
   end;
   // The text first; the code under it when the page is tall enough, else at its
   // right; the address along the bottom.
-  CodesText.Top := ScaleY(12);
+  CodesText.Top := ScaleY(6);
   CodesText.Width := CodesPage.SurfaceWidth;
   WizardForm.AdjustLabelHeight(CodesText);
   CodesImage.Top := CodesText.Top + CodesText.Height + ScaleY(12);
