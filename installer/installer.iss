@@ -105,7 +105,7 @@ var
   ParentPage, ServerPage, SettingsPage: TInputQueryWizardPage;
   NoSync: TNewCheckBox;   // on the server page: no account, the server is never contacted
   CodesPage: TWizardPage;   // after the install without a server: where the extra-time codes come from
-  CodesText: TNewStaticText;
+  CodesText, CodesHint: TNewStaticText;   // the hint: what the child does with a code
   CodesAddress: TNewEdit;
   CodesImage: TBitmapImage;
   Token, Secret: String;   // what the setup code was traded for; empty when there was none
@@ -238,6 +238,11 @@ begin
   CodesText.Caption := 'Your computer is not synchronized with any remote server. All data about your child stays local.' + #13#10#13#10 +
     'If you ever need to grant extra time to your child, use this page. Scan it with your phone, ' +
     'bookmark it and KEEP IT SECRET from the child.';
+  CodesHint := TNewStaticText.Create(CodesPage);
+  CodesHint.Parent := CodesPage.Surface;
+  CodesHint.WordWrap := True;
+  CodesHint.AutoSize := False;
+  CodesHint.Caption := 'To use a code, the child opens the "Extra time" app on this computer and types it in.';
   CodesImage := TBitmapImage.Create(CodesPage);
   CodesImage.Parent := CodesPage.Surface;
   CodesAddress := TNewEdit.Create(CodesPage);
@@ -337,21 +342,31 @@ begin
     CodesImage.Height := CodesImage.Bitmap.Height;
     Log('enoughy: QR code ' + IntToStr(CodesImage.Width) + ' px');
   end;
-  // The text first; the code under it when the page is tall enough, else at its
-  // right; the address along the bottom.
+  // The text first; the code under it with the hint at its side when the page is
+  // tall enough, else the code at the right with the hint under the text; the
+  // address along the bottom.
   CodesText.Top := ScaleY(6);
   CodesText.Width := CodesPage.SurfaceWidth;
   WizardForm.AdjustLabelHeight(CodesText);
   CodesImage.Top := CodesText.Top + CodesText.Height + ScaleY(12);
-  if CodesImage.Top + CodesImage.Height + CodesAddress.Height + ScaleY(12) > CodesPage.SurfaceHeight then begin
+  if CodesImage.Top + CodesImage.Height + CodesAddress.Height + ScaleY(12) <= CodesPage.SurfaceHeight then begin
+    CodesHint.Left := CodesImage.Width + ScaleX(12);
+    CodesHint.Width := CodesPage.SurfaceWidth - CodesHint.Left;
+    WizardForm.AdjustLabelHeight(CodesHint);
+    CodesHint.Top := CodesImage.Top + (CodesImage.Height - CodesHint.Height) div 2;
+  end else begin
     CodesImage.Top := CodesText.Top;
     CodesImage.Left := CodesPage.SurfaceWidth - CodesImage.Width;
     CodesText.Width := CodesImage.Left - ScaleX(12);
     WizardForm.AdjustLabelHeight(CodesText);
+    CodesHint.Left := 0;
+    CodesHint.Width := CodesText.Width;
+    WizardForm.AdjustLabelHeight(CodesHint);
+    CodesHint.Top := CodesText.Top + CodesText.Height + ScaleY(12);
   end;
   CodesAddress.Top := CodesImage.Top + CodesImage.Height + ScaleY(12);
-  if CodesText.Top + CodesText.Height + ScaleY(12) > CodesAddress.Top then
-    CodesAddress.Top := CodesText.Top + CodesText.Height + ScaleY(12);
+  if CodesHint.Top + CodesHint.Height + ScaleY(12) > CodesAddress.Top then
+    CodesAddress.Top := CodesHint.Top + CodesHint.Height + ScaleY(12);
   Log('enoughy: codes page text ' + IntToStr(CodesText.Width) + 'x' + IntToStr(CodesText.Height) + ' at ' + IntToStr(CodesText.Top) +
     ', address at ' + IntToStr(CodesAddress.Top) + ', surface ' + IntToStr(CodesPage.SurfaceWidth) + 'x' + IntToStr(CodesPage.SurfaceHeight));
 end;
