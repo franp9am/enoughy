@@ -57,7 +57,6 @@ the database.
   the installer shows it for a family without an account. Behind a button: a
   key on the screen is the risk. `/codes` stays for the account parent whose
   child's computer is offline right now; the first manual does not mention it.
-
 * site: enoughy.com is the address since 2026-10-11; enoughy.cz, www and the
   old marwin.pfranek.cz answer too. Once the description exists, `/` shows it
   to a stranger and the overview to a parent, and the other names redirect the
