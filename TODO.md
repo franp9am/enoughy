@@ -10,26 +10,6 @@ the database.
 
 * server: a parent deletes the family and everything under it from the
   page, since the server holds a child's usage by name.
-* server + installer: one setup code instead of token and secret; the
-  parent's only credential is the login:
-  * The parent adds a child on the page. The server makes the token and the
-    secret and shows a short code, single use and short-lived.
-  * The parent types the code into the installer, which fetches the token
-    and the secret. The monitor does not change, and the login password is
-    never typed on the child's computer.
-  * The code is the only way a parent connects a machine: the page stops
-    showing the token, the installer stops asking for one, and an old
-    installer is replaced by downloading the current one. In front of a
-    parent there is one path; a second one is confusion, not a fallback.
-  * Offline extra-time codes: `/codes` makes them on the server under the
-    child's own secret, which the setup code will write into `secret.txt`;
-    until then by hand. `extra_time.html` stays
-    for families without an account. A phone app later keeps the secret and
-    makes them itself.
-  * The price: the server knows the secret. Small, since it already grants
-    any time to a syncing child without it.
-  * Maybe later: the same signed exe served under a name that carries the
-    code, read by the installer to fill the field.
 * server: settings UI, a widget per setting, keyed by name (durations, hour
   picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
   back to the JSON box, so a monitor reporting a new setting works on day
@@ -72,23 +52,19 @@ the database.
 * monitor: a changed time zone, which a standard user may set, moves the
   clock out of the night and rolls the date into a fresh limit. When the
   Windows zone name changes, log an event for the parent's page.
-* product: fully offline mode, with no account, for a computer that never
-  syncs. `parent/extra_time.html` already makes the codes in the browser
-  from the secret in its address after `#`; left is the secret's direction.
-  * The page generates the secret and the parent types it into the
-    installer's setup code field. Longer than a setup code, so the
-    installer writes it to `secret.txt` and never contacts the server.
-  * The typed secret checks itself: some of its characters are a checksum
-    of the rest, so the installer refuses a typo. Length and format to be
-    decided; long enough that the child cannot guess it from valid codes.
-  * Maybe later: the installer makes the secret and shows the link as a QR
-    code, so nothing is typed.
+* server: `/children` shows a QR code with the `/extra-time-codes` address for
+  every child whose setup code was used, one scan for the parent's phone, as
+  the installer shows it for a family without an account. Behind a button: a
+  key on the screen is the risk. `/codes` stays for the account parent whose
+  child's computer is offline right now; the first manual does not mention it.
+* installer: the same signed exe served under a name that carries the setup
+  code, read by the installer to fill the field.
 
 * site: enoughy.com is the address since 2026-10-11; enoughy.cz, www and the
   old marwin.pfranek.cz answer too. Once the description exists, `/` shows it
-  to a stranger and the overview to a parent, the extra-time page is served
-  there, and the other names redirect the page paths only: installed monitors
-  sync to marwin.pfranek.cz, and urllib turns a redirected POST into a GET.
+  to a stranger and the overview to a parent, and the other names redirect the
+  page paths only: installed monitors sync to marwin.pfranek.cz, and urllib
+  turns a redirected POST into a GET.
 
 ## Someday / maybe
 
