@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -34,6 +34,14 @@ DISPLAY_TIMEZONE = ZoneInfo("Europe/Prague")
 # secret, lasts this long after the page shows it: from the page to the
 # child's computer, with the download and the account pages in between.
 SETUP_CODE_LIFETIME = timedelta(hours=1)
+
+# What enoughy.com/install sends the browser to: the exe of the newest release,
+# which release.ps1 uploads under this name. The page tells the parent the
+# address, since it is typed on the child's computer, not clicked.
+INSTALLER_URL = "https://github.com/franp9am/enoughy/releases/latest/download/enoughy-setup.exe"
+
+# The offline code page, the one file in parent/; the same repo checkout serves it.
+EXTRA_TIME_PAGE = Path(__file__).parent.parent / "parent" / "extra_time.html"
 
 
 class SettingsChangeOutcome(BaseModel):
@@ -548,6 +556,18 @@ def setup(request: SetupRequest) -> SetupResponse:
     if child is None:
         raise HTTPException(status_code=401, detail="unknown or expired code")
     return SetupResponse(token=child["token"], secret=secret)
+
+
+@app.get("/install")
+def install() -> RedirectResponse:
+    """The address a parent types on the child's computer; follows every release."""
+    return RedirectResponse(INSTALLER_URL, status_code=302)
+
+
+@app.get("/extra-time-codes")
+def extra_time_codes() -> FileResponse:
+    """The offline code page, no login: it signs in the browser with a key the parent types."""
+    return FileResponse(EXTRA_TIME_PAGE)
 
 
 @app.get("/health")

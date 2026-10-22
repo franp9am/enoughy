@@ -9,9 +9,9 @@ For whoever changes the code, runs the server or makes a release.
   screen unlocked. `settings.py` is what the parent changes, `config.py` what is fixed.
 * `widget/` -- the "time left" box, cosmetic: the child may hide or kill it. Next to it
   `enter_code.py`, the dialog behind the "Extra time" shortcut.
-* `parent/` -- `extra_time.html`, the page that makes the offline codes. A copy is served
-  at https://pfranek.cz/enoughy-extra-time.html, for now; upload it again when the file
-  changes. Its `SIGNATURE_CHARS` must match `config.py`.
+* `parent/` -- `extra_time.html`, the page that makes the offline codes. The server
+  serves it at `/extra-time-codes`, without login; a copy is also at
+  https://pfranek.cz/enoughy-extra-time.html. Its `SIGNATURE_CHARS` must match `config.py`.
 * `server/` -- the optional web page for the parent.
 * `installer/` -- the Inno Setup script and `build-python.ps1`, which fetches the Python
   the setup bundles.
