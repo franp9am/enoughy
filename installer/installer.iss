@@ -480,7 +480,8 @@ begin
     if not NoSync.Checked then begin
       if Trim(ServerPage.Values[0]) <> '' then
         Result := FetchCredentials(Trim(ServerPage.Values[1]), Trim(ServerPage.Values[0]))
-      else if not FileExists(ChildDataDir + '\child_token.txt') then begin
+      else if not (FileExists(ChildDataDir + '\child_token.txt')
+          or FileExists(ExpandConstant('{commonappdata}\ScreenTime\data\child_token.txt'))) then begin   // a 0.1.0 token, copied over at install
         MsgBox('Enter the code, or click "No server".', mbError, MB_OK);
         Result := False;
       end;
