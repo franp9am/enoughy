@@ -267,18 +267,51 @@ end;
 
 function Python: String; begin Result := ExpandConstant('{#PythonDir}\python.exe'); end;
 
+// A number in a 0.1.0 settings.json, the one after `"Name":`, or -1 when the name
+// is not there. This release's Python is not installed yet when the page shows,
+// so the text is read directly. Goes with RemoveScreenTime.
+function OldSetting(Json: String; Name: String): Integer;
+var
+  P: Integer;
+  Digits: String;
+begin
+  P := Pos('"' + Name + '":', Json);
+  if P > 0 then begin
+    P := P + Length(Name) + 3;
+    while (P <= Length(Json)) and (Json[P] = ' ') do P := P + 1;
+    while (P <= Length(Json)) and (Json[P] >= '0') and (Json[P] <= '9') do begin
+      Digits := Digits + Json[P];
+      P := P + 1;
+    end;
+  end;
+  Result := StrToIntDef(Digits, -1);
+end;
+
 // What a reinstall has, read by this release's settings.py on the Python already
 // there (the installed one may predate the `show` verb). A fresh install has no
 // Python yet and shows settings.py's defaults, read when this exe was built.
 procedure ShowBasics;
 var
   OutFile: String;
+  Old: AnsiString;
   Lines: TArrayOfString;
-  Code: Integer;
+  Code, Limit, First, Last: Integer;
 begin
   SettingsPage.Values[0] := '{#DefaultMinutes}';
   SettingsPage.Values[1] := '{#DefaultDayStarts}';
   SettingsPage.Values[2] := '{#DefaultNightStarts}';
+  // A 0.1.0 install's settings, moved to the child picked at the install step
+  if not FileExists(ChildDataDir + '\settings.json')
+     and LoadStringFromFile(ExpandConstant('{commonappdata}\ScreenTime\data\settings.json'), Old) then begin
+    Limit := OldSetting(Old, 'DAILY_LIMIT_SECONDS');
+    First := OldSetting(Old, 'EARLIEST_HOUR_INCLUDED');
+    Last := OldSetting(Old, 'LATEST_HOUR_INCLUDED');
+    if (Limit >= 0) and (First >= 0) and (Last >= 0) then begin
+      SettingsPage.Values[0] := IntToStr(Limit div 60);
+      SettingsPage.Values[1] := IntToStr(First) + ':00';
+      SettingsPage.Values[2] := IntToStr(Last + 1) + ':00';   // the night began when the last included hour ended
+    end;
+  end;
   if not (FileExists(Python) and FileExists(ChildDataDir + '\settings.json')) then Exit;
   ExtractTemporaryFile('settings.py');
   ExtractTemporaryFile('os_tooling.py');
@@ -464,8 +497,9 @@ begin
   if (CurPageID = AccountPage.ID) and Result then begin
     Demote := IsAdmin[AccountPage.SelectedValueIndex];
     if Demote and OtherAdmin then
-      Demote := MsgBox(Child('') + ' is an administrator, so the limit holds only until the child finds that out. ' +
-        'Make it a standard user? The other accounts stay as they are.', mbConfirmation, MB_YESNO) = IDYES;
+      Demote := TaskDialogMsgBox(Child('') + ' is an administrator, so the limit holds only until the child finds that out.',
+        'Change the account type? The other accounts stay as they are.', mbConfirmation,
+        MB_YESNO, ['Change ' + Child('') + ' to a standard user', 'Keep ' + Child('') + ' an administrator'], 0) = IDYES;
   end;
   if (CurPageID = ParentPage.ID) and (ParentPage.Values[0] = '') then begin
     MsgBox('Choose a password.', mbError, MB_OK);
