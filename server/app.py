@@ -340,7 +340,7 @@ async def register(request: Request) -> Response:
             {"error": f"{login} is taken.", "invitation": invitation},
             status_code=400,
         )
-    response = start_session(connection, parent_id)
+    response = start_session(connection, parent_id, next_path="/children")
     connection.close()
     return response
 

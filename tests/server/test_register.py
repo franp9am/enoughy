@@ -16,7 +16,8 @@ def register(client):
 
 def test_registering_logs_the_parent_in(client, register):
     answer = register("anna", "correct horse")
-    assert answer.status_code == 200  # followed the redirect to /
+    assert answer.status_code == 200
+    assert answer.url.path == "/children"  # the next step: add a child
     assert "session" in client.cookies
     assert "anna" in answer.text  # the name in the corner of the page
 
