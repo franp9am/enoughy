@@ -55,3 +55,28 @@ def test_a_new_child_is_on_the_children_page_not_the_dashboard(anna_logged_in):
     dashboard = anna_logged_in.get("/").text
     assert "Tom" not in dashboard  # nothing has synced for him yet
     assert "Tom" in anna_logged_in.get("/children").text
+
+
+def test_a_removed_child_is_gone_with_their_history_and_their_monitor_is_refused(anna_logged_in):
+    anna_logged_in.post("/children", data={"name": "Tom"})
+    token = db.connect().execute("SELECT token FROM children").fetchone()["token"]
+    report = {"date": "2026-10-12", "time_spent_sec": 600, "carryover_sec": 0, "granted_sec": 0,
+              "remaining_sec": 3000, "last_tick": None, "applied_grant_ids": []}
+    monitor = {"Authorization": f"Bearer {token}"}
+    assert anna_logged_in.post("/api/sync", json=report, headers=monitor).status_code == 200
+    anna_logged_in.post("/grants", data={"child_id": 1, "minutes": 10})
+    page = anna_logged_in.post("/children/delete", data={"child_id": 1}).text
+    assert "Tom" not in page
+    connection = db.connect()
+    for table in ("children", "status", "grants", "setup_codes"):
+        assert connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0] == 0, table
+    assert anna_logged_in.post("/api/sync", json=report, headers=monitor).status_code == 401
+    assert anna_logged_in.post("/children", data={"name": "Tom"}).status_code == 200  # the name is free again
+
+
+def test_removing_another_family_s_child_is_refused(anna_logged_in, client):
+    anna_logged_in.post("/children", data={"name": "Tom"})
+    client.get("/logout")
+    client.post("/register", data={"login": "bob", "password": "correct horse", "password_again": "correct horse"})
+    assert client.post("/children/delete", data={"child_id": 1}).status_code == 404
+    assert db.connect().execute("SELECT count(*) FROM children").fetchone()[0] == 1

@@ -748,6 +748,26 @@ async def new_setup_code(request: Request) -> RedirectResponse:
     return RedirectResponse("/children", status_code=303)
 
 
+@app.post("/children/delete")
+async def delete_child(request: Request) -> RedirectResponse:
+    """The child and everything the server holds about them. The monitor on
+    their machine, if any, is refused at its next sync and goes on offline."""
+    parent = current_parent(request)
+    form = await request.form()
+    connection = db.connect()
+    try:
+        child = require_child_in_family(connection, int(form.get("child_id", 0)), parent.family_id)
+        with connection:
+            for table in ("status", "grants", "settings_changes", "setup_codes", "children"):
+                connection.execute(
+                    f"DELETE FROM {table} WHERE {'id' if table == 'children' else 'child_id'} = :child_id",
+                    {"child_id": child["id"]},
+                )
+    finally:
+        connection.close()
+    return RedirectResponse("/children", status_code=303)
+
+
 @app.get("/codes")
 def codes_page(request: Request, child_id: int | None = None) -> HTMLResponse:
     parent = current_parent(request)

@@ -11,6 +11,9 @@
     background: #fff; color: #444; font-size: .85rem; font-family: inherit;
   }
   .setup button:hover { background: #f2f2f2; border-color: #999; color: #1a1a1a; }
+  .remove { margin: .4rem 0 0; font-size: .85rem; text-align: right; }
+  .remove button { padding: 0; border: 0; background: none; color: #888; cursor: pointer; font-size: inherit; font-family: inherit; }
+  .remove button:hover { color: #b00; }
   .add-child { display: flex; gap: .5rem; }
   .add-child input {
     flex: 1; padding: .55rem .6rem; border-radius: 6px;
@@ -43,6 +46,11 @@
       for {{ child.name }}'s computer, good for {{ lifetime_hours }} hour{{ 's' if lifetime_hours != 1 }}.
       {% endif %}
     </p>
+    <form class="remove" method="post" action="{{ url_for('delete_child') }}"
+          onsubmit="return confirm('Remove {{ child.name }} and their usage history from the server?')">
+      <input type="hidden" name="child_id" value="{{ child.id }}">
+      <button type="submit">Remove {{ child.name }}</button>
+    </form>
   </div>
   {% endfor %}
   <div class="section">
