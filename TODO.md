@@ -8,8 +8,6 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* server: a parent deletes the family and everything under it from the
-  page, since the server holds a child's usage by name.
 * server: settings UI, a widget per setting, keyed by name (durations, hour
   picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
   back to the JSON box, so a monitor reporting a new setting works on day
@@ -32,6 +30,10 @@ the database.
 * server: a second parent joins the family by an invite link from the first
   parent's page; a name typed at registration cannot tell them from a
   stranger.
+* server: a parent deletes their account. Removing the children already
+  takes every trace of a child; what stays is a login and a hash, deleted
+  by hand on request. Waits for the second parent, which decides whether a
+  parent leaves a family or takes it down.
 * server: a parent changes their own password on the page; until then
   `set_password.py` by the maintainer, after proof by a child's token.
 * installer, admin accounts, left: an account named `parent` already there
