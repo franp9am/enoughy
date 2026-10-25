@@ -64,20 +64,33 @@ def anna(client):
     connection.close()
 
 
-def test_without_login_the_page_sends_to_the_form(client, anna):
+def test_without_login_the_front_page_is_about_enoughy(client, anna):
     answer = client.get("/", follow_redirects=False)
     assert answer.status_code == 303
-    assert answer.headers["location"] == "/login?next=%2F"
+    assert answer.headers["location"] == "/about"
+
+
+def test_about_offers_a_stranger_to_register(client, anna):
+    answer = client.get("/about")
+    assert answer.status_code == 200
+    assert 'href="https://testserver/register"' in answer.text
+    assert "Tom" not in answer.text
+
+
+def test_without_login_a_parent_page_sends_to_the_form(client, anna):
+    answer = client.get("/parent", follow_redirects=False)
+    assert answer.status_code == 303
+    assert answer.headers["location"] == "/login?next=%2Fparent"
 
 
 def test_login_returns_to_the_page_asked_for(client, anna):
-    sent_away = client.get("/children", follow_redirects=False)
-    assert sent_away.headers["location"] == "/login?next=%2Fchildren"
+    sent_away = client.get("/parent", follow_redirects=False)
+    assert sent_away.headers["location"] == "/login?next=%2Fparent"
     answer = client.post(
-        "/login", data={"login": "anna", "password": "correct horse", "next": "/children"},
+        "/login", data={"login": "anna", "password": "correct horse", "next": "/parent"},
         follow_redirects=False,
     )
-    assert answer.headers["location"] == "/children"
+    assert answer.headers["location"] == "/parent"
 
 
 def test_login_never_sends_to_another_site(client, anna):
@@ -111,12 +124,19 @@ def test_the_cookie_opens_the_page_on_later_visits(client, anna):
 
 def test_logout_ends_the_session(client, anna):
     client.post("/login", data={"login": "anna", "password": "correct horse"})
-    client.get("/logout")
-    answer = client.get("/", follow_redirects=False)
-    assert answer.headers["location"] == "/login?next=%2F"
+    assert client.get("/logout", follow_redirects=False).headers["location"] == "/about"
+    answer = client.get("/parent", follow_redirects=False)
+    assert answer.headers["location"] == "/login?next=%2Fparent"
 
 
 def test_made_up_cookie_is_no_login(client, anna):
     client.cookies.set("session", "a-value-the-server-never-issued")
-    answer = client.get("/", follow_redirects=False)
-    assert answer.headers["location"] == "/login?next=%2F"
+    answer = client.get("/parent", follow_redirects=False)
+    assert answer.headers["location"] == "/login?next=%2Fparent"
+
+
+def test_about_shows_a_parent_the_manual_without_the_register_button(client, anna):
+    client.post("/login", data={"login": "anna", "password": "correct horse"})
+    answer = client.get("/about")
+    assert "Add a child" in answer.text
+    assert 'href="https://testserver/register"' not in answer.text

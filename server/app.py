@@ -16,7 +16,7 @@ import add_child
 import add_parent
 import db
 from auth import (
-    NotLoggedIn, authenticated_child_id, current_parent, end_session, local_path,
+    NotLoggedIn, Parent, authenticated_child_id, current_parent, end_session, local_path,
     parent_from_credentials, start_session,
 )
 from children import (
@@ -229,9 +229,20 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def parent_if_logged_in(request: Request) -> Parent | None:
+    """For the pages a stranger may read too: the parent, or None."""
+    try:
+        return current_parent(request)
+    except NotLoggedIn:
+        return None
+
+
 @app.get("/")
-def index(request: Request, child_id: int | None = None) -> HTMLResponse:
-    parent = current_parent(request)
+def index(request: Request, child_id: int | None = None) -> Response:
+    """The dashboard for a parent; anyone else is sent to what enoughy is."""
+    parent = parent_if_logged_in(request)
+    if parent is None:
+        return RedirectResponse("/about", status_code=303)
     connection = db.connect()
     children = synced_children(connection, parent.family_id)
     selected_child = next(
@@ -259,6 +270,12 @@ def index(request: Request, child_id: int | None = None) -> HTMLResponse:
             "week": week,
         },
     )
+
+
+@app.get("/about")
+def about(request: Request) -> HTMLResponse:
+    """What enoughy is and the parent's manual, readable before registering."""
+    return templates.TemplateResponse(request, "about.html", {"parent": parent_if_logged_in(request)})
 
 
 @app.get("/login")
@@ -340,7 +357,7 @@ async def register(request: Request) -> Response:
             {"error": f"{login} is taken.", "invitation": invitation},
             status_code=400,
         )
-    response = start_session(connection, parent_id, next_path="/children")
+    response = start_session(connection, parent_id, next_path="/parent")
     connection.close()
     return response
 
@@ -353,15 +370,16 @@ def logout(request: Request) -> RedirectResponse:
     return response
 
 
-@app.get("/children")
-def children_page(request: Request) -> HTMLResponse:
+@app.get("/parent")
+def parent_page(request: Request) -> HTMLResponse:
+    """The parent's own page: the children and what is done to them, and the way out."""
     parent = current_parent(request)
     connection = db.connect()
     children = children_in_family(connection, parent.family_id, datetime.now(timezone.utc))
     connection.close()
     return templates.TemplateResponse(
         request,
-        "children.html",
+        "parent.html",
         {"parent": parent, "children": children, "lifetime_hours": SETUP_CODE_LIFETIME // timedelta(hours=1)},
     )
 
@@ -382,7 +400,7 @@ async def create_child(request: Request) -> RedirectResponse:
         raise HTTPException(status_code=400, detail=f"you already have a child named {name}")
     finally:
         connection.close()
-    return RedirectResponse("/children", status_code=303)
+    return RedirectResponse("/parent", status_code=303)
 
 
 @app.post("/children/setup-code")
@@ -396,7 +414,7 @@ async def new_setup_code(request: Request) -> RedirectResponse:
         make_setup_code(connection, child["id"], datetime.now(timezone.utc))
     finally:
         connection.close()
-    return RedirectResponse("/children", status_code=303)
+    return RedirectResponse("/parent", status_code=303)
 
 
 @app.post("/children/delete")
@@ -416,7 +434,7 @@ async def delete_child(request: Request) -> RedirectResponse:
                 )
     finally:
         connection.close()
-    return RedirectResponse("/children", status_code=303)
+    return RedirectResponse("/parent", status_code=303)
 
 
 @app.get("/codes")

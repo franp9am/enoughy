@@ -10,7 +10,7 @@ def setup_code(page: str) -> str:
 
 def test_adding_a_child_shows_its_setup_code_and_not_the_token(anna_logged_in):
     answer = anna_logged_in.post("/children", data={"name": "Tom"})
-    assert answer.status_code == 200  # followed the redirect back to /children
+    assert answer.status_code == 200  # followed the redirect back to /parent
     assert "Tom" in answer.text and "good until" in answer.text
     tom = db.connect().execute("SELECT token, secret FROM children").fetchone()
     assert tom["token"] not in answer.text
@@ -21,7 +21,7 @@ def test_adding_a_child_shows_its_setup_code_and_not_the_token(anna_logged_in):
 def test_a_used_or_expired_code_gives_way_to_a_button_for_a_new_one(anna_logged_in):
     page = anna_logged_in.post("/children", data={"name": "Tom"}).text
     anna_logged_in.post("/api/setup", json={"code": setup_code(page)})
-    page = anna_logged_in.get("/children").text
+    page = anna_logged_in.get("/parent").text
     assert "<code>" not in page and "Setup code</button>" in page
     page = anna_logged_in.post("/children/setup-code", data={"child_id": 1}).text
     assert "<code>" in page and "Setup code</button>" not in page
@@ -50,11 +50,11 @@ def test_adding_a_child_needs_a_login(client):
     assert answer.headers["location"] == "/login"
 
 
-def test_a_new_child_is_on_the_children_page_not_the_dashboard(anna_logged_in):
+def test_a_new_child_is_on_the_parent_page_not_the_dashboard(anna_logged_in):
     anna_logged_in.post("/children", data={"name": "Tom"})
     dashboard = anna_logged_in.get("/").text
     assert "Tom" not in dashboard  # nothing has synced for him yet
-    assert "Tom" in anna_logged_in.get("/children").text
+    assert "Tom" in anna_logged_in.get("/parent").text
 
 
 def test_a_removed_child_is_gone_with_their_history_and_their_monitor_is_refused(anna_logged_in):

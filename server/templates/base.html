@@ -46,11 +46,11 @@
 </head>
 <body>
   <div class="page">
-    <h1>{% block heading %}Enoughy{% endblock %}{% if parent %}<a class="whoami" href="{{ url_for('logout') }}" title="Sign out">
+    <h1>{% block heading %}Enoughy{% endblock %}{% block whoami %}{% if parent %}<a class="whoami" href="{{ url_for('parent_page') }}" title="Your page">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="8" r="3.6"></circle>
         <path d="M4.8 20c0-3.7 3.2-5.6 7.2-5.6s7.2 1.9 7.2 5.6"></path>
-      </svg>{{ parent.login }}</a>{% endif %}</h1>
+      </svg>{{ parent.login }}</a>{% endif %}{% endblock %}</h1>
 
     {% block content %}{% endblock %}
   </div>

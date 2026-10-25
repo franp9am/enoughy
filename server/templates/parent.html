@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block heading %}Children{% endblock %}
+{% block heading %}{{ parent.login }}{% endblock %}
+{% block whoami %}<a class="whoami logoff" href="{{ url_for('logout') }}">Log off</a>{% endblock %}
 {% block style %}
 <style>
   .child h2 { margin-bottom: .4rem; }
@@ -25,11 +26,19 @@
     padding: .55rem 1.4rem; border-radius: 6px; border: 1px solid #1a1a1a; cursor: pointer;
     background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
   }
-  .aside { margin: 1rem 0 0; font-size: .85rem; text-align: right; }
-  .aside a { color: #888; }
+  .back {
+    display: inline-block; margin-bottom: .8rem;
+    font-size: .9rem; color: #666; text-decoration: none;
+  }
+  .back:hover { color: #1a1a1a; }
+  .help { margin: 1rem 0 0; font-size: .9rem; color: #888; }
+  .help a { color: #555; }
+  .whoami.logoff { color: #b00; }
+  .whoami.logoff:hover { border-color: #b00; background: #fff5f5; }
 </style>
 {% endblock %}
 {% block content %}
+<a class="back" href="{{ url_for('index') }}">&larr; Dashboard</a>
 <div class="card plain">
   {% for child in children %}
   <div class="section child">
@@ -38,6 +47,7 @@
       {% if child.code %}
       Setup code for {{ child.name }}'s computer: <code>{{ child.code }}</code>,
       good until {{ child.good_until }}.
+      On that computer, open <strong>enoughy.com/install</strong>, run the installer and type the code.
       {% else %}
       <form method="post" action="{{ url_for('new_setup_code') }}">
         <input type="hidden" name="child_id" value="{{ child.id }}">
@@ -58,7 +68,7 @@
       <input type="text" name="name" placeholder="{% if children %}Another child's name{% else %}The child's name{% endif %}" required>
       <button type="submit">Add</button>
     </form>
+    <p class="help">Lost? <a href="{{ url_for('about') }}">How it works</a></p>
   </div>
 </div>
-<p class="aside"><a href="{{ url_for('index') }}">Back</a></p>
 {% endblock %}
