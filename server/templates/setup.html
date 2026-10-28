@@ -27,7 +27,7 @@
     <ol class="steps">
       <li><span class="term">Create an account</span><a href="{{ url_for('register_form') }}">Register</a> with a login and a password; this makes your family.</li>
       <li><span class="term">Add a child</span>On <a href="{{ url_for('parent_page') }}">your page</a>, type the child's name; it shows a setup code.</li>
-      <li><span class="term">Install on the child's computer</span>On the child's PC, open <a href="{{ url_for('install') }}">enoughy.com/install</a>, run the installer and type the setup code.</li>
+      <li><span class="term">Install on the child's computer</span>On the child's PC, open <a href="{{ url_for('install') }}">enoughy.com/install</a>, run the installer and type the setup code. For a second child on the same computer, run it again with that child's code and pick their account.</li>
       <li><span class="term">Set the limit</span>Once you <a href="{{ url_for('login_form') }}">log in</a> to enoughy.com, the child appears there after the first sync, and you set the daily limit and the hours.</li>
     </ol>
   </div>
