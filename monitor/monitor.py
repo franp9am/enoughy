@@ -149,8 +149,13 @@ def redeem_code(data, datafile, now, child: str, secret: bytes):
         extra_time = redeem["extra_time_sec"]
         data["granted_sec"] += extra_time
         data["event_log"].append(f"redeem code {extra_time} {now_str}")
-        os_tooling.notify(f"extra time {extra_time}", child)
+        os_tooling.notify(extra_time_message(extra_time), child)
     save_data(data, datafile)
+
+
+def extra_time_message(seconds: int) -> str:
+    """The popup for a grant, in the minutes the parent chose: "extra time 60 min"."""
+    return f"extra time {round(seconds / 60)} min"
 
 
 def daily_limit_seconds(date: datetime.date, settings) -> int:
@@ -343,7 +348,7 @@ def sync_with_server(data, datafile, now, settings, child: str) -> dict:
     for grant in answer.pending_grants:
         data["granted_sec"] += grant.seconds
         data["event_log"].append(f"server grant {grant.seconds} sec id {grant.id} {now_str}")
-        os_tooling.notify(f"extra time {grant.seconds}", child)
+        os_tooling.notify(extra_time_message(grant.seconds), child)
     change = answer.settings_change
     if change is not None:
         in_force = save_settings(change.settings, data_dir / "settings.json")

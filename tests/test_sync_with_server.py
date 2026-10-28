@@ -151,7 +151,7 @@ def test_a_grant_adds_time_tells_the_child_and_is_saved(files, sync, notificatio
 
     assert data["granted_sec"] == 600
     assert data["event_log"] == ["server grant 600 sec id 4 2026-09-14 08:00:00"]
-    assert notifications == [("extra time 600", KID)]
+    assert notifications == [("extra time 10 min", KID)]
     assert saved(files["datafile"])["granted_sec"] == 600
     # remembered so the next sync acknowledges it and the server stops sending it
     assert remote_sync.load_applied_grant_ids(files["applied_grants"]) == [4]
@@ -238,7 +238,7 @@ def test_a_grant_and_a_settings_change_in_one_answer_are_both_applied(files, syn
     new_settings, data = run(files)
     assert new_settings == wanted
     assert data["granted_sec"] == 600
-    assert notifications == [("extra time 600", KID)]
+    assert notifications == [("extra time 10 min", KID)]
     on_disk = saved(files["datafile"])
     assert on_disk["granted_sec"] == 600
     assert len(on_disk["event_log"]) == 2

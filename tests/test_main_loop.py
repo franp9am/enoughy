@@ -237,7 +237,7 @@ def test_a_redeem_code_adds_its_time_once(machine, files):
 
     data = today_data(files)
     assert data["granted_sec"] == 600
-    assert machine.notifications == ["extra time 600"]
+    assert machine.notifications == ["extra time 10 min"]
     assert data["event_log"] == ["redeem code 600 2026-09-14 08:00:00"]
     assert data["redeemed_codes"] == [redeem_code(10)]
 
@@ -269,7 +269,7 @@ def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["time up", "extra time 600"]
+    assert machine.notifications == ["time up", "extra time 10 min"]
     assert remaining_shown(files) == 600
     assert today_data(files)["event_log"] == [
         "time up 2026-09-14 08:00:00",
@@ -378,7 +378,7 @@ def test_an_extra_time_code_at_night_is_consumed_and_does_not_help(machine, file
     tick(at(NIGHT_HOUR))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["extra time 600", "Night time"]
+    assert machine.notifications == ["extra time 10 min", "Night time"]
     assert today_data(files)["granted_sec"] == 600
 
 
@@ -462,7 +462,7 @@ def test_startup_applies_a_grant_waiting_on_the_server(machine, files, sync):
     tick(at(8, 1))  # reports the id, so the server does not send the grant again
 
     assert machine.shutdowns == []
-    assert machine.notifications == ["extra time 600"]
+    assert machine.notifications == ["extra time 10 min"]
     data = today_data(files)
     assert data["granted_sec"] == 600
     assert data["time_spent_sec"] == HOUR + CHECK_INTERVAL_SECONDS
@@ -500,7 +500,7 @@ def test_a_grant_in_the_grace_period_calls_the_shutdown_off(machine, files, sync
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["time up", "extra time 600"]
+    assert machine.notifications == ["time up", "extra time 10 min"]
     assert remaining_shown(files) == 600
 
 
@@ -512,7 +512,7 @@ def test_a_negative_grant_from_the_server_orders_the_shutdown(machine, files, sy
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["extra time -600", "time up"]
+    assert machine.notifications == ["extra time -10 min", "time up"]
     assert today_data(files)["granted_sec"] == -600
     assert remaining_shown(files) == 0
 
