@@ -100,7 +100,7 @@ def end_session(connection: sqlite3.Connection, request: Request) -> RedirectRes
     if session_id:
         with connection:
             connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-    response = RedirectResponse("/about", status_code=303)
+    response = RedirectResponse("/", status_code=303)
     response.delete_cookie(SESSION_COOKIE)
     return response
 

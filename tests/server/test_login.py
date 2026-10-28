@@ -65,16 +65,18 @@ def anna(client):
 
 
 def test_without_login_the_front_page_is_about_enoughy(client, anna):
-    answer = client.get("/", follow_redirects=False)
-    assert answer.status_code == 303
-    assert answer.headers["location"] == "/about"
-
-
-def test_about_offers_a_stranger_to_register(client, anna):
-    answer = client.get("/about")
+    answer = client.get("/")
     assert answer.status_code == 200
     assert 'href="https://testserver/register"' in answer.text
     assert "Tom" not in answer.text
+
+
+def test_the_three_pages_behind_the_front_page_are_public(client, anna):
+    for path, heading in (("/how", "What it does"), ("/why", "Why this one"), ("/setup", "Setting it up")):
+        answer = client.get(path)
+        assert answer.status_code == 200
+        assert heading in answer.text
+        assert 'href="https://testserver/">' in answer.text  # back to the front page
 
 
 def test_without_login_a_parent_page_sends_to_the_form(client, anna):
@@ -124,7 +126,7 @@ def test_the_cookie_opens_the_page_on_later_visits(client, anna):
 
 def test_logout_ends_the_session(client, anna):
     client.post("/login", data={"login": "anna", "password": "correct horse"})
-    assert client.get("/logout", follow_redirects=False).headers["location"] == "/about"
+    assert client.get("/logout", follow_redirects=False).headers["location"] == "/"
     answer = client.get("/parent", follow_redirects=False)
     assert answer.headers["location"] == "/login?next=%2Fparent"
 
@@ -135,8 +137,9 @@ def test_made_up_cookie_is_no_login(client, anna):
     assert answer.headers["location"] == "/login?next=%2Fparent"
 
 
-def test_about_shows_a_parent_the_manual_without_the_register_button(client, anna):
+def test_the_manual_sends_a_parent_back_to_their_own_page(client, anna):
     client.post("/login", data={"login": "anna", "password": "correct horse"})
-    answer = client.get("/about")
+    answer = client.get("/setup")
     assert "Add a child" in answer.text
-    assert 'href="https://testserver/register"' not in answer.text
+    assert 'href="https://testserver/parent">' in answer.text
+    assert 'href="https://testserver/">' not in answer.text

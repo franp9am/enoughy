@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block style %}
+<style>
+  /* a reading page, not a dialog: prose width, no card around it */
+  .page { max-width: 42rem; }
+  .card.plain { background: none; border: none; border-radius: 0; }
+  .section { padding: 1.5rem 0; }
+  h1 { margin: 0; min-height: 0; }
+  .section h2 { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; font-size: 1.5rem; margin-bottom: 1.2rem; }
+  .points { margin: 0; padding: 0; font-size: .95rem; line-height: 1.5; color: #666; }
+  .points { list-style: none; }
+  .points li { margin: 0 0 .9rem; }
+  .term { display: block; color: #1a1a1a; }
+  .points a { color: #1a1a1a; }
+  .back {
+    display: inline-block; margin-bottom: .8rem;
+    font-size: .9rem; color: #666; text-decoration: none;
+  }
+  .back:hover { color: #1a1a1a; }
+  .section:first-child { padding-top: .5rem; }
+</style>
+{% endblock %}
+{% block heading %}{% endblock %}
+{% block content %}
+{% if parent %}<a class="back" href="{{ url_for('parent_page') }}">&larr; Your page</a>{% else %}<a class="back" href="{{ url_for('index') }}">&larr; Enoughy</a>{% endif %}
+<div class="card plain">
+  <div class="section">
+    <h2>Why this one</h2>
+    <ul class="points">
+      <li><span class="term">Easy setup</span>One installer, one code, done in ten minutes. No Microsoft account needed, the ordinary local account the child already has is enough. <a href="{{ url_for('setup_page') }}">The four steps.</a></li>
+      <li><span class="term">No data to any big company</span>The computer talks only to this page, and it sends the time used, no personal data.</li>
+      <li><span class="term">Works offline</span>The rules live on the child's computer, so an internet outage changes nothing. The limit holds and the night still comes.</li>
+      <li><span class="term">Open source</span>Every line is public, so anyone can review what runs on your child's computer.</li>
+      <li><span class="term">No surveillance</span>I made enoughy for my son, who hated being watched. It sets a limit and never looks at what the child does with the time. If you want to see what they do for their protection, try Qustodio or Bark instead.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -89,6 +90,7 @@ db.create_schema()
 
 app = FastAPI()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 @app.exception_handler(NotLoggedIn)
@@ -239,10 +241,10 @@ def parent_if_logged_in(request: Request) -> Parent | None:
 
 @app.get("/")
 def index(request: Request, child_id: int | None = None) -> Response:
-    """The dashboard for a parent; anyone else is sent to what enoughy is."""
+    """The dashboard for a parent; anyone else sees what enoughy is."""
     parent = parent_if_logged_in(request)
     if parent is None:
-        return RedirectResponse("/about", status_code=303)
+        return templates.TemplateResponse(request, "landing.html")
     connection = db.connect()
     children = synced_children(connection, parent.family_id)
     selected_child = next(
@@ -272,10 +274,22 @@ def index(request: Request, child_id: int | None = None) -> Response:
     )
 
 
-@app.get("/about")
-def about(request: Request) -> HTMLResponse:
-    """What enoughy is and the parent's manual, readable before registering."""
-    return templates.TemplateResponse(request, "about.html", {"parent": parent_if_logged_in(request)})
+@app.get("/how")
+def how(request: Request) -> HTMLResponse:
+    """What enoughy does, the long version of the landing page's first line."""
+    return templates.TemplateResponse(request, "how.html", {"parent": parent_if_logged_in(request)})
+
+
+@app.get("/why")
+def why(request: Request) -> HTMLResponse:
+    """Why this one and not Family Safety, the long version of the second line."""
+    return templates.TemplateResponse(request, "why.html", {"parent": parent_if_logged_in(request)})
+
+
+@app.get("/setup")
+def setup_page(request: Request) -> HTMLResponse:
+    """The parent's manual: account, child, installer, limit."""
+    return templates.TemplateResponse(request, "setup.html", {"parent": parent_if_logged_in(request)})
 
 
 @app.get("/login")
