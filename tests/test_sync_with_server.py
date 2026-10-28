@@ -188,7 +188,7 @@ def test_a_grant_repeated_by_the_server_is_applied_again(files, sync):
 
 
 def test_an_acceptable_settings_change_is_taken_and_written(files, sync):
-    wanted = settings(DAILY_LIMIT_SECONDS=30 * 60, CARRYOVER=False)
+    wanted = settings(DAILY_LIMIT_SECONDS=30 * 60, MAX_CARRYOVER_SECONDS=0)
     sync.answer = SyncAnswer(pending_grants=[], settings_change=SettingsChange(id=12, settings=wanted))
 
     new_settings, data = run(files, in_force=settings())
@@ -220,17 +220,17 @@ def test_a_partial_change_is_filled_from_the_file_and_counts_as_taken(files, syn
     in_force = settings(DAILY_LIMIT_SECONDS=2 * HOUR)
     write_settings_file(in_force, files["settings"])
     sync.answer = SyncAnswer(
-        pending_grants=[], settings_change=SettingsChange(id=14, settings={"CARRYOVER": False})
+        pending_grants=[], settings_change=SettingsChange(id=14, settings={"MAX_CARRYOVER_SECONDS": 0})
     )
 
     new_settings, _ = run(files, in_force=in_force)
 
-    assert new_settings == {**in_force, "CARRYOVER": False}
+    assert new_settings == {**in_force, "MAX_CARRYOVER_SECONDS": 0}
     assert saved(files["outcome"]) == {"id": 14, "taken": True}
 
 
 def test_a_grant_and_a_settings_change_in_one_answer_are_both_applied(files, sync, notifications):
-    wanted = settings(CARRYOVER=False)
+    wanted = settings(MAX_CARRYOVER_SECONDS=0)
     sync.answer = SyncAnswer(
         pending_grants=[Grant(id=4, seconds=600)],
         settings_change=SettingsChange(id=12, settings=wanted),

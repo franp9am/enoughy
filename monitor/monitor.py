@@ -63,7 +63,8 @@ def find_previous_datafile(today: datetime.date, data_dir: Path) -> Optional[Pat
 def compute_carryover_sec(today: datetime.date, settings, data_dir: Path) -> int:
     """Leftover time from the last day with data, plus its own full limit for
     every calendar day in between that has no data file (machine was off),
-    capped at MAX_CARRYOVER_SECONDS unless that is None."""
+    capped at MAX_CARRYOVER_SECONDS unless that is None; a cap of 0 is no
+    carryover at all."""
     prev_file = find_previous_datafile(today, data_dir)
     if prev_file is None:
         return 0
@@ -367,17 +368,16 @@ def sync_with_server(data, datafile, now, settings, child: str) -> dict:
 
 
 def ensure_datafile(datafile, now, settings):
-    """Create today's datafile if it doesn't exist yet, applying carryover if
-    configured; otherwise just load what's already there."""
+    """Create today's datafile if it doesn't exist yet, with whatever carries
+    over; otherwise just load what's already there."""
     if datafile.is_file():
         return load_data(datafile)
     data = load_data(datafile)  # defaults, since the file doesn't exist
-    if settings["CARRYOVER"]:
-        carryover = compute_carryover_sec(now.date(), settings, datafile.parent)
-        if carryover > 0:
-            data["carryover_sec"] = carryover
-            now_str = now.strftime(TIMESTAMP_FORMAT)
-            data["event_log"].append(f"carryover {carryover} sec from previous day {now_str}")
+    carryover = compute_carryover_sec(now.date(), settings, datafile.parent)
+    if carryover > 0:
+        data["carryover_sec"] = carryover
+        now_str = now.strftime(TIMESTAMP_FORMAT)
+        data["event_log"].append(f"carryover {carryover} sec from previous day {now_str}")
     save_data(data, datafile)
     return data
 

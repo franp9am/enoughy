@@ -13,7 +13,6 @@ HOUR = 60 * 60
 # tell "kept the fallback" from "reset to defaults"
 IN_FORCE = {
     "DAILY_LIMIT_SECONDS": 2 * HOUR,
-    "CARRYOVER": False,
     "MAX_CARRYOVER_SECONDS": 3 * HOUR,
     "ALLOWED_HOURS": ["8:00", "20:00"],
     "DAILY_LIMIT_OVERRIDES": {"sat": 3 * HOUR},
@@ -26,7 +25,7 @@ def validated(change):
 
 
 def test_a_full_valid_change_is_taken_as_is():
-    change = {**IN_FORCE, "DAILY_LIMIT_SECONDS": HOUR, "CARRYOVER": True}
+    change = {**IN_FORCE, "DAILY_LIMIT_SECONDS": HOUR, "MAX_CARRYOVER_SECONDS": None}
     assert validated(change) == change
 
 
@@ -35,9 +34,9 @@ def test_a_partial_change_is_filled_from_what_is_in_force_not_the_defaults():
 
 
 def test_without_a_fallback_the_defaults_fill_the_gaps():
-    assert settings.validated_settings({"CARRYOVER": False}) == {
+    assert settings.validated_settings({"MAX_CARRYOVER_SECONDS": 0}) == {
         **settings.default_settings(),
-        "CARRYOVER": False,
+        "MAX_CARRYOVER_SECONDS": 0,
     }
 
 
@@ -83,7 +82,7 @@ def test_a_null_window_is_no_night():
 
 def test_a_bool_is_not_an_int_and_an_int_is_not_a_bool():
     assert validated({"DAILY_LIMIT_SECONDS": True}) == IN_FORCE
-    assert validated({"CARRYOVER": 1}) == IN_FORCE
+    assert validated({"MAX_CARRYOVER_SECONDS": True}) == IN_FORCE
 
 
 def test_limits_outside_a_day_are_rejected():
@@ -109,9 +108,9 @@ def test_overrides_need_real_weekdays_and_int_seconds():
 def test_the_result_is_a_copy_and_the_fallback_stays_untouched():
     before = dict(IN_FORCE)
     result = validated({"DAILY_LIMIT_SECONDS": HOUR})
-    result["CARRYOVER"] = True
+    result["MAX_CARRYOVER_SECONDS"] = 0
     rejected = validated({"BEDTIME": 21})
-    rejected["CARRYOVER"] = True
+    rejected["MAX_CARRYOVER_SECONDS"] = 0
     assert IN_FORCE == before
 
 
@@ -142,6 +141,19 @@ def test_a_file_from_before_0_7_keeps_its_window_and_the_rest(settings_file):
     for old_names in ({"EARLIEST_HOUR_INCLUDED": 19, "LATEST_HOUR_INCLUDED": 8}, {"LATEST_HOUR_INCLUDED": 19}):
         settings_file.write_text(json.dumps({"DAILY_LIMIT_SECONDS": 2 * HOUR, **old_names}), encoding="utf-8")
         assert settings.settings_in_force(settings_file) == settings.default_settings()
+
+
+def test_a_file_from_before_1_3_turns_carryover_off_into_a_cap_of_zero(settings_file):
+    old = {"DAILY_LIMIT_SECONDS": 2 * HOUR, "CARRYOVER": False, "MAX_CARRYOVER_SECONDS": 3 * HOUR}
+    settings_file.write_text(json.dumps(old), encoding="utf-8")
+    assert settings.settings_in_force(settings_file) == {
+        **settings.default_settings(), "DAILY_LIMIT_SECONDS": 2 * HOUR, "MAX_CARRYOVER_SECONDS": 0
+    }
+    settings_file.write_text(json.dumps({**old, "CARRYOVER": True}), encoding="utf-8")
+    assert settings.settings_in_force(settings_file)["MAX_CARRYOVER_SECONDS"] == 3 * HOUR
+    # a change the server made for the monitor before the upgrade is read the same way
+    saved = settings.save_settings({"CARRYOVER": False}, settings_file)
+    assert saved["MAX_CARRYOVER_SECONDS"] == 0 and "CARRYOVER" not in saved
 
 
 def test_an_unusable_file_means_the_defaults_not_a_crash(settings_file):

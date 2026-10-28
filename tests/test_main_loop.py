@@ -25,7 +25,6 @@ HOUR = 60 * 60
 NIGHT_HOUR = 21  # the first hour outside the allowed window below
 SETTINGS = {  # what the settings file holds in every scenario, whatever the defaults are
     "DAILY_LIMIT_SECONDS": HOUR,
-    "CARRYOVER": True,
     "MAX_CARRYOVER_SECONDS": 5 * HOUR,
     "ALLOWED_HOURS": ["6:00", f"{NIGHT_HOUR}:00"],
     "DAILY_LIMIT_OVERRIDES": {},

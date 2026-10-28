@@ -9,7 +9,6 @@ HOUR = 60 * 60
 
 def settings(**overrides):
     return {
-        "CARRYOVER": True,
         "DAILY_LIMIT_SECONDS": HOUR,
         "MAX_CARRYOVER_SECONDS": 5 * HOUR,
         "DAILY_LIMIT_OVERRIDES": {},
@@ -48,11 +47,11 @@ def test_a_new_day_gets_the_carryover_and_a_log_line(tmp_path):
     assert json.loads(f.read_text(encoding="utf-8")) == data  # written, not just returned
 
 
-def test_carryover_switched_off_starts_the_day_from_zero(tmp_path):
+def test_a_cap_of_zero_is_no_carryover_and_starts_the_day_from_zero(tmp_path):
     write_past_day(tmp_path, spent=0)
     f = monitor.get_datafile(NOW, tmp_path)
 
-    data = monitor.ensure_datafile(f, NOW, settings(CARRYOVER=False))
+    data = monitor.ensure_datafile(f, NOW, settings(MAX_CARRYOVER_SECONDS=0))
 
     assert data["carryover_sec"] == 0
     assert data["event_log"] == []

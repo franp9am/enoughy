@@ -36,12 +36,11 @@ hard to get around:
 
 ## Settings
 
-Six settings, in `C:\ProgramData\Enoughy\data\<child>\settings.json`:
+Five settings, in `C:\ProgramData\Enoughy\data\<child>\settings.json`:
 
 ```json
 {
   "DAILY_LIMIT_SECONDS": 3600,
-  "CARRYOVER": true,
   "MAX_CARRYOVER_SECONDS": 18000,
   "ALLOWED_HOURS": ["6:00", "21:00"],
   "DAILY_LIMIT_OVERRIDES": {"mon": 1800, "sat": 7200},
@@ -57,11 +56,12 @@ is carried over to the next day, but never more than five hours of it.
   the machine shuts down: `["6:00", "22:00"]` keeps it up until 22:00. Any minute goes,
   as in `["6:30", "20:10"]`; `null` is no night at all.
 * The two overrides take the days `mon` to `sun`; `{}` means every day is the same.
-* A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, with no cap.
+* A `MAX_CARRYOVER_SECONDS` of `null` carries everything over, with no cap; `0` carries
+  nothing over.
 * Five minutes before the night the child sees a message; before the time runs out
   there is none, the widget turns red instead.
 
-The setup asks for the first and the fourth. Edit that file for the rest, or let the
+The setup asks for the first and the third. Edit that file for the rest, or let the
 parent's server set the values. A value that is missing or
 out of range falls back to its default, so a mangled file cannot leave the machine
 unrestricted.

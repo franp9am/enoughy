@@ -11,7 +11,7 @@ from config import MONITOR_VERSION, SYNC_TIMEOUT_SECONDS
 
 SERVER_URL = "https://screentime.example.com"
 TOKEN = "child-token-123"
-SETTINGS = {"DAILY_LIMIT_SECONDS": 3600, "CARRYOVER": True}
+SETTINGS = {"DAILY_LIMIT_SECONDS": 3600, "MAX_CARRYOVER_SECONDS": None}
 
 
 def status(**overrides):

@@ -52,14 +52,10 @@ SETTINGS = {
         "default": 1 * 60 * 60,
         "allowed": DAILY_LIMIT_RANGE
     },
-    "CARRYOVER": {
-        "default": True,
-        "allowed": (True, False)
-    },
     "MAX_CARRYOVER_SECONDS": {
         "default": 5 * 60 * 60,
         "allowed": range(sys.maxsize),  # any non-negative int; a day can use at most its limit anyway
-        "nullable": True,  # null is no cap; the default stays a number so a report types the field
+        "nullable": True,  # null is no cap, 0 is no carryover; the default stays a number so a report types the field
     },
     "ALLOWED_HOURS": {
         # [day starts, night starts]: usable from 6:00, the night begins at 21:00
@@ -128,12 +124,18 @@ def validated_settings(stored: dict, fallback=None) -> dict:
 
 def upgraded(stored: dict) -> dict:
     """A file written before 0.7 has the window as two hours, the last one
-    included. Goes once no such machine remains; anything else in the old
-    names is left for validation to reject."""
+    included; one from before 1.3 has carryover on or off beside the cap, and
+    off is a cap of 0. Goes once no such machine remains; anything else in the
+    old names is left for validation to reject."""
     old = stored.get("EARLIEST_HOUR_INCLUDED"), stored.get("LATEST_HOUR_INCLUDED")
     if all(is_int_in(hour, range(24)) for hour in old):
         stored = {name: value for name, value in stored.items() if not name.endswith("_HOUR_INCLUDED")}
         stored["ALLOWED_HOURS"] = [f"{old[0]}:00", f"{old[1] + 1}:00"]  # the night began when the last included hour ended
+    if isinstance(stored.get("CARRYOVER"), bool):
+        carryover = stored["CARRYOVER"]
+        stored = {name: value for name, value in stored.items() if name != "CARRYOVER"}
+        if not carryover:
+            stored["MAX_CARRYOVER_SECONDS"] = 0
     return stored
 
 
@@ -155,8 +157,10 @@ def write_settings_file(settings: dict, settings_file: Path) -> None:
 
 
 def save_settings(sent: dict, settings_file: Path) -> dict:
-    """Store what the server sent, keeping what is in force wherever it may not."""
-    settings = validated_settings(sent, settings_in_force(settings_file))
+    """Store what the server sent, keeping what is in force wherever it may not.
+    A change the server made for the monitor this one replaced is read like
+    that monitor's file."""
+    settings = validated_settings(upgraded(sent), settings_in_force(settings_file))
     write_settings_file(settings, settings_file)
     return settings
 
