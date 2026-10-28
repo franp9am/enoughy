@@ -19,6 +19,7 @@
   .lines { margin: 0; padding: 0; list-style: none; font-size: 1.05rem; line-height: 1.6; color: #444; }
   .lines li { margin: 0 0 .5rem; }
   .more { margin: 2.5rem 0 0; font-size: .95rem; color: #888; }
+  .more + .more { margin-top: .6rem; }
   .more a { color: #555; }
 </style>
 {% endblock %}
@@ -44,4 +45,5 @@
   <a href="{{ url_for('why') }}">Why this one</a> &middot;
   <a href="{{ url_for('setup_page') }}">Setting it up</a>
 </p>
+<p class="more">Questions, feedback: peter.franek at gmail.</p>
 {% endblock %}
