@@ -16,10 +16,10 @@ the database.
   reports; the server test that every widget name exists in the client's
   `SETTINGS` once there is a second name. Without this a parent meets the
   JSON box at the first change, which is where a nontechnical one stops.
-* server: the same principle for `settings_in_words`, which hardcodes the
-  five setting names: a renamed, missing or malformed setting is a 500 on
-  both `/` and `/settings` for that child. Render the compact line only when
-  the known names fit, else fall back to plain `name=value`.
+* server: make `settings_in_words` safe against a report it does not
+  expect. It indexes five setting names, so a monitor that renames or drops
+  one is a 500 on `/` and `/settings` for that child. When the known names
+  are not all there, show plain `name=value` instead of the compact line.
 * monitor: send the day's whole `event_log` and the last `crash.log` entry
   with each sync, so debugging works from the server page without machine
   access; cap the crash log at 1 MB (rename to `.old`) and read only its
@@ -42,8 +42,6 @@ the database.
   accounts alone.
 * product: a general description of what this is, in Czech and English, for
   the site and the top of the README.
-* product: a parent's manual: creating an account, adding children,
-  installing on the child's machine. The README covers the install for now.
 * product: in that manual, an optional step that takes the right to change
   the time zone from standard users. `secpol.msc` on Pro; Home needs a try
   on the test VM.
