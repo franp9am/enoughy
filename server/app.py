@@ -26,8 +26,8 @@ from children import (
 )
 from views import (
     DISPLAY_TIMEZONE, child_reported_settings, csv_download, export_filename,
-    formatted_local_time, last_seen, last_week, pending_grants, settings_fields,
-    settings_view, wanted_settings,
+    formatted_local_time, last_seen, last_week, pending_grants, setting_from_form,
+    settings_fields, settings_view, wanted_settings,
 )
 
 # What enoughy.com/install sends the browser to: the exe of the newest release,
@@ -591,16 +591,16 @@ async def change_settings(request: Request) -> RedirectResponse:
         if reported is None:
             raise HTTPException(status_code=409, detail="this monitor has never reported settings")
         try:
-            new_settings = {name: json.loads(form[name]) for name in reported}
+            new_settings = {name: setting_from_form(name, form) for name in reported}
         except (KeyError, ValueError):
             raise HTTPException(
                 status_code=400,
-                detail="every setting needs a JSON value, like 3600 or true",
+                detail="every setting needs a value: a number of minutes, or JSON like 3600 or true",
             )
-        # Any JSON value goes through: the monitor's ranges and types are its
-        # own, and the server talks to monitors of several versions at once, so
-        # it holds no opinion of its own. A value the monitor will not take
-        # comes back refused, and is shown as sent.
+        # Any value goes through: the widgets convert shape, minutes to seconds,
+        # and hold no opinion on ranges. The monitor's ranges and types are its
+        # own, and the server talks to monitors of several versions at once. A
+        # value the monitor will not take comes back refused, and is shown as sent.
         with connection:
             connection.execute(
                 """INSERT INTO settings_changes (child_id, changed_by, settings, created_at)

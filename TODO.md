@@ -27,6 +27,15 @@ the database.
 
 ## Later
 
+* monitor: a window whose night starts before its day starts, `["5:00", "1:00"]`,
+  is a day that runs past midnight; the daily limit still resets at 0:00. Two
+  edits, `is_night_time` and the hour-apart rule; the name stays, an old monitor
+  refuses it and the page says so. The settings page can already send the pair.
+* monitor: drop the rule that the window is at least an hour, in
+  `is_hours_window`. It guarded against a mistake that locked the machine before
+  a correction could arrive; now any setting is changed or called off from the
+  server, so the page's own check, night after day, is enough. Goes with a
+  monitor release; until then a shorter window comes back refused.
 * server: a second parent joins the family by an invite link from the first
   parent's page; a name typed at registration cannot tell them from a
   stranger.

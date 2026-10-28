@@ -37,11 +37,133 @@ class SettingsView:
     refused: str | None  # the change the child answered with a refusal, in words
 
 
-@dataclass
-class SettingsField:
-    name: str  # the monitor's own name for the setting, raw
-    value: str  # as JSON, so 3600 comes back an int and true a bool
-    wide: bool  # a dict or list needs a whole row, not a number-sized box
+# One widget per setting name, in the page's order: how the value shows as boxes
+# and how the form's answer reads back into the value the monitor expects. Each
+# widget reads and writes its own boxes only. A name not here is a JSON box
+# after the widgets, so a monitor reporting a new setting works on day one. A
+# name's meaning never changes; a new meaning is a new name. The widgets
+# convert shape, minutes to seconds and clock times to the monitor's strings;
+# the ranges stay the monitor's.
+WIDGETS = {
+    "DAILY_LIMIT_SECONDS": "minutes",
+    "ALLOWED_HOURS": "hours",  # two time boxes with "no night" under them
+    "MAX_CARRYOVER_SECONDS": "carryover cap",  # a box with "no carryover" and "unlimited" under it; 0 and null
+    "DAILY_LIMIT_OVERRIDES": "limit exceptions",  # a minutes box per weekday, blank for none
+    "ALLOWED_HOURS_OVERRIDES": "hours exceptions",  # two time boxes and "no night" per weekday, blank for none
+}
+
+# in the monitor's order, which is date.weekday(); the words are the page's
+WEEKDAYS = (
+    ("mon", "Monday"), ("tue", "Tuesday"), ("wed", "Wednesday"), ("thu", "Thursday"),
+    ("fri", "Friday"), ("sat", "Saturday"), ("sun", "Sunday"),
+)
+
+
+def in_minutes(seconds) -> str:
+    # a value the box cannot show, such as a string from an older change still
+    # in flight, leaves it empty for the parent to fill
+    return str(seconds // 60) if isinstance(seconds, int) else ""
+
+
+def as_clock_time(moment) -> str:
+    """"6:00" as the "06:00" a time box takes. The box stops at 23:59, so the
+    monitor's "24:00", the end of the day, shows a minute early; anything that
+    is not a time of day leaves the box empty."""
+    if moment == "24:00":
+        return "23:59"
+    try:
+        hours, mins = moment.split(":")
+        return f"{int(hours):02d}:{mins}"
+    except (AttributeError, ValueError):
+        return ""
+
+
+def clock_pair(window) -> tuple[str, str]:
+    """A window as its two time boxes; no night, or junk, is two empty ones."""
+    if isinstance(window, list) and len(window) == 2:
+        return as_clock_time(window[0]), as_clock_time(window[1])
+    return "", ""
+
+
+def settings_field(name: str, value) -> dict:
+    """What the page shows for one setting: its name, its widget, and the
+    widget's boxes."""
+    widget = WIDGETS.get(name, "json")
+    field = {"name": name, "widget": widget}
+    if widget == "minutes":
+        field["minutes"] = in_minutes(value)
+    elif widget == "hours":
+        field["day"], field["night"] = clock_pair(value)
+        field["no_night"] = value is None
+    elif widget == "carryover cap":
+        # the box takes typing only while neither checkbox is on; a ticked one freezes it at 0 or the infinity sign
+        field["carryover"] = "off" if value == 0 else "unlimited" if value is None else "capped"
+        field["cap"] = "0" if value == 0 else "\u221e" if value is None else in_minutes(value)
+    elif widget == "limit exceptions":
+        limits = value if isinstance(value, dict) else {}
+        field["rows"] = [{"weekday": weekday, "word": word, "minutes": in_minutes(limits.get(weekday))}
+                         for weekday, word in WEEKDAYS]
+        field["open"] = bool(limits)
+    elif widget == "hours exceptions":
+        windows = value if isinstance(value, dict) else {}
+        field["rows"] = []
+        for weekday, word in WEEKDAYS:
+            day, night = clock_pair(windows.get(weekday))
+            field["rows"].append({"weekday": weekday, "word": word, "day": day, "night": night,
+                                  "no_night": weekday in windows and windows[weekday] is None})
+        field["open"] = bool(windows)
+    else:
+        field["json"] = json.dumps(value)
+        field["wide"] = isinstance(value, (dict, list))  # a dict or list needs a whole row, not a number-sized box
+    return field
+
+
+def as_monitor_time(clock_time: str) -> str:
+    """"06:00" from a time box as the "6:00" the installer writes, so the in-force
+    line reads the same whoever set it. ValueError when it is not hours:minutes."""
+    hours, mins = clock_time.split(":")
+    return f"{int(hours)}:{mins}"
+
+
+def window_from_boxes(form, day_box: str, night_box: str, no_night_box: str):
+    """Two time boxes and a "no night" checkbox as the monitor's window: the
+    checkbox or both boxes empty is no night, one box empty is a ValueError.
+    Both empty and no checkbox is None too; a caller that tells the two apart
+    looks at the checkbox itself."""
+    if no_night_box in form:
+        return None
+    day, night = form[day_box], form[night_box]
+    if day == "" and night == "":
+        return None
+    if day == "" or night == "":
+        raise ValueError("one time of two")
+    return [as_monitor_time(day), as_monitor_time(night)]
+
+
+def setting_from_form(name: str, form) -> object:
+    """The form's answer for one setting as the value the monitor expects.
+    KeyError when the form lacks a box, ValueError when one holds no value."""
+    widget = WIDGETS.get(name, "json")
+    if widget == "minutes":
+        return int(form[name]) * 60
+    if widget == "hours":
+        return window_from_boxes(form, "day_starts", "night_starts", "no_night")
+    if widget == "carryover cap":
+        off, unlimited = "no_carryover" in form, "unlimited_carryover" in form
+        if off and unlimited:
+            raise ValueError("both no carryover and unlimited carryover")
+        return 0 if off else None if unlimited else int(form[name]) * 60
+    if widget == "limit exceptions":
+        minutes = {weekday: form[f"limit_{weekday}"].strip() for weekday, _ in WEEKDAYS}
+        return {weekday: int(box) * 60 for weekday, box in minutes.items() if box != ""}
+    if widget == "hours exceptions":
+        windows = {}
+        for weekday, _ in WEEKDAYS:
+            window = window_from_boxes(form, f"day_starts_{weekday}", f"night_starts_{weekday}", f"no_night_{weekday}")
+            if window is not None or f"no_night_{weekday}" in form:
+                windows[weekday] = window
+        return windows
+    return json.loads(form[name])
 
 
 @dataclass
@@ -179,9 +301,10 @@ def settings_in_words(settings: dict) -> str:
     if settings.get("ALLOWED_HOURS_OVERRIDES"):
         window = f"{window}\u00a0+overrides"
     parts = [limit, window]
-    # only what is in effect is named, so carryover that is off says nothing
+    # only what is in effect is named, so carryover that is off says nothing;
+    # before 1.3 off was a flag of its own, since then it is a cap of 0
     cap = settings["MAX_CARRYOVER_SECONDS"]
-    if settings["CARRYOVER"]:
+    if settings.get("CARRYOVER", True) and cap != 0:
         parts.append("carryover" if cap is None else f"carryover\u00a0≤{compact_duration(cap)}")
     return ", ".join(parts)
 
@@ -235,9 +358,10 @@ def child_reported_settings(connection: sqlite3.Connection, child_id: int) -> di
     return json.loads(row["reported_settings"])
 
 
-def settings_fields(connection: sqlite3.Connection, child_id: int) -> list[SettingsField] | None:
-    """One input per setting the child reports -- its report is the whole schema,
-    so a machine never heard from gets no form and no invented defaults.
+def settings_fields(connection: sqlite3.Connection, child_id: int) -> list[dict] | None:
+    """A widget per setting the child reports, the known ones first in the
+    page's order -- its report is the whole schema, so a machine never heard
+    from gets no form and no invented defaults.
 
     Prefilled from the change still in flight when there is one, not from the
     child, so a second parent pressing Save does not silently revert the first.
@@ -249,15 +373,10 @@ def settings_fields(connection: sqlite3.Connection, child_id: int) -> list[Setti
     wanted = wanted_settings(connection, child_id)
     if wanted is not None and wanted["outcome"] is None:
         prefill = json.loads(wanted["settings"])  # an ask still in transit wins
-    fields = []
-    for name, value in reported.items():
-        shown = prefill.get(name, value)
-        fields.append(
-            SettingsField(
-                name=name, value=json.dumps(shown), wide=isinstance(shown, (dict, list))
-            )
-        )
-    return fields
+    shown = {name: prefill.get(name, value) for name, value in reported.items()}
+    known = [name for name in WIDGETS if name in shown]
+    unknown = [name for name in shown if name not in WIDGETS]
+    return [settings_field(name, shown[name]) for name in known + unknown]
 
 
 def csv_download(filename: str, header: list[str], rows: list[list]) -> Response:

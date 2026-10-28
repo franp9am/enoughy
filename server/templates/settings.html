@@ -16,16 +16,41 @@
   }
   .settings-form label { font-size: .85rem; color: #333; overflow-wrap: anywhere; }
   .settings-form input {
-    width: 7.5rem; padding: .55rem .6rem; border-radius: 6px; text-align: right;
+    width: 8.5rem; padding: .55rem .6rem; border-radius: 6px; text-align: right;
     border: 1px solid #ccc; background: #fff; color: #1a1a1a;
     font-size: 1rem; font-family: inherit;
   }
   .settings-form input:focus { outline: none; border-color: #888; }
+  /* a number box without the browser's up and down buttons */
+  .settings-form input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  .settings-form input::-webkit-inner-spin-button,
+  .settings-form input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   /* a JSON object gets a row of its own, under its label */
   .settings-form label.wide, .settings-form input.wide { grid-column: 1 / -1; }
   .settings-form input.wide { width: 100%; box-sizing: border-box; text-align: left; }
   /* a label in a row of its own lacks the half input height the others are centred in */
   .settings-form label.wide { margin-top: .5rem; }
+  /* a checkbox under a box, in a row of its own, starting where the box starts */
+  .settings-form label.check {
+    grid-column: 2; display: flex; align-items: center; gap: .4rem; margin: 0; white-space: nowrap;
+  }
+  .settings-form label.check input { width: auto; margin: 0; }
+  .settings-form input:read-only { color: #999; background: #f6f6f6; }
+  /* a breath between the window and the carryover, the label and its box alike */
+  .settings-form label[for="MAX_CARRYOVER_SECONDS"], #MAX_CARRYOVER_SECONDS { margin-top: .7rem; }
+  /* a time box keeps its text clear of the browser's clock icon on its right */
+  .settings-form input[type="time"] { text-align: left; }
+  /* the exceptions fold open to a weekday each, with smaller boxes */
+  .settings-form details { grid-column: 1 / -1; min-width: 0; margin-top: .5rem; }
+  .settings-form summary { cursor: pointer; font-size: .85rem; color: #333; }
+  .settings-form table { border-collapse: collapse; margin-top: .5rem; width: 100%; }
+  .settings-form th { font-size: .75rem; font-weight: 400; color: #888; text-align: left; padding: 0 .2rem .2rem; }
+  .settings-form td { padding: .1rem .15rem; font-size: .85rem; color: #333; }
+  .settings-form td input { width: 100%; min-width: 0; padding: .25rem .3rem; font-size: .85rem; }
+  .settings-form th { padding: 0 .15rem .2rem; }
+  .settings-form td label { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
+  .settings-form td label input { width: auto; margin: 0; }
+  .settings-form details .muted { margin-top: .5rem; font-size: .8rem; }
   .settings-form button {
     grid-column: 2; justify-self: end; margin-top: .4rem;
     padding: .55rem 1.4rem; border-radius: 6px;
@@ -59,10 +84,69 @@
         <h2>Change them</h2>
         <form class="settings-form" method="post" action="{{ url_for('change_settings') }}">
           <input type="hidden" name="child_id" value="{{ child.id }}">
-          {% for field in fields %}
-          <label for="{{ field.name }}" {% if field.wide %}class="wide"{% endif %}>{{ field.name }}</label>
-          <input id="{{ field.name }}" name="{{ field.name }}" value="{{ field.value }}" required
-                 {% if field.wide %}class="wide"{% endif %}>
+          {% for f in fields %}
+          {% if f.widget == "minutes" %}
+          <label for="{{ f.name }}">Minutes a day</label>
+          <input id="{{ f.name }}" name="{{ f.name }}" value="{{ f.minutes }}" required
+                 type="number" min="0" step="1">
+
+          {% elif f.widget == "hours" %}
+          <label for="day_starts">Day starts</label>
+          <input id="day_starts" name="day_starts" value="{{ f.day }}" required
+                 type="time" {% if f.no_night %}readonly{% endif %}>
+          <label for="night_starts">Night starts</label>
+          <input id="night_starts" name="night_starts" value="{{ f.night }}" required
+                 type="time" data-after="day_starts" {% if f.no_night %}readonly{% endif %}>
+          <label class="check"><input type="checkbox" name="no_night" data-boxes="day_starts night_starts"
+                 onchange="noNight(this)" {% if f.no_night %}checked{% endif %}> no night</label>
+
+          {% elif f.widget == "carryover cap" %}
+          <label for="{{ f.name }}">Carryover cap in minutes</label>
+          <input id="{{ f.name }}" name="{{ f.name }}" value="{{ f.cap }}" required
+                 type="text" inputmode="numeric" pattern="\d+|∞" title="whole minutes"
+                 {% if f.carryover != "capped" %}readonly{% endif %}>
+          <label class="check"><input type="checkbox" name="no_carryover" onchange="ticked(this, '0')"
+                 {% if f.carryover == "off" %}checked{% endif %}> no carryover</label>
+          <label class="check"><input type="checkbox" name="unlimited_carryover" onchange="ticked(this, '\u221e')"
+                 {% if f.carryover == "unlimited" %}checked{% endif %}> unlimited carryover</label>
+
+          {% elif f.widget == "limit exceptions" %}
+          <details {% if f.open %}open{% endif %}>
+            <summary>Daily limit exceptions</summary>
+            <table>
+              <tr>{% for row in f.rows %}<th>{{ row.word[:3] }}</th>{% endfor %}</tr>
+              <tr>{% for row in f.rows %}<td><input name="limit_{{ row.weekday }}" value="{{ row.minutes }}"
+                 type="number" min="0" step="1"></td>{% endfor %}</tr>
+            </table>
+            <p class="muted">Minutes a day; blank is the limit above.</p>
+          </details>
+
+          {% elif f.widget == "hours exceptions" %}
+          <details {% if f.open %}open{% endif %}>
+            <summary>Daytime exceptions</summary>
+            <table>
+              <tr><th></th><th>day starts</th><th>night starts</th><th></th></tr>
+              {% for row in f.rows %}
+              <tr>
+                <td>{{ row.word[:3] }}</td>
+                <td><input name="day_starts_{{ row.weekday }}" value="{{ row.day }}" type="time"
+                           {% if row.no_night %}readonly{% endif %}></td>
+                <td><input name="night_starts_{{ row.weekday }}" value="{{ row.night }}" type="time"
+                           data-after="day_starts_{{ row.weekday }}" {% if row.no_night %}readonly{% endif %}></td>
+                <td><label><input type="checkbox" name="no_night_{{ row.weekday }}"
+                           data-boxes="day_starts_{{ row.weekday }} night_starts_{{ row.weekday }}"
+                           onchange="noNight(this)" {% if row.no_night %}checked{% endif %}> no night</label></td>
+              </tr>
+              {% endfor %}
+            </table>
+            <p class="muted">Blank is the hours above.</p>
+          </details>
+
+          {% else %}
+          <label for="{{ f.name }}" {% if f.wide %}class="wide"{% endif %}>{{ f.name }}</label>
+          <input id="{{ f.name }}" name="{{ f.name }}" value="{{ f.json }}" required
+                 {% if f.wide %}class="wide"{% endif %}>
+          {% endif %}
           {% endfor %}
           <button type="submit">Save</button>
         </form>
@@ -71,4 +155,40 @@
         {% endif %}
       </div>
     </div>
+{% endblock %}
+{% block script %}
+<script>
+  // a ticked checkbox unticks the other, fills the cap box and freezes it
+  function ticked(checkbox, frozen) {
+    const form = checkbox.form, box = form.MAX_CARRYOVER_SECONDS;
+    if (checkbox.checked) {
+      form.no_carryover.checked = form.unlimited_carryover.checked = false;
+      checkbox.checked = true;
+    }
+    box.readOnly = checkbox.checked;
+    box.value = checkbox.checked ? frozen : "";
+    if (!checkbox.checked) box.focus();
+  }
+  // "no night" names its two time boxes in data-boxes and freezes them with their values,
+  // so unticking brings the window back
+  function noNight(checkbox) {
+    const boxes = checkbox.dataset.boxes.split(" ").map(name => checkbox.form[name]);
+    boxes.forEach(box => box.readOnly = checkbox.checked);
+    if (!checkbox.checked) boxes[0].focus();
+  }
+  // a night box names its day box in data-after: the night must start after the day,
+  // and where the pair may be empty it is both or neither. The monitor's finer rule,
+  // an hour apart, stays its own
+  function checkWindow(nightBox) {
+    const day = nightBox.form[nightBox.dataset.after].value, night = nightBox.value;
+    let fault = "";
+    if (day && night && night <= day) fault = "Night must start after the day starts.";
+    else if (!nightBox.required && (day === "") !== (night === "")) fault = "Both times, or neither.";
+    nightBox.setCustomValidity(fault);
+  }
+  document.querySelectorAll("input[data-after]").forEach(nightBox => {
+    nightBox.oninput = nightBox.form[nightBox.dataset.after].oninput = () => checkWindow(nightBox);
+    checkWindow(nightBox);
+  });
+</script>
 {% endblock %}
