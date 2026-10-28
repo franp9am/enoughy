@@ -8,14 +8,6 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* server: settings UI, a widget per setting, keyed by name (durations, hour
-  picker, weekday sliders over `DAILY_LIMIT_OVERRIDES`); unknown names fall
-  back to the JSON box, so a monitor reporting a new setting works on day
-  one. The client stays the validator. A name's meaning never changes, new
-  meaning means new name. First the widgets for what the current monitor
-  reports; the server test that every widget name exists in the client's
-  `SETTINGS` once there is a second name. Without this a parent meets the
-  JSON box at the first change, which is where a nontechnical one stops.
 * server: make `settings_in_words` safe against a report it does not
   expect. It indexes five setting names, so a monitor that renames or drops
   one is a 500 on `/` and `/settings` for that child. When the known names
