@@ -72,7 +72,7 @@ def test_without_login_the_front_page_is_about_enoughy(client, anna):
 
 
 def test_the_three_pages_behind_the_front_page_are_public(client, anna):
-    for path, heading in (("/how", "What it does"), ("/why", "Why this one"), ("/setup", "Setting it up")):
+    for path, heading in (("/how", "How it works"), ("/why", "Why this one"), ("/setup", "Setting it up")):
         answer = client.get(path)
         assert answer.status_code == 200
         assert heading in answer.text
