@@ -107,9 +107,10 @@ def today_data(files) -> dict:
     return day_data(files, TODAY)
 
 
-def remaining_shown(files) -> int:
-    """What the widget would display."""
-    return int(files["remaining"].read_text(encoding="utf-8"))
+def remaining_shown(files):
+    """What the widget would display: seconds, or "night"."""
+    text = files["remaining"].read_text(encoding="utf-8")
+    return text if text == "night" else int(text)
 
 
 def redeem_code(minutes, date="2026-09-14") -> str:
@@ -171,7 +172,7 @@ def test_night_time_orders_the_shutdown(machine, files):
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
     assert machine.notifications == ["Night time"]
-    assert remaining_shown(files) == 0
+    assert remaining_shown(files) == "night"
     assert today_data(files)["time_spent_sec"] == 600
 
 

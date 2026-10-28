@@ -169,11 +169,13 @@ def remaining_seconds(data, settings, date: datetime.date):
     )
 
 
-def write_remaining_time_file(remaining_sec, target: Path):
-    """Publish remaining seconds to a child-readable file for a UI to display."""
+def write_remaining_time_file(remaining, target: Path):
+    """Publish remaining seconds, or the word "night", to a child-readable
+    file for the widget to display."""
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        os_tooling.write_atomically(target, str(max(0, remaining_sec)))
+        text = remaining if isinstance(remaining, str) else str(max(0, remaining))
+        os_tooling.write_atomically(target, text)
     except Exception:
         pass  # not critical
 
@@ -415,7 +417,9 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     three steps, so a failure there costs this tick and the next one retries.
     The whole period belongs to the tick it started in, so `now` stays that of
     the tick and nothing is charged."""
-    write_remaining_time_file(0, SHARED_DIR / child / "remaining_time.txt")
+    # the widget tells the child which code would help: extra time, or no night
+    shown = "night" if reason == "Night time" else 0
+    write_remaining_time_file(shown, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify(reason, child)
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
     save_data(data, datafile)

@@ -209,11 +209,13 @@ class RemainingTimeWidget:
             self._apply_click_through()
             self._position_in_corner()
 
-    def read_remaining_seconds(self):
-        """Seconds left, or None while the monitor isn't publishing them."""
+    def read_remaining(self):
+        """Seconds left, "night" once the night has begun, or None while the
+        monitor isn't publishing."""
         try:
             age = time.time() - REMAINING_TIME_FILE_PATH.stat().st_mtime
-            remaining = int(REMAINING_TIME_FILE_PATH.read_text(encoding="utf-8").strip())
+            text = REMAINING_TIME_FILE_PATH.read_text(encoding="utf-8").strip()
+            remaining = text if text == "night" else int(text)
         except Exception:
             return None
         # A reboot can bring granted time or a new day, so an old number may be
@@ -223,10 +225,13 @@ class RemainingTimeWidget:
         return remaining
 
     def update_label(self):
-        remaining = self.read_remaining_seconds()
+        remaining = self.read_remaining()
         if remaining is None:
             text = "Time: --"
             color = COLOR_NORMAL
+        elif remaining == "night":
+            text = "Night time"
+            color = COLOR_CRITICAL
         elif remaining <= 0:
             text = "Time's up"
             color = COLOR_CRITICAL
