@@ -241,10 +241,10 @@ def parent_if_logged_in(request: Request) -> Parent | None:
 
 @app.get("/")
 def index(request: Request, child_id: int | None = None) -> Response:
-    """The dashboard for a parent; anyone else sees what enoughy is."""
+    """The dashboard for a parent; anyone else is sent to what enoughy is."""
     parent = parent_if_logged_in(request)
     if parent is None:
-        return templates.TemplateResponse(request, "landing.html")
+        return RedirectResponse("/intro", status_code=303)
     connection = db.connect()
     children = synced_children(connection, parent.family_id)
     selected_child = next(
@@ -272,6 +272,12 @@ def index(request: Request, child_id: int | None = None) -> Response:
             "week": week,
         },
     )
+
+
+@app.get("/intro")
+def intro(request: Request) -> HTMLResponse:
+    """The front page: a drawing, six lines and the links to the three pages behind it."""
+    return templates.TemplateResponse(request, "landing.html", {"parent": parent_if_logged_in(request)})
 
 
 @app.get("/how")

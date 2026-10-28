@@ -65,7 +65,10 @@ def anna(client):
 
 
 def test_without_login_the_front_page_is_about_enoughy(client, anna):
-    answer = client.get("/")
+    answer = client.get("/", follow_redirects=False)
+    assert answer.status_code == 303
+    assert answer.headers["location"] == "/intro"
+    answer = client.get("/intro")
     assert answer.status_code == 200
     assert 'href="https://testserver/register"' in answer.text
     assert "Tom" not in answer.text
@@ -76,7 +79,7 @@ def test_the_three_pages_behind_the_front_page_are_public(client, anna):
         answer = client.get(path)
         assert answer.status_code == 200
         assert heading in answer.text
-        assert 'href="https://testserver/">' in answer.text  # back to the front page
+        assert 'href="https://testserver/intro">' in answer.text  # back to the front page
 
 
 def test_without_login_a_parent_page_sends_to_the_form(client, anna):
@@ -137,9 +140,9 @@ def test_made_up_cookie_is_no_login(client, anna):
     assert answer.headers["location"] == "/login?next=%2Fparent"
 
 
-def test_the_manual_sends_a_parent_back_to_their_own_page(client, anna):
+def test_a_parent_can_still_read_the_front_page_without_the_register_button(client, anna):
     client.post("/login", data={"login": "anna", "password": "correct horse"})
-    answer = client.get("/setup")
-    assert "Add a child" in answer.text
-    assert 'href="https://testserver/parent">' in answer.text
-    assert 'href="https://testserver/">' not in answer.text
+    answer = client.get("/intro")
+    assert answer.status_code == 200
+    assert 'href="https://testserver/register"' not in answer.text
+    assert 'href="https://testserver/parent"' in answer.text  # the session pill
