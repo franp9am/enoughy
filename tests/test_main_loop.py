@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import random
 import time
+import types
 
 import pytest
 
@@ -46,6 +47,7 @@ class Machine:
 
     def __init__(self):
         self.logged_in = True
+        self.clock = at(12)  # the real clock, which a tick's `now` otherwise stands in for
         self.notifications = []  # what the child saw on screen
         self.shutdowns = []  # the delay of every shutdown ordered, "called off" for an abort
 
@@ -59,6 +61,14 @@ def machine(monkeypatch):
     monkeypatch.setattr(os_tooling, "order_shutdown", lambda delay: m.shutdowns.append(delay))
     monkeypatch.setattr(os_tooling, "abort_shutdown", lambda: m.shutdowns.append("called off"))
     monkeypatch.setattr(time, "sleep", lambda seconds: None)  # the grace period passes at once
+
+    class Clock(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return m.clock
+
+    monkeypatch.setattr(monitor, "datetime", types.SimpleNamespace(
+        datetime=Clock, date=datetime.date, timedelta=datetime.timedelta))
     return m
 
 
@@ -277,6 +287,42 @@ def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files
     ]
 
 
+def test_a_machine_asleep_overnight_wakes_into_a_new_day_with_its_full_time(machine, files):
+    """Asleep with time left and no shutdown pending: the first tick after the
+    wake is an ordinary tick of the new day, with yesterday's leftover."""
+    write_day(files, spent=HOUR // 2, last_tick="2026-09-14 20:00:00")
+    machine.clock = at(7, 0, TOMORROW)
+
+    tick(at(7, 0, TOMORROW))
+
+    assert machine.shutdowns == []
+    tomorrow = day_data(files, TOMORROW)
+    assert tomorrow["carryover_sec"] == HOUR // 2
+    assert tomorrow["time_spent_sec"] == CHECK_INTERVAL_SECONDS
+    assert remaining_shown(files) == HOUR + HOUR // 2 - CHECK_INTERVAL_SECONDS
+
+
+def test_a_machine_asleep_through_the_grace_period_wakes_into_a_new_day_and_is_not_shut_down(
+    machine, files, monkeypatch
+):
+    """The child closes the lid, or shuts down with fast startup on, while the
+    shutdown counts down; the morning power-on resumes the frozen period."""
+    write_day(files, spent=HOUR)
+    # the shutdown is ordered today; the first ten-second sleep of the countdown is the night
+    monkeypatch.setattr(time, "sleep", lambda seconds: setattr(machine, "clock", at(7, 0, TOMORROW)))
+
+    tick(at(20, 0))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert today_data(files)["event_log"] == [
+        "time up 2026-09-14 20:00:00",
+        "shutdown called off, new day 2026-09-14 20:00:00",
+    ]
+    tick(at(7, 1, TOMORROW))  # the next tick, which gives the new day its time
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert remaining_shown(files) == HOUR - CHECK_INTERVAL_SECONDS
+
+
 def test_a_redeem_code_too_small_for_the_debt_does_not_call_the_shutdown_off(machine, files, monkeypatch):
     write_day(files, spent=HOUR + 600)
     code = redeem_code(5)
@@ -335,6 +381,7 @@ def test_after_a_day_with_no_night_the_night_is_back_at_midnight(machine, files)
     files["redeem"].write_text(no_night_code(), encoding="utf-8")
 
     tick(at(23, 55))
+    machine.clock = at(0, date=TOMORROW)
     tick(at(0, date=TOMORROW))
 
     assert machine.notifications == ["no night today", "5 minutes to night", "Night time"]

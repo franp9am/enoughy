@@ -414,7 +414,10 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     calls the shutdown off. The shutdown is ordered only after the first
     three steps, so a failure there costs this tick and the next one retries.
     The whole period belongs to the tick it started in, so `now` stays that of
-    the tick and nothing is charged."""
+    the tick and nothing is charged. Only a new day on the real clock is looked
+    at: sleep or hibernation froze the machine in the period, and the child's
+    power-on resumed it instead of booting, so the shutdown would come for a
+    day that is over. Called off, the next tick opens today's file."""
     write_remaining_time_file(0, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify(reason, child)
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
@@ -426,6 +429,8 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     os_tooling.order_shutdown(SHUTDOWN_DELAY_SECONDS)
     for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS):
         time.sleep(GRACE_CHECK_SECONDS)
+        if datetime.datetime.now().date() != now.date():
+            break
         redeem_code(data, datafile, now, child, secret)
         settings = sync_with_server(data, datafile, now, settings, child)
         remaining = remaining_seconds(data, settings, now.date())
@@ -436,6 +441,11 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
             save_data(data, datafile)
             write_remaining_time_file(remaining, SHARED_DIR / child / "remaining_time.txt")
             return
+    if datetime.datetime.now().date() != now.date():  # also in the last ten seconds
+        os_tooling.abort_shutdown()  # windows resumes its countdown too
+        data["event_log"].append(f"shutdown called off, new day {now.strftime(TIMESTAMP_FORMAT)}")
+        save_data(data, datafile)
+        return
     os_tooling.shutdown(0)  # blocks until the machine is down
 
 
