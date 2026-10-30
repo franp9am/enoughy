@@ -61,7 +61,7 @@ browsers make an exception for `127.0.0.1`, which is how the server runs locally
 reverse proxy in front only forwards.
 
 Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
-older marwin.pfranek.cz, one certificate for all five: the clone in `~/enoughy`, the
+older marwin.pfranek.cz, which also answers as www, one certificate for all six: the clone in `~/enoughy`, the
 database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
 port 8000 with rate limits, which are also all that stands between a guesser and
 `/login` or `/api/setup`. A cookie belongs to one host name, so each name is its own
