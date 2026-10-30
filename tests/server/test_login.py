@@ -74,6 +74,12 @@ def test_without_login_the_front_page_is_about_enoughy(client, anna):
     assert "Tom" not in answer.text
 
 
+def test_without_login_the_old_address_shows_the_form(client, anna):
+    answer = client.get("https://marwin.pfranek.cz/", follow_redirects=False)
+    assert answer.status_code == 303
+    assert answer.headers["location"] == "/login"
+
+
 def test_the_three_pages_behind_the_front_page_are_public(client, anna):
     for path, heading in (("/how", "How it works"), ("/why", "Why this one"), ("/setup", "Setting it up")):
         answer = client.get(path)

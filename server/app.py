@@ -38,6 +38,10 @@ INSTALLER_URL = "https://github.com/franp9am/enoughy/releases/latest/download/en
 # The offline code page, the one file in parent/; the same repo checkout serves it.
 EXTRA_TIME_PAGE = Path(__file__).parent.parent / "parent" / "extra_time.html"
 
+# The first family's address from before enoughy.com. It is their private door,
+# not a front page, so a stranger there meets the login form, not the intro.
+LOGIN_FIRST_HOST = "marwin.pfranek.cz"
+
 
 class SettingsChangeOutcome(BaseModel):
     id: int  # of the settings change
@@ -244,7 +248,8 @@ def index(request: Request, child_id: int | None = None) -> Response:
     """The dashboard for a parent; anyone else is sent to what enoughy is."""
     parent = parent_if_logged_in(request)
     if parent is None:
-        return RedirectResponse("/intro", status_code=303)
+        target = "/login" if request.url.hostname == LOGIN_FIRST_HOST else "/intro"
+        return RedirectResponse(target, status_code=303)
     connection = db.connect()
     children = synced_children(connection, parent.family_id)
     selected_child = next(
