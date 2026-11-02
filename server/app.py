@@ -1,5 +1,6 @@
 import hmac
 import json
+import logging
 import os
 import secrets
 import sqlite3
@@ -41,6 +42,14 @@ EXTRA_TIME_PAGE = Path(__file__).parent.parent / "parent" / "extra_time.html"
 # The first family's address from before enoughy.com. It is their private door,
 # not a front page, so a stranger there meets the login form, not the intro.
 LOGIN_FIRST_HOST = "marwin.pfranek.cz"
+
+# What the server prints goes to the journal under systemd, read with
+# `journalctl -u enoughy`; the journal adds the time. Only what is rare and
+# worth a look is logged here: a login, a child set up, a change answered.
+# Requests are uvicorn's lines, a sync is routine, and what a child did is
+# nobody's business.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+log = logging.getLogger(__name__)
 
 
 class SettingsChangeOutcome(BaseModel):
@@ -172,6 +181,10 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
                        WHERE id = :change_id""",
                     {"outcome": "taken" if outcome.taken else "refused", "change_id": wanted["id"]},
                 )
+                if outcome.taken:
+                    log.info(f"child {child_id} took settings change {wanted['id']}")
+                else:
+                    log.warning(f"child {child_id} refused settings change {wanted['id']}")
             else:
                 change_to_send = SettingsChange(
                     id=wanted["id"], settings=json.loads(wanted["settings"])
@@ -211,7 +224,9 @@ def setup(request: SetupRequest) -> SetupResponse:
             )
     connection.close()
     if child is None:
+        log.warning("setup with an unknown or expired code")
         raise HTTPException(status_code=401, detail="unknown or expired code")
+    log.info(f"child {child['id']} set up")
     return SetupResponse(token=child["token"], secret=secret)
 
 
@@ -318,12 +333,14 @@ async def login(request: Request) -> Response:
     parent = parent_from_credentials(connection, form.get("login", ""), form.get("password", ""))
     if parent is None:
         connection.close()
+        log.warning(f"failed login as {form.get('login', '')!r}")
         return templates.TemplateResponse(
             request,
             "login.html",
             {"error": "Wrong login or password.", "next": local_path(form.get("next", "/"))},
             status_code=401,
         )
+    log.info(f"parent {parent.id} logged in")
     response = start_session(connection, parent.id, form.get("next", "/"))
     connection.close()
     return response
@@ -382,6 +399,7 @@ async def register(request: Request) -> Response:
             {"error": f"{login} is taken.", "invitation": invitation},
             status_code=400,
         )
+    log.info(f"parent {parent_id} registered as {login!r}")
     response = start_session(connection, parent_id, next_path="/parent")
     connection.close()
     return response
@@ -419,6 +437,7 @@ async def create_child(request: Request) -> RedirectResponse:
         add_child.add_child(connection, parent.family_id, name)
         child_id = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
         make_setup_code(connection, child_id, datetime.now(timezone.utc))
+        log.info(f"child {child_id} added to family {parent.family_id}")
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     except sqlite3.IntegrityError:
@@ -457,6 +476,7 @@ async def delete_child(request: Request) -> RedirectResponse:
                     f"DELETE FROM {table} WHERE {'id' if table == 'children' else 'child_id'} = :child_id",
                     {"child_id": child["id"]},
                 )
+        log.info(f"child {child['id']} deleted from family {parent.family_id}")
     finally:
         connection.close()
     return RedirectResponse("/parent", status_code=303)

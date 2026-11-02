@@ -152,3 +152,18 @@ def test_a_parent_can_still_read_the_front_page_without_the_register_button(clie
     assert answer.status_code == 200
     assert 'href="https://testserver/register"' not in answer.text
     assert 'href="https://testserver/parent"' in answer.text  # the session pill
+
+
+def test_a_login_is_a_line_in_the_journal_and_a_wrong_one_a_warning(client, anna, caplog):
+    """Only the rare events are logged, never a sync; the journal stays readable by eye."""
+    with caplog.at_level("INFO"):
+        client.post("/login", data={"login": "anna", "password": "correct horse"})
+        client.post("/login", data={"login": "anna", "password": "wrong"})
+        synced = client.post("/api/sync", headers={"Authorization": "Bearer tom-token"}, json={
+            "date": "2026-10-11", "time_spent_sec": 600, "carryover_sec": 0, "granted_sec": 0,
+            "remaining_sec": 3000, "last_tick": "2026-10-11 10:00:00", "applied_grant_ids": [],
+            "settings": None, "monitor_version": "1.2.1",
+        })
+    assert synced.status_code == 200
+    lines = [(record.levelname, record.getMessage()) for record in caplog.records if record.name == "app"]
+    assert lines == [("INFO", "parent 1 logged in"), ("WARNING", "failed login as 'anna'")]

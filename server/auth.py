@@ -4,6 +4,7 @@ A parent proves who they are once, with login and password, and from then on
 by the session cookie that `start_session` set. Swapping this for an identity
 provider means rewriting this module and nothing else.
 """
+import logging
 import secrets
 import sqlite3
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 import db
+
+log = logging.getLogger(__name__)
 
 SESSION_COOKIE = "session"
 SESSION_DAYS = 90
@@ -117,5 +120,6 @@ def authenticated_child_id(authorization: str) -> int:
     ).fetchone()
     connection.close()
     if child is None:
+        log.warning("sync with a token no child has")
         raise HTTPException(status_code=401, detail="unknown token")
     return child["id"]

@@ -8,10 +8,6 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* server: make `settings_in_words` safe against a report it does not
-  expect. It indexes five setting names, so a monitor that renames or drops
-  one is a 500 on `/` and `/settings` for that child. When the known names
-  are not all there, show plain `name=value` instead of the compact line.
 * monitor: send the day's whole `event_log` and the last `crash.log` entry
   with each sync, so debugging works from the server page without machine
   access; cap the crash log at 1 MB (rename to `.old`) and read only its
@@ -49,7 +45,6 @@ the database.
 * server: test the server against the report of each released monitor
   version, since it has to stay compatible with every one still installed
   (see `DEVELOPING.md`). Due before the first stranger installs.
-* server: logging.
 * monitor: a changed time zone, which a standard user may set, moves the
   clock out of the night and rolls the date into a fresh limit. When the
   Windows zone name changes, log an event for the parent's page.
@@ -58,11 +53,6 @@ the database.
   the installer shows it for a family without an account. Behind a button: a
   key on the screen is the risk. `/codes` stays for the account parent whose
   child's computer is offline right now; the first manual does not mention it.
-* site: enoughy.com is the address since 2026-10-11; enoughy.cz, www and the
-  old marwin.pfranek.cz answer too. Once the description exists, `/` shows it
-  to a stranger and the overview to a parent, and the other names redirect the
-  page paths only: installed monitors sync to marwin.pfranek.cz, and urllib
-  turns a redirected POST into a GET.
 
 ## Someday / maybe
 

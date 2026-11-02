@@ -171,3 +171,15 @@ def test_a_0_1_0_monitor_gets_the_widgets_it_has_names_for_and_json_for_the_rest
     assert anna_logged_in.post("/settings", data=answers).status_code == 200
     assert asked() == {"DAILY_LIMIT_SECONDS": 5400, "CARRYOVER": False, "MAX_CARRYOVER_SECONDS": 3600,
                        "EARLIEST_HOUR_INCLUDED": 7, "LATEST_HOUR_INCLUDED": 21}
+
+
+def test_a_report_missing_a_known_name_is_a_question_mark_and_an_error_not_a_500(anna_logged_in, caplog):
+    child_id = tom_reporting(anna_logged_in, {"DAILY_LIMIT_SECONDS": 3600})
+    with caplog.at_level("ERROR"):
+        dashboard = anna_logged_in.get("/", params={"child_id": child_id})
+        page = anna_logged_in.get("/settings", params={"child_id": child_id})
+    assert dashboard.status_code == 200 and page.status_code == 200
+    assert "1h/d, ?, ?" in dashboard.text
+    errors = [record.getMessage() for record in caplog.records if record.levelname == "ERROR"]
+    assert errors[:2] == ["window_in_words cannot read the report {'DAILY_LIMIT_SECONDS': 3600}",
+                          "carryover_in_words cannot read the report {'DAILY_LIMIT_SECONDS': 3600}"]

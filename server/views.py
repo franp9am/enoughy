@@ -4,11 +4,14 @@ beyond the CSV Response."""
 import csv
 import io
 import json
+import logging
 import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+log = logging.getLogger(__name__)
 
 from fastapi.responses import Response
 
@@ -283,29 +286,52 @@ def wanted_settings(connection: sqlite3.Connection, child_id: int) -> sqlite3.Ro
     ).fetchone()
 
 
-def settings_in_words(settings: dict) -> str:
-    """The settings the child reports, on one line."""
+def limit_in_words(settings: dict) -> str:
     # non-breaking space so a wrap never splits a value from the word it belongs to
     limit = f"{compact_duration(settings['DAILY_LIMIT_SECONDS'])}/d"
     # .get: a monitor older than the setting does not report it. The days are
     # not spelled out here: the settings page shows the dict as the child sent it.
     if settings.get("DAILY_LIMIT_OVERRIDES"):
-        limit = f"{limit}\u00a0+overrides"
+        limit = f"{limit} +overrides"
+    return limit
+
+
+def window_in_words(settings: dict) -> str:
     if "ALLOWED_HOURS" in settings:
         hours = settings["ALLOWED_HOURS"]  # [day starts, night starts], or null for no night
     else:
         # before 0.7 the window came as two hours, the last one included in
         # full; goes once every machine installed before 0.7 is reinstalled
         hours = (settings["EARLIEST_HOUR_INCLUDED"], settings["LATEST_HOUR_INCLUDED"] + 1)
-    window = "no night" if hours is None else f"{hours[0]}-{hours[1]}"
+    window = "no night" if hours is None else f"{hours[0]}-{hours[1]}"
     if settings.get("ALLOWED_HOURS_OVERRIDES"):
-        window = f"{window}\u00a0+overrides"
-    parts = [limit, window]
-    # only what is in effect is named, so carryover that is off says nothing;
-    # before 1.3 off was a flag of its own, since then it is a cap of 0
+        window = f"{window} +overrides"
+    return window
+
+
+def carryover_in_words(settings: dict) -> str:
+    """Only what is in effect is named, so carryover that is off is nothing;
+    before 1.3 off was a flag of its own, since then it is a cap of 0."""
     cap = settings["MAX_CARRYOVER_SECONDS"]
-    if settings.get("CARRYOVER", True) and cap != 0:
-        parts.append("carryover" if cap is None else f"carryover\u00a0≤{compact_duration(cap)}")
+    if not settings.get("CARRYOVER", True) or cap == 0:
+        return ""
+    return "carryover" if cap is None else f"carryover ≤{compact_duration(cap)}"
+
+
+def settings_in_words(settings: dict) -> str:
+    """The settings the child reports, on one line. Every monitor released
+    reports the names the parts read; a report that lacks one, from a monitor
+    changed without the server, gets a question mark in that place and an
+    error in the journal, not a 500 on the parent's pages."""
+    parts = []
+    for part in (limit_in_words, window_in_words, carryover_in_words):
+        try:
+            words = part(settings)
+        except (KeyError, TypeError, IndexError):
+            log.error(f"{part.__name__} cannot read the report {settings}")
+            words = "?"
+        if words:
+            parts.append(words)
     return ", ".join(parts)
 
 
