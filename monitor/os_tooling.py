@@ -121,7 +121,7 @@ def write_atomically(target: Path, text: str) -> None:
 
 
 def notify(message: str, user: str) -> None:
-    title = "Screen time"
+    title = "Enoughy"
     clicked_button = wintypes.DWORD()
     try:
         for session_id, name in users_at_screen().items():
