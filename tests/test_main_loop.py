@@ -46,6 +46,7 @@ class Machine:
 
     def __init__(self):
         self.logged_in = True
+        self.other_at_screen = None  # who else sits at the unlocked screen
         self.clock = at(12)  # the real clock, which a tick's `now` otherwise stands in for
         self.notifications = []  # what the child saw on screen
         self.shutdowns = []  # the delay of every shutdown ordered, "called off" for an abort
@@ -55,6 +56,7 @@ class Machine:
 def machine(monkeypatch):
     m = Machine()
     monkeypatch.setattr(os_tooling, "user_logged_in", lambda user: m.logged_in)
+    monkeypatch.setattr(os_tooling, "another_user_at_screen", lambda user: m.other_at_screen)
     monkeypatch.setattr(os_tooling, "notify", lambda message, user: m.notifications.append(message))
     monkeypatch.setattr(os_tooling, "shutdown", lambda delay: m.shutdowns.append(delay))
     monkeypatch.setattr(os_tooling, "order_shutdown", lambda delay: m.shutdowns.append(delay))
@@ -284,6 +286,22 @@ def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files
         "time up 2026-09-14 08:00:00",
         "redeem code 600 2026-09-14 08:00:00",
         "shutdown called off 2026-09-14 08:00:00",
+    ]
+
+
+def test_another_user_at_the_screen_in_the_grace_period_calls_the_shutdown_off(machine, files, monkeypatch):
+    """The child logged off and a parent logged in: the machine is theirs now.
+    A locked screen or the login screen is nobody, and the shutdown goes on."""
+    write_day(files, spent=HOUR - CHECK_INTERVAL_SECONDS)
+    monkeypatch.setattr(time, "sleep", lambda seconds: setattr(machine, "other_at_screen", "mum"))
+
+    tick(at(8, 0))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert machine.notifications == ["time up"]
+    assert today_data(files)["event_log"] == [
+        "time up 2026-09-14 08:00:00",
+        "shutdown called off, mum at screen 2026-09-14 08:00:00",
     ]
 
 

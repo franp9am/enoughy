@@ -101,6 +101,16 @@ def user_logged_in(user: str) -> bool:
         return legacy_user_logged_in(user)
 
 
+def another_user_at_screen(user: str) -> Optional[str]:
+    """The name of somebody other than that user at an unlocked screen, or
+    None; None too on the windows the legacy fallback above is for."""
+    try:
+        others = [name for name in users_at_screen().values() if name.lower() != user.lower()]
+    except OSError:
+        return None
+    return others[0] if others else None
+
+
 def write_atomically(target: Path, text: str) -> None:
     """A reader sees the old content or the new, never an empty or half-written
     file; `open(..., "w")` truncates first, and a crash or a concurrent read can

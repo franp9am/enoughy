@@ -418,7 +418,9 @@ def startup(now, child: str):
 def shut_down_unless_called_off(reason, data, datafile, now, settings, child: str, secret: bytes):
     """Tell the child, record why, get the last word to the server, then the
     grace period: a code or a server change that leaves some time and no night
-    calls the shutdown off. The shutdown is ordered only after the first
+    calls the shutdown off, and so does another user at the screen, whose
+    machine it is now. Nobody at the screen (the child logged off or locked
+    it) lets the shutdown through. The shutdown is ordered only after the first
     three steps, so a failure there costs this tick and the next one retries.
     The whole period belongs to the tick it started in, so `now` stays that of
     the tick and nothing is charged. Only a new day on the real clock is looked
@@ -440,6 +442,12 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
         time.sleep(GRACE_CHECK_SECONDS)
         if datetime.datetime.now().date() != now.date():
             break
+        other = os_tooling.another_user_at_screen(child)
+        if other:
+            os_tooling.abort_shutdown()
+            data["event_log"].append(f"shutdown called off, {other} at screen {now.strftime(TIMESTAMP_FORMAT)}")
+            save_data(data, datafile)
+            return
         redeem_code(data, datafile, now, child, secret)
         settings = sync_with_server(data, datafile, now, settings, child)
         remaining = remaining_seconds(data, settings, now.date())
@@ -450,7 +458,9 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
             save_data(data, datafile)
             write_remaining_time_file(remaining, SHARED_DIR / child / "remaining_time.txt")
             return
-    if datetime.datetime.now().date() != now.date():  # also in the last ten seconds
+    # the break above, and a sleep that began during the last redeem or sync
+    # and ended on a new day: that day must not start with a shutdown
+    if datetime.datetime.now().date() != now.date():
         os_tooling.abort_shutdown()  # windows resumes its countdown too
         data["event_log"].append(f"shutdown called off, new day {now.strftime(TIMESTAMP_FORMAT)}")
         save_data(data, datafile)
