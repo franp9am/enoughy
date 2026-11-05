@@ -240,7 +240,7 @@ class RemainingTimeWidget:
             opacity = MOON_OPACITY
             color = MOON_COLOR
         elif remaining <= 0:
-            text = "Time's up"
+            text = "0 min ⏳"
             color = COLOR_CRITICAL
         else:
             text = format_remaining(remaining)

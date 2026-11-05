@@ -431,7 +431,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     # the widget tells the child which code would help: extra time, or no night
     night = reason == "Night time"
     write_remaining_time_file("night" if night else 0, SHARED_DIR / child / "remaining_time.txt")
-    os_tooling.notify("🌙" if night else reason, child)  # the moon needs no language
+    os_tooling.notify("🌙" if night else "0 min ⏳", child)  # the symbols need no language
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
     save_data(data, datafile)
     # without this the page keeps stale numbers, and a grant that caused this

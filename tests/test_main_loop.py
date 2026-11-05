@@ -169,7 +169,7 @@ def test_time_up_orders_the_shutdown(machine, files):
 
     # in the same tick, not one later; the undelayed one ends the grace period
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["time up"]
+    assert machine.notifications == ["0 min ⏳"]
     assert remaining_shown(files) == 0
     data = today_data(files)
     assert data["time_spent_sec"] == HOUR
@@ -280,7 +280,7 @@ def test_a_redeem_code_in_the_grace_period_calls_the_shutdown_off(machine, files
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["time up", "+10 min ⏳"]
+    assert machine.notifications == ["0 min ⏳", "+10 min ⏳"]
     assert remaining_shown(files) == 600
     assert today_data(files)["event_log"] == [
         "time up 2026-09-14 08:00:00",
@@ -298,7 +298,7 @@ def test_another_user_at_the_screen_in_the_grace_period_calls_the_shutdown_off(m
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["time up"]
+    assert machine.notifications == ["0 min ⏳"]
     assert today_data(files)["event_log"] == [
         "time up 2026-09-14 08:00:00",
         "shutdown called off, mum at screen 2026-09-14 08:00:00",
@@ -385,7 +385,7 @@ def test_a_no_night_code_leaves_the_daily_limit_alone(machine, files):
     tick(at(NIGHT_HOUR))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["no night today", "time up"]
+    assert machine.notifications == ["no night today", "0 min ⏳"]
 
 
 def test_a_no_night_code_is_good_on_its_date_only(machine, files):
@@ -564,7 +564,7 @@ def test_a_grant_in_the_grace_period_calls_the_shutdown_off(machine, files, sync
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["time up", "+10 min ⏳"]
+    assert machine.notifications == ["0 min ⏳", "+10 min ⏳"]
     assert remaining_shown(files) == 600
 
 
@@ -576,7 +576,7 @@ def test_a_negative_grant_from_the_server_orders_the_shutdown(machine, files, sy
     tick(at(8, 0))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["-10 min ⏳", "time up"]
+    assert machine.notifications == ["-10 min ⏳", "0 min ⏳"]
     assert today_data(files)["granted_sec"] == -600
     assert remaining_shown(files) == 0
 
