@@ -360,7 +360,7 @@ def test_a_no_night_code_keeps_the_machine_up_at_night(machine, files):
     tick(at(NIGHT_HOUR, 1))  # the file is empty by now; the day remembers
 
     assert machine.shutdowns == []
-    assert machine.notifications == ["no night today"]
+    assert machine.notifications == ["No night 🌙 ❌"]
     data = today_data(files)
     assert data["no_night"] is True
     assert data["event_log"] == ["no night code 2026-09-14 21:00:00"]
@@ -385,7 +385,7 @@ def test_a_no_night_code_leaves_the_daily_limit_alone(machine, files):
     tick(at(NIGHT_HOUR))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
-    assert machine.notifications == ["no night today", "0 min ⏳"]
+    assert machine.notifications == ["No night 🌙 ❌", "0 min ⏳"]
 
 
 def test_a_no_night_code_is_good_on_its_date_only(machine, files):
@@ -402,7 +402,7 @@ def test_after_a_day_with_no_night_the_night_is_back_at_midnight(machine, files)
     machine.clock = at(0, date=TOMORROW)
     tick(at(0, date=TOMORROW))
 
-    assert machine.notifications == ["no night today", "5 min 🌙", "🌙"]
+    assert machine.notifications == ["No night 🌙 ❌", "5 min 🌙", "🌙"]
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, 0]
 
 
@@ -426,7 +426,7 @@ def test_a_no_night_code_in_the_grace_period_calls_the_night_shutdown_off(machin
     tick(at(NIGHT_HOUR))
 
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
-    assert machine.notifications == ["🌙", "no night today"]
+    assert machine.notifications == ["🌙", "No night 🌙 ❌"]
     assert remaining_shown(files) == HOUR - 600
     assert today_data(files)["event_log"] == [
         "Night time 2026-09-14 21:00:00",

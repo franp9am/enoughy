@@ -145,7 +145,7 @@ def redeem_code(data, datafile, now, child: str, secret: bytes):
     if redeem["nonight"]:
         data["no_night"] = True
         data["event_log"].append(f"no night code {now_str}")
-        os_tooling.notify("no night today", child)
+        os_tooling.notify("No night 🌙 ❌", child)
     else:
         extra_time = redeem["extra_time_sec"]
         data["granted_sec"] += extra_time
