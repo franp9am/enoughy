@@ -233,7 +233,7 @@ class RemainingTimeWidget:
         remaining = self.read_remaining()
         opacity = OPACITY
         if remaining is None:
-            text = "Time: --"
+            text = "-- ⏳"
             color = COLOR_NORMAL
         elif remaining == "night":
             text = "🌙"  # a moon, readable in any language
