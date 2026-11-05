@@ -37,9 +37,10 @@ TOP_MARGIN_PX = 38
 # for trying a copy out next to the one already running.
 CORNER = "right"
 OPACITY = 0.6
-MOON_OPACITY = 1.0  # the night's moon is a picture, and a faint one is hard to make out
+ALERT_OPACITY = 1.0  # the moon and "0 min" are to be seen, not glanced at
 FONT_FAMILY = "Segoe UI"
 FONT_SIZE = 14
+MOON_FONT_SIZE = 20  # the moon alone, a little bigger than a number
 WARNING_SECONDS = 15 * 60  # orange below this
 CRITICAL_SECONDS = 5 * 60  # red below this
 COLOR_NORMAL = "#2ecc71"
@@ -232,21 +233,24 @@ class RemainingTimeWidget:
     def update_label(self):
         remaining = self.read_remaining()
         opacity = OPACITY
+        size = FONT_SIZE
         if remaining is None:
             text = "-- ⏳"
             color = COLOR_NORMAL
         elif remaining == "night":
             text = "🌙"  # a moon, readable in any language
-            opacity = MOON_OPACITY
+            opacity = ALERT_OPACITY
+            size = MOON_FONT_SIZE
             color = MOON_COLOR
         elif remaining <= 0:
             text = "0 min ⏳"
+            opacity = ALERT_OPACITY
             color = COLOR_CRITICAL
         else:
             text = format_remaining(remaining)
             color = color_for(remaining)
 
-        self.label.config(text=text, fg=color)
+        self.label.config(text=text, fg=color, font=(FONT_FAMILY, size, "bold"))
         self._set_opacity(opacity)
         if not self.hidden:
             self._position_in_corner()
