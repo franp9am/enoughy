@@ -37,6 +37,7 @@ TOP_MARGIN_PX = 38
 # for trying a copy out next to the one already running.
 CORNER = "right"
 OPACITY = 0.6
+MOON_OPACITY = 1.0  # the night's moon is a picture, and a faint one is hard to make out
 FONT_FAMILY = "Segoe UI"
 FONT_SIZE = 14
 WARNING_SECONDS = 15 * 60  # orange below this
@@ -44,6 +45,7 @@ CRITICAL_SECONDS = 5 * 60  # red below this
 COLOR_NORMAL = "#2ecc71"
 COLOR_WARNING = "#f39c12"
 COLOR_CRITICAL = "#e74c3c"
+MOON_COLOR = "#fff3b0"  # pale moonlight, which shows up where the red does not
 
 # Ctrl+Alt+H hides the widget, the same combination brings it back. The keyboard
 # state is read directly rather than claiming the combination from Windows, so
@@ -167,7 +169,10 @@ class RemainingTimeWidget:
         )
         # A layered window does not render until its alpha is set, and Tk only
         # sets it for an opacity below 1.0.
-        _user32.SetLayeredWindowAttributes(hwnd, 0, int(OPACITY * 255), _LWA_ALPHA)
+        self._set_opacity(OPACITY)
+
+    def _set_opacity(self, opacity):
+        _user32.SetLayeredWindowAttributes(self._hwnd(), 0, int(opacity * 255), _LWA_ALPHA)
 
     def _position_in_corner(self):
         # Let Tk lay the new text out first, or the width is the previous one
@@ -226,12 +231,14 @@ class RemainingTimeWidget:
 
     def update_label(self):
         remaining = self.read_remaining()
+        opacity = OPACITY
         if remaining is None:
             text = "Time: --"
             color = COLOR_NORMAL
         elif remaining == "night":
-            text = "Night time"
-            color = COLOR_CRITICAL
+            text = "🌙"  # a moon, readable in any language
+            opacity = MOON_OPACITY
+            color = MOON_COLOR
         elif remaining <= 0:
             text = "Time's up"
             color = COLOR_CRITICAL
@@ -240,6 +247,7 @@ class RemainingTimeWidget:
             color = color_for(remaining)
 
         self.label.config(text=text, fg=color)
+        self._set_opacity(opacity)
         if not self.hidden:
             self._position_in_corner()
         self.root.after(POLL_INTERVAL_MS, self.update_label)

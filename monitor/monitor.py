@@ -155,8 +155,9 @@ def redeem_code(data, datafile, now, child: str, secret: bytes):
 
 
 def extra_time_message(seconds: int) -> str:
-    """The popup for a grant, in the minutes the parent chose: "extra time 60 min"."""
-    return f"extra time {round(seconds / 60)} min"
+    """The popup for a grant, in the minutes the parent chose: "+60 min ⏳".
+    The hourglass, like the moon, needs no language; a grant can be negative."""
+    return f"{round(seconds / 60):+d} min ⏳"
 
 
 def daily_limit_seconds(date: datetime.date, settings) -> int:
@@ -428,9 +429,9 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     power-on resumed it instead of booting, so the shutdown would come for a
     day that is over. Called off, the next tick opens today's file."""
     # the widget tells the child which code would help: extra time, or no night
-    shown = "night" if reason == "Night time" else 0
-    write_remaining_time_file(shown, SHARED_DIR / child / "remaining_time.txt")
-    os_tooling.notify(reason, child)
+    night = reason == "Night time"
+    write_remaining_time_file("night" if night else 0, SHARED_DIR / child / "remaining_time.txt")
+    os_tooling.notify("🌙" if night else reason, child)  # the moon needs no language
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
     save_data(data, datafile)
     # without this the page keeps stale numbers, and a grant that caused this
@@ -498,7 +499,8 @@ def tick(now, child: str, secret: bytes):
     warning = f"{NIGHT_WARNING_SECONDS // 60} minutes to night"
     warned = any(e.startswith(warning) for e in data["event_log"])
     if is_night_time(soon, settings, no_night_date) and not warned:
-        os_tooling.notify(warning, child)
+        # The child sees a moon, not a word, so the message needs no language
+        os_tooling.notify(f"{NIGHT_WARNING_SECONDS // 60} min 🌙", child)
         data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
 
     data["time_spent_sec"] += seconds_to_charge(data, now)
