@@ -238,7 +238,7 @@ class RemainingTimeWidget:
             text = "-- ⏳"
             color = COLOR_NORMAL
         elif remaining == "night":
-            text = "🌙"  # a moon, readable in any language
+            text = "⏾"  # a moon, readable in any language
             opacity = ALERT_OPACITY
             size = MOON_FONT_SIZE
             color = MOON_COLOR

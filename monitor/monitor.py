@@ -145,7 +145,7 @@ def redeem_code(data, datafile, now, child: str, secret: bytes):
     if redeem["nonight"]:
         data["no_night"] = True
         data["event_log"].append(f"no night code {now_str}")
-        os_tooling.notify("No night 🌙 ❌", child)
+        os_tooling.notify("No night ⏾ ❌", child)
     else:
         extra_time = redeem["extra_time_sec"]
         data["granted_sec"] += extra_time
@@ -431,7 +431,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     # the widget tells the child which code would help: extra time, or no night
     night = reason == "Night time"
     write_remaining_time_file("night" if night else 0, SHARED_DIR / child / "remaining_time.txt")
-    os_tooling.notify("🌙" if night else "0 min ⏳", child)  # the symbols need no language
+    os_tooling.notify("Night time ⏾" if night else "0 min ⏳", child)
     data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
     save_data(data, datafile)
     # without this the page keeps stale numbers, and a grant that caused this
@@ -500,7 +500,7 @@ def tick(now, child: str, secret: bytes):
     warned = any(e.startswith(warning) for e in data["event_log"])
     if is_night_time(soon, settings, no_night_date) and not warned:
         # The child sees a moon, not a word, so the message needs no language
-        os_tooling.notify(f"{NIGHT_WARNING_SECONDS // 60} min 🌙", child)
+        os_tooling.notify(f"{NIGHT_WARNING_SECONDS // 60} min ⏾", child)
         data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
 
     data["time_spent_sec"] += seconds_to_charge(data, now)
