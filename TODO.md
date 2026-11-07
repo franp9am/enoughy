@@ -24,6 +24,12 @@ the database.
   a correction could arrive; now any setting is changed or called off from the
   server, so the page's own check, night after day, is enough. Goes with a
   monitor release; until then a shorter window comes back refused.
+* server: the settings page's times as two dropdowns, hours 0-24 and minutes
+  in steps of 5, instead of a time box, which stops at 23:59. Hour 24 locks
+  the minutes at 00. `as_clock_time` drops its 24:00-as-23:59 case, which
+  today turns a monitor's 24:00 into 23:59 whenever the parent saves the page
+  for any other setting. A minute off the steps, set by the installer, shows
+  as an extra option so saving keeps it.
 * server: a second parent joins the family by an invite link from the first
   parent's page; a name typed at registration cannot tell them from a
   stranger.
