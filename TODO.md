@@ -8,10 +8,9 @@ goes there unless it hurts a current user or blocks the goal.
 The goal: a stranger registers and installs without the maintainer touching
 the database.
 
-* monitor: send the day's whole `event_log` and the last `crash.log` entry
-  with each sync, so debugging works from the server page without machine
-  access; cap the crash log at 1 MB (rename to `.old`) and read only its
-  tail.
+* monitor: send a new `crash.log` entry with the next sync, once, so the
+  server's journal has it without machine access; cap the crash log at 1 MB
+  (rename to `.old`) and read only its tail.
 
 ## Later
 
@@ -59,6 +58,14 @@ the database.
   the installer shows it for a family without an account. Behind a button: a
   key on the screen is the risk. `/codes` stays for the account parent whose
   child's computer is offline right now; the first manual does not mention it.
+* server and monitor: a "No night today" button on the dashboard, sent through
+  the sync like a grant and pinned to the parent's date, so one delivered
+  after midnight expires instead of lifting the next night. A separate key in
+  the sync answer, which old monitors ignore; a 0-second grant would show them
+  "0 min". The monitor reports `no_night` in its status: missing hides the
+  button (too old), true shows "Tonight: no night" whatever lifted it, a code
+  included. Unconfirmed, it sits in "Waiting for the next sync"; past its day
+  it drops out quietly. Monitor release and server deploy go together.
 
 ## Someday / maybe
 

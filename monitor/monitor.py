@@ -22,6 +22,7 @@ from config import (
     SHUTDOWN_DELAY_SECONDS,
     SIGNATURE_CHARS,
     STARTUP_DELAY_SECONDS,
+    UNSENT_EVENTS_KEPT,
 )
 from settings import WEEKDAY_NAMES, ensure_settings_file, minutes, save_settings, settings_in_force
 
@@ -124,6 +125,16 @@ def save_data(data, datafile):
     os_tooling.write_atomically(datafile, json.dumps(data, indent=2))
 
 
+def log_event(data, text, datafile):
+    """Into the day's log, and into the outbox beside it, which the next
+    answered sync empties: the server's journal gets every entry, whenever
+    the server is reached."""
+    data["event_log"].append(text)
+    unsent_events_file = datafile.parent / "events_unsent.json"
+    unsent = remote_sync.load_unsent_events(unsent_events_file) + [text]
+    remote_sync.save_unsent_events(unsent[-UNSENT_EVENTS_KEPT:], unsent_events_file)
+
+
 def redeem_code(data, datafile, now, child: str, secret: bytes):
     """Applies the code waiting in the child's redeem file, if there is one:
     a no-night code lifts today's night, an extra-time code adds its seconds.
@@ -144,12 +155,12 @@ def redeem_code(data, datafile, now, child: str, secret: bytes):
     data["redeemed_codes"].append(redeem["redeem_code"])
     if redeem["nonight"]:
         data["no_night"] = True
-        data["event_log"].append(f"no night code {now_str}")
+        log_event(data, f"no night code {now_str}", datafile)
         os_tooling.notify("No night ⏾ ❌", child)
     else:
         extra_time = redeem["extra_time_sec"]
         data["granted_sec"] += extra_time
-        data["event_log"].append(f"redeem code {extra_time} {now_str}")
+        log_event(data, f"redeem code {extra_time} {now_str}", datafile)
         os_tooling.notify(extra_time_message(extra_time), child)
     save_data(data, datafile)
 
@@ -327,6 +338,7 @@ def sync_with_server(data, datafile, now, settings, child: str) -> dict:
         return settings
     applied_grants_file = data_dir / "applied_grants.json"
     outcome_file = data_dir / "settings_change_outcome.json"  # of the last change delivered
+    unsent_events_file = data_dir / "events_unsent.json"
 
     now_str = now.strftime(TIMESTAMP_FORMAT)
     status = remote_sync.DailyStatus(
@@ -338,25 +350,29 @@ def sync_with_server(data, datafile, now, settings, child: str) -> dict:
         last_tick=data["last_tick"],
         settings=settings,
         settings_change_outcome=remote_sync.load_settings_change_outcome(outcome_file),
+        event_log=remote_sync.load_unsent_events(unsent_events_file),
     )
     applied_grant_ids = remote_sync.load_applied_grant_ids(applied_grants_file)
     try:
         answer = remote_sync.send_status(status, applied_grant_ids, server_url, token)
     except Exception:
         return settings  # offline is the normal case, not a crash
+    # The server has them; what the answer below logs goes with the next sync.
+    if status.event_log:
+        remote_sync.save_unsent_events([], unsent_events_file)
 
     # The server keeps sending a grant until it hears the id back, so applying
     # first and recording afterwards can repeat a grant, never lose one.
     for grant in answer.pending_grants:
         data["granted_sec"] += grant.seconds
-        data["event_log"].append(f"server grant {grant.seconds} sec id {grant.id} {now_str}")
+        log_event(data, f"server grant {grant.seconds} sec id {grant.id} {now_str}", datafile)
         os_tooling.notify(extra_time_message(grant.seconds), child)
     change = answer.settings_change
     if change is not None:
         in_force = save_settings(change.settings, data_dir / "settings.json")
         taken = all(in_force.get(name) == value for name, value in change.settings.items())
         verdict = "taken" if taken else "refused"
-        data["event_log"].append(f"server settings {verdict} {change.settings} {now_str}")
+        log_event(data, f"server settings {verdict} {change.settings} {now_str}", datafile)
         remote_sync.save_settings_change_outcome(change.id, taken, outcome_file)
         settings = in_force
     if answer.pending_grants or change is not None:
@@ -378,7 +394,7 @@ def ensure_datafile(datafile, now, settings):
     if carryover > 0:
         data["carryover_sec"] = carryover
         now_str = now.strftime(TIMESTAMP_FORMAT)
-        data["event_log"].append(f"carryover {carryover} sec from previous day {now_str}")
+        log_event(data, f"carryover {carryover} sec from previous day {now_str}", datafile)
     save_data(data, datafile)
     return data
 
@@ -432,7 +448,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     night = reason == "Night time"
     write_remaining_time_file("night" if night else 0, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify("Night time ⏾" if night else "0 min ⏳", child)
-    data["event_log"].append(f"{reason} {now.strftime(TIMESTAMP_FORMAT)}")
+    log_event(data, f"{reason} {now.strftime(TIMESTAMP_FORMAT)}", datafile)
     save_data(data, datafile)
     # without this the page keeps stale numbers, and a grant that caused this
     # shutdown stays pending until the next boot
@@ -446,7 +462,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
         other = os_tooling.another_user_at_screen(child)
         if other:
             os_tooling.abort_shutdown()
-            data["event_log"].append(f"shutdown called off, {other} at screen {now.strftime(TIMESTAMP_FORMAT)}")
+            log_event(data, f"shutdown called off, {other} at screen {now.strftime(TIMESTAMP_FORMAT)}", datafile)
             save_data(data, datafile)
             return
         redeem_code(data, datafile, now, child, secret)
@@ -455,7 +471,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
         no_night_date = now.date() if data["no_night"] else None
         if remaining > 0 and not is_night_time(now, settings, no_night_date):
             os_tooling.abort_shutdown()
-            data["event_log"].append(f"shutdown called off {now.strftime(TIMESTAMP_FORMAT)}")
+            log_event(data, f"shutdown called off {now.strftime(TIMESTAMP_FORMAT)}", datafile)
             save_data(data, datafile)
             write_remaining_time_file(remaining, SHARED_DIR / child / "remaining_time.txt")
             return
@@ -463,7 +479,7 @@ def shut_down_unless_called_off(reason, data, datafile, now, settings, child: st
     # and ended on a new day: that day must not start with a shutdown
     if datetime.datetime.now().date() != now.date():
         os_tooling.abort_shutdown()  # windows resumes its countdown too
-        data["event_log"].append(f"shutdown called off, new day {now.strftime(TIMESTAMP_FORMAT)}")
+        log_event(data, f"shutdown called off, new day {now.strftime(TIMESTAMP_FORMAT)}", datafile)
         save_data(data, datafile)
         return
     os_tooling.shutdown(0)  # blocks until the machine is down
@@ -501,7 +517,7 @@ def tick(now, child: str, secret: bytes):
     if is_night_time(soon, settings, no_night_date) and not warned:
         # The child sees a moon, not a word, so the message needs no language
         os_tooling.notify(f"{NIGHT_WARNING_SECONDS // 60} min ⏾", child)
-        data["event_log"].append(f"{warning} {now_str}")  # once a day: the log remembers
+        log_event(data, f"{warning} {now_str}", datafile)  # once a day: the log remembers
 
     data["time_spent_sec"] += seconds_to_charge(data, now)
     data["ticks"].append(now.strftime(TICK_TIME_FORMAT))

@@ -32,6 +32,7 @@ def files(tmp_path, monkeypatch):
         "outcome": data_dir / "settings_change_outcome.json",
         "settings": data_dir / "settings.json",
         "datafile": data_dir / "2026-09-14.json",
+        "unsent_events": data_dir / "events_unsent.json",
     }
     paths["server_url"].write_text("https://screentime.example.com\n", encoding="utf-8")
     paths["token"].write_text("child-token-123\n", encoding="utf-8")
@@ -100,6 +101,7 @@ def test_a_server_that_fails_leaves_everything_as_it_was(files, sync, notificati
     assert notifications == []
     assert not files["datafile"].exists()
     assert not files["outcome"].exists()
+    assert not files["unsent_events"].exists()
     # the unacknowledged grant is kept for the next attempt
     assert remote_sync.load_applied_grant_ids(files["applied_grants"]) == [4]
 
@@ -139,6 +141,53 @@ def test_with_nothing_pending_no_file_is_written(files, sync):
     assert not files["datafile"].exists()
     assert not files["applied_grants"].exists()
     assert not files["outcome"].exists()
+    assert not files["unsent_events"].exists()
+
+
+# --- the event log ---------------------------------------------------------
+
+
+def test_an_event_goes_into_the_day_log_and_the_outbox(files):
+    data = day_data()
+    monitor.log_event(data, "one", files["datafile"])
+    monitor.log_event(data, "two", files["datafile"])
+    assert data["event_log"] == ["one", "two"]
+    assert saved(files["unsent_events"]) == ["one", "two"]
+
+
+def test_the_outbox_keeps_the_last_entries_only(files, monkeypatch):
+    monkeypatch.setattr(monitor, "UNSENT_EVENTS_KEPT", 2)
+    data = day_data()
+    for text in ["one", "two", "three"]:
+        monitor.log_event(data, text, files["datafile"])
+    assert data["event_log"] == ["one", "two", "three"]
+    assert saved(files["unsent_events"]) == ["two", "three"]
+
+
+def test_the_outbox_goes_with_the_sync_and_is_emptied_by_the_answer(files, sync):
+    remote_sync.save_unsent_events(["one", "two"], files["unsent_events"])
+    run(files)
+    assert sync.status.event_log == ["one", "two"]
+    assert saved(files["unsent_events"]) == []
+
+
+def test_events_a_failed_sync_did_not_deliver_go_with_the_next(files, sync):
+    remote_sync.save_unsent_events(["one"], files["unsent_events"])
+    sync.error = OSError("offline")
+    run(files)
+    assert saved(files["unsent_events"]) == ["one"]
+    sync.error = None
+    run(files)
+    assert sync.status.event_log == ["one"]
+
+
+def test_an_event_the_answer_adds_waits_for_the_next_sync(files, sync, notifications):
+    sync.answer = SyncAnswer(pending_grants=[Grant(id=5, seconds=600)], settings_change=None)
+    _, data = run(files)
+    assert sync.status.event_log == []
+    assert saved(files["unsent_events"]) == data["event_log"]
+    run(files, data=data)
+    assert sync.status.event_log == ["server grant 600 sec id 5 2026-09-14 08:00:00"]
 
 
 # --- grants ----------------------------------------------------------------

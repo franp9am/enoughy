@@ -7,7 +7,7 @@ machine down whether the server answers or not.
 
 import json
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,6 +28,8 @@ class DailyStatus:
     settings: dict  # in force
     # {"id": <change id>, "taken": <bool>} for the last change the server delivered
     settings_change_outcome: Optional[dict] = None
+    # event log entries the server has not had yet, for its journal
+    event_log: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -90,6 +92,19 @@ def load_settings_change_outcome(outcome_file: Path) -> Optional[dict]:
 
 def save_settings_change_outcome(change_id: int, taken: bool, outcome_file: Path) -> None:
     write_atomically(outcome_file, json.dumps({"id": change_id, "taken": taken}))
+
+
+def load_unsent_events(unsent_events_file: Path) -> List[str]:
+    """Event log entries written since the last sync the server answered."""
+    try:
+        with open(unsent_events_file, "r", encoding="utf-8") as f:
+            return [str(entry) for entry in json.load(f)]
+    except Exception:
+        return []
+
+
+def save_unsent_events(entries: List[str], unsent_events_file: Path) -> None:
+    write_atomically(unsent_events_file, json.dumps(entries))
 
 
 def send_status(

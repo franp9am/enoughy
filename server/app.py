@@ -45,9 +45,11 @@ LOGIN_FIRST_HOST = "marwin.pfranek.cz"
 
 # What the server prints goes to the journal under systemd, read with
 # `journalctl -u enoughy`; the journal adds the time. Only what is rare and
-# worth a look is logged here: a login, a child set up, a change answered.
-# Requests are uvicorn's lines, a sync is routine, and what a child did is
-# nobody's business.
+# worth a look is logged here: a login, a child set up, a change answered,
+# and the entries of a monitor's event log as they arrive. Those are about
+# the terms (grants, codes, settings, shutdowns), never about what the child
+# did, which is nobody's business. Requests are uvicorn's lines, and a sync
+# is routine.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
 
@@ -70,6 +72,8 @@ class SyncRequest(BaseModel):
     # of the last change delivered to the child; None before any
     settings_change_outcome: SettingsChangeOutcome | None = None
     monitor_version: str | None = None
+    # the child's event log entries since the last sync; none from an old monitor
+    event_log: list[str] = []
 
 
 class SetupRequest(BaseModel):
@@ -190,6 +194,11 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
                     id=wanted["id"], settings=json.loads(wanted["settings"])
                 )
     connection.close()
+    # The event log has no acknowledgement field: this answer is it. The monitor
+    # drops the entries only when the answer arrives, and sends them again
+    # after any error.
+    for entry in sync_request.event_log:
+        log.info(f"child {child_id} event: {entry}")
     return SyncResponse(
         pending_grants=[PendingGrant(id=row["id"], seconds=row["seconds"]) for row in pending],
         settings_change=change_to_send,
