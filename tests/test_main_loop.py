@@ -47,7 +47,7 @@ class Machine:
     def __init__(self):
         self.logged_in = True
         self.other_at_screen = None  # who else sits at the unlocked screen
-        self.clock = at(12)  # the real clock, which a tick's `now` otherwise stands in for
+        self.clock = at(12)  # the real clock; a tick sets it to its `now`, a test moves it on
         self.notifications = []  # what the child saw on screen
         self.shutdowns = []  # the delay of every shutdown ordered, "called off" for an abort
 
@@ -62,6 +62,13 @@ def machine(monkeypatch):
     monkeypatch.setattr(os_tooling, "order_shutdown", lambda delay: m.shutdowns.append(delay))
     monkeypatch.setattr(os_tooling, "abort_shutdown", lambda: m.shutdowns.append("called off"))
     monkeypatch.setattr(time, "sleep", lambda seconds: None)  # the grace period passes at once
+    real_tick = monitor.tick
+
+    def tick_on_the_clock(now, child, secret):
+        m.clock = now
+        real_tick(now, child, secret)
+
+    monkeypatch.setattr(monitor, "tick", tick_on_the_clock)
 
     class Clock(datetime.datetime):
         @classmethod
@@ -173,7 +180,7 @@ def test_time_up_orders_the_shutdown(machine, files):
     assert remaining_shown(files) == 0
     data = today_data(files)
     assert data["time_spent_sec"] == HOUR
-    assert data["event_log"] == ["time up 2026-09-14 08:00:00"]
+    assert data["event_log"] == ["time up 2026-09-14 08:00:00", "shutdown 2026-09-14 08:00:00"]
 
 
 def test_night_time_orders_the_shutdown(machine, files):
@@ -334,11 +341,30 @@ def test_a_machine_asleep_through_the_grace_period_wakes_into_a_new_day_and_is_n
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
     assert today_data(files)["event_log"] == [
         "time up 2026-09-14 20:00:00",
-        "shutdown called off, new day 2026-09-14 20:00:00",
+        "shutdown called off, new day 2026-09-15 07:00:00",
     ]
     tick(at(7, 1, TOMORROW))  # the next tick, which gives the new day its time
     assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
     assert remaining_shown(files) == HOUR - CHECK_INTERVAL_SECONDS
+
+
+def test_a_machine_asleep_through_the_grace_period_wakes_after_the_night_and_is_not_shut_down(
+    machine, files, monkeypatch
+):
+    """Switched on before six, put to sleep in the countdown, woken at eight:
+    the night is over, the day is the same."""
+    write_day(files, spent=600)
+    # the countdown's first ten-second sleep is the lid closed until eight
+    monkeypatch.setattr(time, "sleep", lambda seconds: setattr(machine, "clock", at(8, 0)))
+
+    tick(at(5, 30))
+
+    assert machine.shutdowns == [SHUTDOWN_DELAY_SECONDS, "called off"]
+    assert today_data(files)["event_log"] == [
+        "Night time 2026-09-14 05:30:00",
+        "shutdown called off 2026-09-14 08:00:00",
+    ]
+    assert remaining_shown(files) == HOUR - 600
 
 
 def test_a_redeem_code_too_small_for_the_debt_does_not_call_the_shutdown_off(machine, files, monkeypatch):

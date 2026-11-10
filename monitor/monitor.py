@@ -432,56 +432,51 @@ def startup(now, child: str):
     )
 
 
-def shut_down_unless_called_off(reason, data, datafile, now, settings, child: str, secret: bytes):
-    """Tell the child, record why, get the last word to the server, then the
-    grace period: a code or a server change that leaves some time and no night
-    calls the shutdown off, and so does another user at the screen, whose
-    machine it is now. Nobody at the screen (the child logged off or locked
-    it) lets the shutdown through. The shutdown is ordered only after the first
-    three steps, so a failure there costs this tick and the next one retries.
-    The whole period belongs to the tick it started in, so `now` stays that of
-    the tick and nothing is charged. Only a new day on the real clock is looked
-    at: sleep or hibernation froze the machine in the period, and the child's
-    power-on resumed it instead of booting, so the shutdown would come for a
-    day that is over. Called off, the next tick opens today's file."""
+def shut_down_unless_called_off(reason, data, datafile, tick_time, settings, child: str, secret: bytes):
+    """Order the shutdown, then a grace period in which extra time, the end of
+    the night or another user at the screen calls it off."""
     # the widget tells the child which code would help: extra time, or no night
     night = reason == "Night time"
     write_remaining_time_file("night" if night else 0, SHARED_DIR / child / "remaining_time.txt")
     os_tooling.notify("Night time ⏾" if night else "0 min ⏳", child)
-    log_event(data, f"{reason} {now.strftime(TIMESTAMP_FORMAT)}", datafile)
+    log_event(data, f"{reason} {tick_time.strftime(TIMESTAMP_FORMAT)}", datafile)
     save_data(data, datafile)
     # without this the page keeps stale numbers, and a grant that caused this
     # shutdown stays pending until the next boot
-    sync_with_server(data, datafile, now, settings, child)
+    sync_with_server(data, datafile, tick_time, settings, child)
 
     os_tooling.order_shutdown(SHUTDOWN_DELAY_SECONDS)
     for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS):
         time.sleep(GRACE_CHECK_SECONDS)
-        if datetime.datetime.now().date() != now.date():
+        clock = datetime.datetime.now()  # far past `tick_time` after a sleep; the journal gets it
+        if clock.date() != tick_time.date():
             break
         other = os_tooling.another_user_at_screen(child)
         if other:
             os_tooling.abort_shutdown()
-            log_event(data, f"shutdown called off, {other} at screen {now.strftime(TIMESTAMP_FORMAT)}", datafile)
+            log_event(data, f"shutdown called off, {other} at screen {clock.strftime(TIMESTAMP_FORMAT)}", datafile)
             save_data(data, datafile)
             return
-        redeem_code(data, datafile, now, child, secret)
-        settings = sync_with_server(data, datafile, now, settings, child)
-        remaining = remaining_seconds(data, settings, now.date())
-        no_night_date = now.date() if data["no_night"] else None
-        if remaining > 0 and not is_night_time(now, settings, no_night_date):
+        redeem_code(data, datafile, tick_time, child, secret)
+        settings = sync_with_server(data, datafile, tick_time, settings, child)
+        remaining = remaining_seconds(data, settings, tick_time.date())
+        no_night_date = tick_time.date() if data["no_night"] else None
+        if remaining > 0 and not is_night_time(clock, settings, no_night_date):
             os_tooling.abort_shutdown()
-            log_event(data, f"shutdown called off {now.strftime(TIMESTAMP_FORMAT)}", datafile)
+            log_event(data, f"shutdown called off {clock.strftime(TIMESTAMP_FORMAT)}", datafile)
             save_data(data, datafile)
             write_remaining_time_file(remaining, SHARED_DIR / child / "remaining_time.txt")
             return
     # the break above, and a sleep that began during the last redeem or sync
     # and ended on a new day: that day must not start with a shutdown
-    if datetime.datetime.now().date() != now.date():
+    clock = datetime.datetime.now()
+    if clock.date() != tick_time.date():
         os_tooling.abort_shutdown()  # windows resumes its countdown too
-        log_event(data, f"shutdown called off, new day {now.strftime(TIMESTAMP_FORMAT)}", datafile)
+        log_event(data, f"shutdown called off, new day {clock.strftime(TIMESTAMP_FORMAT)}", datafile)
         save_data(data, datafile)
         return
+    log_event(data, f"shutdown {clock.strftime(TIMESTAMP_FORMAT)}", datafile)
+    save_data(data, datafile)
     os_tooling.shutdown(0)  # blocks until the machine is down
 
 
