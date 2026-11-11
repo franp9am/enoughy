@@ -190,6 +190,42 @@ def test_an_event_the_answer_adds_waits_for_the_next_sync(files, sync, notificat
     assert sync.status.event_log == ["server grant 600 sec id 5 2026-09-14 08:00:00"]
 
 
+# --- the crash log ---------------------------------------------------------
+
+
+def crash(child=None):
+    try:
+        raise ValueError("odd data")
+    except ValueError:
+        monitor.log_unexpected_error(child)
+
+
+def test_a_crash_goes_into_the_crash_log_and_the_childs_outbox(files, tmp_path, monkeypatch):
+    monkeypatch.setattr(monitor, "CRASH_LOG_FILE", tmp_path / "crash.log")
+    crash(KID)
+    assert "ValueError: odd data" in (tmp_path / "crash.log").read_text(encoding="utf-8")
+    [entry] = saved(files["unsent_events"])
+    assert entry.startswith("crash ") and "ValueError: odd data" in entry
+
+
+def test_a_crash_before_any_child_is_known_stays_on_the_machine(files, tmp_path, monkeypatch):
+    monkeypatch.setattr(monitor, "CRASH_LOG_FILE", tmp_path / "crash.log")
+    crash()
+    assert "ValueError: odd data" in (tmp_path / "crash.log").read_text(encoding="utf-8")
+    assert not files["unsent_events"].exists()
+
+
+def test_a_full_crash_log_is_set_aside_and_a_new_one_started(files, tmp_path, monkeypatch):
+    log, old = tmp_path / "crash.log", tmp_path / "crash.log.old"
+    monkeypatch.setattr(monitor, "CRASH_LOG_FILE", log)
+    monkeypatch.setattr(monitor, "MAX_CRASH_LOG_BYTES", 10)
+    old.write_text("the one before", encoding="utf-8")
+    log.write_text("more than ten bytes", encoding="utf-8")
+    crash()
+    assert old.read_text(encoding="utf-8") == "more than ten bytes"
+    assert log.read_text(encoding="utf-8").count("ValueError: odd data") == 1
+
+
 # --- grants ----------------------------------------------------------------
 
 

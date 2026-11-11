@@ -28,7 +28,7 @@ class DailyStatus:
     settings: dict  # in force
     # {"id": <change id>, "taken": <bool>} for the last change the server delivered
     settings_change_outcome: Optional[dict] = None
-    # event log entries the server has not had yet, for its journal
+    # event log entries and crashes the server has not had yet, for its journal
     event_log: List[str] = field(default_factory=list)
 
 
@@ -95,7 +95,8 @@ def save_settings_change_outcome(change_id: int, taken: bool, outcome_file: Path
 
 
 def load_unsent_events(unsent_events_file: Path) -> List[str]:
-    """Event log entries written since the last sync the server answered."""
+    """What was written since the last sync the server answered: the day's
+    event log entries, plus the crashes, which have no place in the day's data."""
     try:
         with open(unsent_events_file, "r", encoding="utf-8") as f:
             return [str(entry) for entry in json.load(f)]

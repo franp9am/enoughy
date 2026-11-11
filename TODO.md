@@ -1,19 +1,5 @@
 # TODO
 
-First is in order and serves one goal. Later is roughly ordered; a new item
-goes there unless it hurts a current user or blocks the goal.
-
-## First
-
-The goal: a stranger registers and installs without the maintainer touching
-the database.
-
-* monitor: send a new `crash.log` entry with the next sync, once, so the
-  server's journal has it without machine access; cap the crash log at 1 MB
-  (rename to `.old`) and read only its tail.
-
-## Later
-
 * monitor: a window whose night starts before its day starts, `["5:00", "1:00"]`,
   is a day that runs past midnight; the daily limit still resets at 0:00. Two
   edits, `is_night_time` and the hour-apart rule; the name stays, an old monitor

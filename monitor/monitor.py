@@ -15,6 +15,7 @@ from config import (
     CRASH_LOG_FILE,
     DATA_DIR,
     GRACE_CHECK_SECONDS,
+    MAX_CRASH_LOG_BYTES,
     MAX_REDEEM_FILE_BYTES,
     NETWORK_WARMUP_SECONDS,
     NIGHT_WARNING_SECONDS,
@@ -130,7 +131,11 @@ def log_event(data, text, datafile):
     answered sync empties: the server's journal gets every entry, whenever
     the server is reached."""
     data["event_log"].append(text)
-    unsent_events_file = datafile.parent / "events_unsent.json"
+    send_with_next_sync(text, datafile.parent)
+
+
+def send_with_next_sync(text, data_dir):
+    unsent_events_file = data_dir / "events_unsent.json"
     unsent = remote_sync.load_unsent_events(unsent_events_file) + [text]
     remote_sync.save_unsent_events(unsent[-UNSENT_EVENTS_KEPT:], unsent_events_file)
 
@@ -198,12 +203,18 @@ def write_remaining_time_file(remaining, target: Path):
         pass  # not critical
 
 
-def log_unexpected_error():
-    """Append the current traceback to the crash log; never raise itself."""
+def log_unexpected_error(child=None):
+    """Append the current traceback to the crash log, and to the child's
+    outbox so the server's journal has it too; never raise itself."""
     try:
         now_str = datetime.datetime.now().strftime(TIMESTAMP_FORMAT)
+        # a tick that fails every time must not fill the disk: one full log is kept
+        if CRASH_LOG_FILE.exists() and CRASH_LOG_FILE.stat().st_size > MAX_CRASH_LOG_BYTES:
+            CRASH_LOG_FILE.replace(CRASH_LOG_FILE.with_name("crash.log.old"))
         with open(CRASH_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"--- {now_str} ---\n{traceback.format_exc()}\n")
+        if child:
+            send_with_next_sync(f"crash {now_str}\n{traceback.format_exc()}", DATA_DIR / child)
     except Exception:
         pass
 
@@ -540,7 +551,7 @@ def main():
         try:
             startup(datetime.datetime.now(), child)
         except Exception:
-            log_unexpected_error()
+            log_unexpected_error(child)
     # the rest of the delay, waiting for the redeem file to be created
     time.sleep(max(0, STARTUP_DELAY_SECONDS - NETWORK_WARMUP_SECONDS))
 
@@ -552,7 +563,7 @@ def main():
             try:
                 tick(datetime.datetime.now(), child, secrets[child])
             except Exception:
-                log_unexpected_error()
+                log_unexpected_error(child)
         time.sleep(CHECK_INTERVAL_SECONDS)
 
 

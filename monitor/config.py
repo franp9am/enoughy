@@ -11,6 +11,7 @@ MONITOR_VERSION = Path(__file__).with_name("VERSION").read_text(encoding="ascii"
 DATA_DIR = Path(__file__).parent / "data"
 SHARED_DIR = Path(r"C:\ProgramData\EnoughyShared")
 CRASH_LOG_FILE = DATA_DIR / "crash.log"  # the monitor's own, so not under any child
+MAX_CRASH_LOG_BYTES = 1024 * 1024  # past this it becomes crash.log.old, replacing the last one
 
 SYNC_TIMEOUT_SECONDS = 5  # a slow server must not stall the check loop
 
