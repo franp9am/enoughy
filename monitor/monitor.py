@@ -457,7 +457,9 @@ def shut_down_unless_called_off(reason, data, datafile, tick_time, settings, chi
     sync_with_server(data, datafile, tick_time, settings, child)
 
     os_tooling.order_shutdown(SHUTDOWN_DELAY_SECONDS)
-    for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS):
+    # one check fewer than fits: the last would come just after windows has
+    # begun the shutdown, and confirm a code it can no longer call it off for
+    for _ in range(SHUTDOWN_DELAY_SECONDS // GRACE_CHECK_SECONDS - 1):
         time.sleep(GRACE_CHECK_SECONDS)
         clock = datetime.datetime.now()  # far past `tick_time` after a sleep; the journal gets it
         if clock.date() != tick_time.date():
