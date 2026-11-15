@@ -59,15 +59,15 @@ def sign(zip_path: Path, pfx: Path) -> None:
 
 
 def make_release(served_dir: Path, version: str, pfx: Path) -> Path:
-    """The layout release.ps1 builds: flat, with the launcher alongside, which
-    an update must leave where it is."""
+    """The layout release.ps1 builds: flat, with the launcher alongside, here
+    the real one with a line added, since later runs in a test start it."""
     zip_path = served_dir / "enoughy.zip"
     with zipfile.ZipFile(zip_path, "w") as z:
         z.writestr("VERSION", version)
         z.writestr("monitor.py", "from pathlib import Path\nPath(__file__).with_name('started.txt').write_text('new')\n")
         z.writestr("config.py", "# new\n")
         z.writestr("remaining_time_widget.py", "# new widget\n")
-        z.writestr("launcher.ps1", "# new launcher\n")
+        z.writestr("launcher.ps1", (REPO / "monitor" / "launcher.ps1").read_text() + "# new launcher\n")
     sign(zip_path, pfx)
     return zip_path
 
@@ -106,10 +106,11 @@ def server(tmp_path):
 
 
 def run_launcher(machine: Path, url: str) -> dict:
-    """One boot: the launcher with no network wait, against the local server."""
+    """One boot and its first day: the launcher with no network wait, against
+    the local server."""
     subprocess.run(
         ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-         "-File", str(machine / "Enoughy" / "launcher.ps1"), "-Url", url, "-Wait", "0"],
+         "-File", str(machine / "Enoughy" / "launcher.ps1"), "-Url", url, "-Wait", "0", "-Once"],
         capture_output=True, text=True, check=True, timeout=120,
     )
     monitor_dir = machine / "Enoughy"
@@ -119,25 +120,20 @@ def run_launcher(machine: Path, url: str) -> dict:
         "version": (monitor_dir / "VERSION").read_text(),
         "config": (monitor_dir / "config.py").read_text(),
         "widget": (machine / "EnoughyShared" / "remaining_time_widget.py").read_text(),
-        "launcher_kept": (monitor_dir / "launcher.ps1").read_text() == (REPO / "monitor" / "launcher.ps1").read_text(),
+        "launcher_updated": (monitor_dir / "launcher.ps1").read_text().endswith("# new launcher\n"),
         "log": log.read_text() if log.exists() else "",
         "staged": (monitor_dir / "update").exists(),
     }
 
 
-def test_a_newer_release_is_staged_at_one_boot_and_installed_at_the_next(machine, server, keys):
+def test_a_newer_release_is_installed_when_fetched_and_the_monitor_restarted(machine, server, keys):
     make_release(server["dir"], "0.6.0", keys["pfx"])
-    result = run_launcher(machine, server["url"])
-    assert result["started"] == "old"
-    assert result["version"] == "0.5.0"
-    assert result["staged"]
-    assert result["log"] == ""
     result = run_launcher(machine, server["url"])
     assert result["started"] == "new"
     assert result["version"] == "0.6.0"
     assert result["config"] == "# new\n"
     assert result["widget"] == "# new widget\n"
-    assert result["launcher_kept"]  # only running the setup again changes it
+    assert result["launcher_updated"]
     assert "updated 0.5.0 to 0.6.0" in result["log"]
 
 
@@ -173,17 +169,17 @@ def test_manual_mode_never_fetches(machine, server, keys):
     assert not result["staged"]
 
 
-def test_manual_mode_still_installs_what_is_already_staged(machine, server, keys):
-    """Switching to manual stops the download, not the copy: the release staged
-    at the last auto boot still lands, and no later one follows it."""
-    make_release(server["dir"], "0.6.0", keys["pfx"])
-    run_launcher(machine, server["url"])   # auto: staged, not yet installed
+def test_a_release_left_staged_is_installed_before_the_monitor_starts_even_in_manual_mode(machine, server, keys):
+    """Manual stops the download, not the copy: what an install that failed
+    left staged still lands, and no later release follows it."""
+    with zipfile.ZipFile(make_release(server["dir"], "0.6.0", keys["pfx"])) as z:
+        z.extractall(machine / "Enoughy" / "update")
     (machine / "Enoughy" / "UPDATE_MODE").write_text("manual")
     result = run_launcher(machine, server["url"])
+    assert result["started"] == "new"
     assert result["version"] == "0.6.0"
     assert "updated 0.5.0 to 0.6.0" in result["log"]
     make_release(server["dir"], "0.7.0", keys["pfx"])
-    result = run_launcher(machine, server["url"])
     result = run_launcher(machine, server["url"])
     assert result["version"] == "0.6.0"   # 0.7.0 was never fetched
 
@@ -207,8 +203,7 @@ def test_the_monitor_starts_even_when_the_staged_folder_cannot_be_deleted(machin
         result = run_launcher(machine, server["url"])
     assert result["started"] == "old"
     assert "launcher" in result["log"]
-    result = run_launcher(machine, server["url"])  # the handle is gone: staged now, installed a boot later
-    result = run_launcher(machine, server["url"])
+    result = run_launcher(machine, server["url"])  # the handle is gone
     assert result["version"] == "0.6.0"
 
 
@@ -217,7 +212,5 @@ def test_a_half_unpacked_release_is_never_installed_and_does_not_block_the_next(
     half = machine / "Enoughy" / "update.new"  # the power went while unpacking
     half.mkdir(parents=True)
     (half / "VERSION").write_text("0.9.0")
-    result = run_launcher(machine, server["url"])
-    assert result["version"] == "0.5.0"
     result = run_launcher(machine, server["url"])
     assert result["version"] == "0.6.0"

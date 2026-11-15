@@ -81,7 +81,7 @@ old report and sends back only what that version understands.
 
 ## Updates and old installs
 
-`UPDATE_MODE` in `C:\ProgramData\Enoughy` is `auto`, which fetches releases at boot and
+`UPDATE_MODE` in `C:\ProgramData\Enoughy` is `auto`, which fetches releases once a day and
 is the default with a server token, or `manual`, the default offline. A reinstall keeps
 it.
 
@@ -102,7 +102,7 @@ widget's Tk part.
 ## Releasing
 
 A release is a signed zip of what a child's machine runs, which every installed
-launcher fetches at boot, and the setup exe for a fresh install.
+launcher fetches once a day, and the setup exe for a fresh install.
 
 Needs: the private key at `~\.enoughy\release_key.pfx`, `gh` logged in, `iscc` on the
 PATH, SimplySign Desktop connected, a clean tree on `main`, pushed.
@@ -114,8 +114,10 @@ From a PowerShell in the repo folder:
 It writes the version into `monitor/VERSION`, the only place it is written, and
 commits and pushes that. `-NoSign` leaves the setup exe unsigned.
 
-An update leaves the launcher and Python alone; only running the setup again changes
-them.
+An update replaces the launcher too, which runs from the next boot. Python and the
+scheduled tasks it leaves alone; only running the setup again changes them. Launchers
+up to 1.3.2 fetch only at boot and never replace themselves, so those machines need
+the setup once more.
 
 Never tag by hand: a tag without a release behind it is invisible to the launcher.
 A release is never moved; a fix is a new version. To take one back before anyone

@@ -630,7 +630,7 @@ begin
   if Token <> '' then SaveStringToFile(ChildDataDir + '\child_token.txt', Token, False);
   if NoSync.Checked then DeleteFile(ChildDataDir + '\child_token.txt');   // a reinstall that gives up its account
   SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
-  // `auto` fetches releases at boot, `manual` stays as installed; the default is
+  // `auto` fetches releases once a day, `manual` stays as installed; the default is
   // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
   if not FileExists(ExpandConstant('{app}\UPDATE_MODE')) then begin
     if FileExists(ChildDataDir + '\child_token.txt') then UpdateMode := 'auto' else UpdateMode := 'manual';

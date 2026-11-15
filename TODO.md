@@ -52,12 +52,12 @@
   button (too old), true shows "Tonight: no night" whatever lifted it, a code
   included. Unconfirmed, it sits in "Waiting for the next sync"; past its day
   it drops out quietly. Monitor release and server deploy go together.
-* launcher: fetch updates once a day, not once per boot: with Fast Startup
-  a Start menu shutdown is a hibernate and the boot task does not fire. No
-  service needed, the task's process survives: instead of waiting on the
-  monitor, loop, and when a newer release is staged install it and restart
-  the monitor, both while it is idle. Reaches installed machines by reinstall,
-  the launcher is not in the update set.
+* launcher: start the monitor again when it has died, one line in the daily
+  loop. Without it a dead monitor means no limits until the next real boot,
+  which Fast Startup makes rare. To think through first: a monitor that fails
+  at every start is restarted every 10 minutes, each time into crash.log and
+  the journal; and after a reinstall without a reboot the old launcher starts
+  the monitor that setup closed, maybe while setup still copies.
 
 ## Someday / maybe
 

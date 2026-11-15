@@ -1,14 +1,16 @@
-# launcher.ps1 -- the boot task: install a release staged at an earlier boot,
-# start the monitor, then fetch the latest release and stage it for the next
-# boot. A failure is logged and the monitor runs as it is.
+# launcher.ps1 -- the boot task: start the monitor, then once a day fetch the
+# latest release and, when it is newer, install it and restart the monitor.
+# A failure is logged and the monitor runs as it is.
 #
-# An update takes the .py files, the widget and VERSION out of the zip; this
-# file, the installer and Python change only with a reinstall. Next to it:
-# release_key.cer, UPDATE_MODE (`auto` or `manual`) and VERSION.
-# -Url and -Wait are for the test, which serves a release locally.
+# An update takes the .py files, the widget, VERSION and this file out of the
+# zip; the new launcher runs from the next boot. The installer and Python
+# change only with a reinstall. Next to it: release_key.cer, UPDATE_MODE
+# (`auto` or `manual`) and VERSION.
+# -Url, -Wait and -Once are for the test, which serves a release locally.
 param(
     [string]$Url = "https://github.com/franp9am/enoughy/releases/latest/download",
-    [int]$Wait = 60   # at boot the network comes up after this task starts
+    [int]$Wait = 60,   # at boot the network comes up after this task starts
+    [switch]$Once      # one day's fetch, then wait for the monitor
 )
 $ErrorActionPreference = "Stop"
 
@@ -26,17 +28,18 @@ function Install-Staged {
     $current = if (Test-Path "$MonitorDir\VERSION") { [version](Get-Content "$MonitorDir\VERSION") } else { [version]"0.0.0" }
     if ($new -le $current) { return }   # never downgrades: a rollback is a new version
     Copy-Item "$Staged\remaining_time_widget.py" $SharedDir -Force
-    Copy-Item "$Staged\*.py" $MonitorDir -Force -Exclude remaining_time_widget.py
+    Copy-Item "$Staged\*.py", "$Staged\launcher.ps1" $MonitorDir -Force -Exclude remaining_time_widget.py
     Remove-Item "$MonitorDir\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue   # stale bytecode
-    Copy-Item "$Staged\VERSION" $MonitorDir -Force   # last: until it lands, the next boot redoes the copy
+    Copy-Item "$Staged\VERSION" $MonitorDir -Force   # last: until it lands, the next day or boot redoes the copy
     Log "updated $current to $new"
+    return $true
 }
 
 function Fetch {
     $zip = "$MonitorDir\enoughy.zip"
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $ProgressPreference = "SilentlyContinue"   # the progress bar makes Invoke-WebRequest many times slower
-    Start-Sleep $Wait   # one try; a miss costs one boot
+    Start-Sleep $Wait   # one try; a miss costs one day
     Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri "$Url/enoughy.zip" -OutFile $zip
     Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri "$Url/enoughy.zip.sig" -OutFile "$zip.sig"
 
@@ -55,10 +58,27 @@ function Fetch {
     Remove-Item $zip, "$zip.sig"
 }
 
-# Nothing before the monitor's start may end the script.
-try { if (Test-Path $Staged) { Install-Staged } } catch { Log $_ }
-$monitor = Start-Process $python "`"$MonitorDir\monitor.py`"" -WorkingDirectory $MonitorDir -NoNewWindow -PassThru
-if ((Get-Content "$MonitorDir\UPDATE_MODE" -ErrorAction SilentlyContinue) -ne "manual") {
-    try { Fetch } catch { Log $_ }
+function Start-Monitor {
+    return Start-Process $python "`"$MonitorDir\monitor.py`"" -WorkingDirectory $MonitorDir -NoNewWindow -PassThru   # -PassThru: the process
 }
-$monitor.WaitForExit()   # so the task counts as running for as long as the monitor does
+
+# Nothing before the monitor's start may end the script.
+try { if (Test-Path $Staged) { $null = Install-Staged } } catch { Log $_ }   # what a failed install left
+$monitor = Start-Monitor
+$fetched = $null
+while ($true) {   # forever: a monitor that died is started again by the next release
+    $today = (Get-Date).Date
+    if ($fetched -ne $today -and (Get-Content "$MonitorDir\UPDATE_MODE" -ErrorAction SilentlyContinue) -ne "manual") {
+        $fetched = $today
+        try {
+            Fetch
+            if (Install-Staged) {
+                $monitor | Stop-Process -Force -ErrorAction SilentlyContinue   # it may be gone already
+                $monitor = Start-Monitor
+            }
+        } catch { Log $_ }
+    }
+    if ($Once) { break }
+    Start-Sleep 600   # a look at the date, not one long sleep: the machine sleeps too
+}
+$monitor.WaitForExit()   # only the test's -Once gets here
