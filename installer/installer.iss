@@ -4,8 +4,9 @@
 ;
 ; It asks which account is the child's and for the parent's server, unpacks its
 ; own Python (bundled from installer\build\python, which
-; build-python.ps1 makes), copies the monitor into C:\ProgramData\Enoughy and
-; locks it, the widget and the "Extra time" dialog into the shared folder, with
+; build-python.ps1 makes), copies the launcher into C:\ProgramData\Enoughy and
+; the monitor into a release folder there, v<version>, as update.ps1 makes them,
+; locks that all, the widget and the "Extra time" dialog into the shared folder, with
 ; one shortcut to the dialog in the shared Start menu, and for each child
 ; registers a widget task at logon, next to the monitor task at boot. Running it
 ; again and picking another account adds that child next to the ones there.
@@ -32,6 +33,8 @@
 #expr FileClose(DefaultsHandle)
 
 #define MonitorDir "{commonappdata}\Enoughy"
+; What a release brings; the launcher runs the highest of these folders.
+#define ReleaseDir "{app}\v" + Version
 #define SharedDir  "{commonappdata}\EnoughyShared"
 #define PythonDir  "{commonappdata}\EnoughyPython"
 
@@ -59,14 +62,15 @@ AlwaysRestart=yes
 SetupLogging=yes
 
 [Files]
-Source: "..\monitor\monitor.py";      DestDir: "{app}"
-Source: "..\monitor\os_tooling.py";   DestDir: "{app}"
-Source: "..\monitor\remote_sync.py";  DestDir: "{app}"
-Source: "..\monitor\config.py";       DestDir: "{app}"
-Source: "..\monitor\settings.py";     DestDir: "{app}"
-Source: "..\monitor\VERSION";         DestDir: "{app}"
 Source: "..\monitor\launcher.ps1";    DestDir: "{app}"
-Source: "..\monitor\release_key.cer"; DestDir: "{app}"
+Source: "..\monitor\monitor.py";      DestDir: "{#ReleaseDir}"
+Source: "..\monitor\os_tooling.py";   DestDir: "{#ReleaseDir}"
+Source: "..\monitor\remote_sync.py";  DestDir: "{#ReleaseDir}"
+Source: "..\monitor\config.py";       DestDir: "{#ReleaseDir}"
+Source: "..\monitor\settings.py";     DestDir: "{#ReleaseDir}"
+Source: "..\monitor\VERSION";         DestDir: "{#ReleaseDir}"
+Source: "..\monitor\update.ps1";      DestDir: "{#ReleaseDir}"
+Source: "..\monitor\release_key.cer"; DestDir: "{#ReleaseDir}"
 Source: "..\widget\remaining_time_widget.py"; DestDir: "{#SharedDir}"
 Source: "..\widget\enter_code.py";            DestDir: "{#SharedDir}"
 ; Only run at the end of the install, for the QR code of the codes page; never installed.
@@ -89,8 +93,8 @@ Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Param
 Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 
 [UninstallDelete]
-; The whole monitor folder: besides data, what the launcher put there (UPDATE_MODE,
-; a staged release, __pycache__). The accounts stay as the install left them.
+; The whole monitor folder: besides data, what came later (UPDATE_MODE, FETCHED,
+; the releases updates brought, one half unpacked, __pycache__). The accounts stay as the install left them.
 Type: filesandordirs; Name: "{app}"
 Type: filesandordirs; Name: "{#SharedDir}"
 Type: filesandordirs; Name: "{#PythonDir}"
@@ -642,7 +646,7 @@ end;
 // through the settings.py just installed.
 procedure WriteBasics;
 begin
-  Run(Python, ExpandConstant('"{app}\settings.py" set "') + ChildDataDir + '\settings.json" "' +
+  Run(Python, ExpandConstant('"{#ReleaseDir}\settings.py" set "') + ChildDataDir + '\settings.json" "' +
     Trim(SettingsPage.Values[0]) + '" "' + Trim(SettingsPage.Values[1]) + '" "' + Trim(SettingsPage.Values[2]) + '"',
     'Writing the settings');
 end;
@@ -739,7 +743,7 @@ begin
   // and the dialog, nothing trusted; each child's folder in it is locked below.
   At('opening the shared folder');
   Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
-  // Task 1: the launcher as SYSTEM at every boot; it starts monitor.py and installs releases.
+  // Task 1: the launcher as SYSTEM at every boot; it keeps monitor.py running and runs update.ps1.
   At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
     ExpandConstant('-NoProfile -ExecutionPolicy Bypass -File "{app}\launcher.ps1"'), ExpandConstant('{app}'));

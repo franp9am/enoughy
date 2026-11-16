@@ -1,5 +1,16 @@
 # TODO
 
+* installer and updater: the widget and the dialog into the release folder,
+  before the release folders are released; it needs the setup.
+
+      Enoughy\          everyone reads, admins and SYSTEM write
+        launcher.ps1
+        starter         the widget task and the shortcut run it
+        v1.5.0\         the whole zip: monitor, widget, dialog
+        data\           locked
+      EnoughyShared\    the per-child files only, no code
+
+  To decide then: all but `data\` to `Program Files\enoughy`, Python with it.
 * monitor: a window whose night starts before its day starts, `["5:00", "1:00"]`,
   is a day that runs past midnight; the daily limit still resets at 0:00. Two
   edits, `is_night_time` and the hour-apart rule; the name stays, an old monitor
@@ -52,12 +63,10 @@
   button (too old), true shows "Tonight: no night" whatever lifted it, a code
   included. Unconfirmed, it sits in "Waiting for the next sync"; past its day
   it drops out quietly. Monitor release and server deploy go together.
-* launcher: start the monitor again when it has died, one line in the daily
-  loop. Without it a dead monitor means no limits until the next real boot,
-  which Fast Startup makes rare. To think through first: a monitor that fails
-  at every start is restarted every 10 minutes, each time into crash.log and
-  the journal; and after a reinstall without a reboot the old launcher starts
-  the monitor that setup closed, maybe while setup still copies.
+* launcher: it now starts a dead monitor again within ten minutes, saying
+  nothing. To see on the VM: after a reinstall without a reboot the old
+  launcher starts the monitor that setup closed, maybe while setup still
+  copies. Later, in the monitor: its own fatal error into crash.log.
 
 ## Someday / maybe
 

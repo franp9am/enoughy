@@ -1,84 +1,30 @@
-# launcher.ps1 -- the boot task: start the monitor, then once a day fetch the
-# latest release and, when it is newer, install it and restart the monitor.
-# A failure is logged and the monitor runs as it is.
-#
-# An update takes the .py files, the widget, VERSION and this file out of the
-# zip; the new launcher runs from the next boot. The installer and Python
-# change only with a reinstall. Next to it: release_key.cer, UPDATE_MODE
-# (`auto` or `manual`) and VERSION.
-# -Url, -Wait and -Once are for the test, which serves a release locally.
-param(
-    [string]$Url = "https://github.com/franp9am/enoughy/releases/latest/download",
-    [int]$Wait = 60,   # at boot the network comes up after this task starts
-    [switch]$Once      # one day's fetch, then wait for the monitor
-)
-$ErrorActionPreference = "Stop"
+# launcher.ps1 -- the boot task: keeps the monitor running from the newest release
+# folder, v<version> beside this file, and every ten minutes runs that folder's
+# update.ps1; when that brought a newer folder, it restarts the monitor from it.
+# No release replaces this file. -Every is for the test.
+param([int]$Every = 600)
 
-$MonitorDir = $PSScriptRoot
-$SharedDir  = Join-Path (Split-Path $MonitorDir) "EnoughyShared"
-$python     = Join-Path (Split-Path $MonitorDir) "EnoughyPython\python.exe"
-$Staged     = "$MonitorDir\update"   # inside the locked folder, so only the launcher writes there
+$python = Join-Path (Split-Path $PSScriptRoot) "EnoughyPython\python.exe"
 
-function Log($message) {   # called from catches, so it must not throw
-    try { Add-Content "$MonitorDir\data\crash.log" "--- $(Get-Date -Format s) launcher: $message" } catch { }
-}
-
-function Install-Staged {
-    $new = [version](Get-Content "$Staged\VERSION")
-    $current = if (Test-Path "$MonitorDir\VERSION") { [version](Get-Content "$MonitorDir\VERSION") } else { [version]"0.0.0" }
-    if ($new -le $current) { return }   # never downgrades: a rollback is a new version
-    Copy-Item "$Staged\remaining_time_widget.py" $SharedDir -Force
-    Copy-Item "$Staged\*.py", "$Staged\launcher.ps1" $MonitorDir -Force -Exclude remaining_time_widget.py
-    Remove-Item "$MonitorDir\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue   # stale bytecode
-    Copy-Item "$Staged\VERSION" $MonitorDir -Force   # last: until it lands, the next day or boot redoes the copy
-    Log "updated $current to $new"
-    return $true
-}
-
-function Fetch {
-    $zip = "$MonitorDir\enoughy.zip"
-    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    $ProgressPreference = "SilentlyContinue"   # the progress bar makes Invoke-WebRequest many times slower
-    Start-Sleep $Wait   # one try; a miss costs one day
-    Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri "$Url/enoughy.zip" -OutFile $zip
-    Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri "$Url/enoughy.zip.sig" -OutFile "$zip.sig"
-
-    $cert = New-Object Security.Cryptography.X509Certificates.X509Certificate2("$MonitorDir\release_key.cer")
-    $key = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($cert)
-    if (-not $key.VerifyData([IO.File]::ReadAllBytes($zip), [IO.File]::ReadAllBytes("$zip.sig"),
-            [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)) {
-        throw "the downloaded zip does not match its signature"
-    }
-    # Unpacked under another name and renamed last, so a staged folder is always whole.
-    $unpacked = "$Staged.new"
-    if (Test-Path $unpacked) { Remove-Item -LiteralPath $unpacked -Recurse -Force }
-    Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
-    if (Test-Path $Staged) { Remove-Item -LiteralPath $Staged -Recurse -Force }
-    Rename-Item -LiteralPath $unpacked -NewName (Split-Path $Staged -Leaf)
-    Remove-Item $zip, "$zip.sig"
+function Get-LatestReleaseFolder {   # the updater renames a folder to its version only once it is whole
+    Get-ChildItem $PSScriptRoot -Directory -Filter v* |
+        Sort-Object { [version]$_.Name.Substring(1) } | Select-Object -Last 1 -ExpandProperty FullName
 }
 
 function Start-Monitor {
-    return Start-Process $python "`"$MonitorDir\monitor.py`"" -WorkingDirectory $MonitorDir -NoNewWindow -PassThru   # -PassThru: the process
+    $process = Start-Process $python "`"$release\monitor.py`"" -WorkingDirectory $PSScriptRoot -NoNewWindow -PassThru
+    $null = $process.Handle   # held, so Windows gives its id to no other process: only the monitor is ever stopped
+    $process
 }
 
-# Nothing before the monitor's start may end the script.
-try { if (Test-Path $Staged) { $null = Install-Staged } } catch { Log $_ }   # what a failed install left
+$release = Get-LatestReleaseFolder
 $monitor = Start-Monitor
-$fetched = $null
-while ($true) {   # forever: a monitor that died is started again by the next release
-    $today = (Get-Date).Date
-    if ($fetched -ne $today -and (Get-Content "$MonitorDir\UPDATE_MODE" -ErrorAction SilentlyContinue) -ne "manual") {
-        $fetched = $today
-        try {
-            Fetch
-            if (Install-Staged) {
-                $monitor | Stop-Process -Force -ErrorAction SilentlyContinue   # it may be gone already
-                $monitor = Start-Monitor
-            }
-        } catch { Log $_ }
-    }
-    if ($Once) { break }
-    Start-Sleep 600   # a look at the date, not one long sleep: the machine sleeps too
+while ($true) {
+    $before = $release
+    powershell -NoProfile -ExecutionPolicy Bypass -File "$release\update.ps1"   # a process of its own: nothing in it ends this one
+    $release = Get-LatestReleaseFolder
+    $updated = $release -ne $before
+    if ($updated) { $monitor | Stop-Process -Force }   # it runs the old release
+    if ($updated -or -not $monitor -or $monitor.HasExited) { $monitor = Start-Monitor }
+    Start-Sleep $Every
 }
-$monitor.WaitForExit()   # only the test's -Once gets here

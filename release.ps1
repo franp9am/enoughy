@@ -1,5 +1,5 @@
-# release.ps1 -- write the version into monitor\VERSION, zip what every launcher
-# updates from, sign it, build the setup exe and sign that too, commit VERSION,
+# release.ps1 -- write the version into monitor\VERSION, zip what every machine's
+# update.ps1 updates from, sign it, build the setup exe and sign that too, commit VERSION,
 # tag the commit v<version> and publish the three files as a GitHub release.
 #
 #   powershell -ExecutionPolicy Bypass -File .\release.ps1 0.9.0 "What changed, in a sentence for the parent." [-NoSign] [-KeyFile ...]
@@ -39,7 +39,7 @@ $stage = Join-Path $env:TEMP "enoughy-release"
 if (Test-Path $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 New-Item -ItemType Directory "$stage\files" | Out-Null
 Copy-Item "$src\monitor\monitor.py", "$src\monitor\os_tooling.py", "$src\monitor\remote_sync.py", "$src\monitor\config.py", "$src\monitor\settings.py",
-          $VersionFile, "$src\monitor\launcher.ps1", "$src\monitor\release_key.cer", "$src\widget\remaining_time_widget.py" "$stage\files"
+          $VersionFile, "$src\monitor\update.ps1", "$src\monitor\release_key.cer", "$src\widget\remaining_time_widget.py" "$stage\files"
 Add-Type -AssemblyName System.IO.Compression.FileSystem   # Compress-Archive would do the same; both write backslashes, which Expand-Archive reads
 $zip = "$stage\enoughy.zip"
 [IO.Compression.ZipFile]::CreateFromDirectory("$stage\files", $zip)
