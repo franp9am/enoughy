@@ -17,9 +17,12 @@ For whoever changes the code, runs the server or makes a release.
   the setup bundles. `qrcodegen.py` is Project Nayuki's QR encoder, v1.8.0, vendored as it
   is; `qr_bmp.py` draws the codes page's QR with it on that Python, at the end of an install.
 
-On the child's machine `C:\ProgramData\Enoughy`, which the child cannot read, holds the
-launcher, a folder per child account under `data\`, and the monitor in a release folder,
-`v<version>`. What the child may touch is in `C:\ProgramData\EnoughyShared`.
+On the child's machine the code is in `C:\Program Files\enoughy`, which everyone reads
+and only administrators and SYSTEM write: the launcher, the starter, Python, and a
+release folder, `v<version>`, with the monitor, the widget and the dialog. The data is
+in `C:\ProgramData\Enoughy`, which the child cannot read, a folder per child account
+under `data\`. What the child may touch is their own folder in
+`C:\ProgramData\EnoughyShared`.
 
 ## Rules the README leaves out
 
@@ -117,20 +120,25 @@ commits and pushes that. `-NoSign` leaves the setup exe unsigned.
 On the machine `launcher.ps1`, the boot task, keeps the monitor running from the release
 folder with the highest version and every ten minutes runs that folder's `update.ps1`,
 which once a day fetches the latest release. A newer one it unpacks into `update.tmp`
-and renames to `v<version>`: no file of a running release is ever written over, and a
-folder with a version for a name is whole, whenever the power goes. The launcher then
-restarts the monitor from the new folder, whose updater removes the older ones at its
-first run. Only the widget is copied over the one in the shared folder.
+and renames to `v<version>`: no file is copied and none of a running release written
+over, so a folder with a version for a name is whole, whenever the power goes. The
+launcher then restarts the monitor from the new folder, whose updater removes the older
+ones at its first run. The widget task and the "Extra time" shortcuts go through
+`run_latest.py`, the starter, which runs the widget or the dialog from the highest
+folder too; a widget already running stays as it is until the child's next logon.
 
-A release brings the monitor, the widget, the key and `update.ps1`, never the launcher:
-that, Python and the scheduled tasks change only by running the setup again. A release
-whose `update.ps1` is broken cuts its machines off until the setup is run there, so the
-launcher test installs a second release with the updater the first one brought.
+A release brings all of a release folder: the monitor, the widget, the dialog, the key
+and `update.ps1`. Never the launcher or the starter: those, Python and the scheduled
+tasks change only by running the setup again. A release whose `update.ps1` is broken
+cuts its machines off until the setup is run there, so the launcher test installs a
+second release with the updater the first one brought.
 
-Installs up to 1.4.0 have the monitor's files in `C:\ProgramData\Enoughy` itself and a
-launcher that knows no release folders. It still copies a new release's `.py` files
-there, and with those the monitor looks for `data\` one folder too high and does not
-start: such a machine needs the setup before it fetches a release in the new layout.
+Installs up to 1.3.2 have everything under `C:\ProgramData`, the monitor's files in
+`Enoughy` itself, and a launcher of their own. That goes on taking the monitor and the
+widget out of each release, at boot; for the layout above, which came with 1.4.0, such
+a machine needs the setup once more. That setup keeps the
+children and their data, but its settings page shows the defaults, not the child's
+values, since the old Python is not where it looks; and the old files stay, unused.
 
 Never tag by hand: a tag without a release behind it is invisible to the updater.
 A release is never moved; a fix is a new version. To take one back before anyone

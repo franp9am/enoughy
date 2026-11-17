@@ -1,16 +1,5 @@
 # TODO
 
-* installer and updater: the widget and the dialog into the release folder,
-  before the release folders are released; it needs the setup.
-
-      Enoughy\          everyone reads, admins and SYSTEM write
-        launcher.ps1
-        starter         the widget task and the shortcut run it
-        v1.5.0\         the whole zip: monitor, widget, dialog
-        data\           locked
-      EnoughyShared\    the per-child files only, no code
-
-  To decide then: all but `data\` to `Program Files\enoughy`, Python with it.
 * monitor: a window whose night starts before its day starts, `["5:00", "1:00"]`,
   is a day that runs past midnight; the daily limit still resets at 0:00. Two
   edits, `is_night_time` and the hour-apart rule; the name stays, an old monitor

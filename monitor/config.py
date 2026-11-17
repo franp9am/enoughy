@@ -8,8 +8,8 @@ MONITOR_VERSION = Path(__file__).with_name("VERSION").read_text(encoding="ascii"
 # A child is a Windows account with `DATA_DIR/<child>/`, hidden from them, and
 # `SHARED_DIR/<child>/`, writable by every local account, so nothing in it is
 # trusted. The installer creates both; every directory in DATA_DIR is a child.
-# This file is in a release folder, v<version>; the data outlives it, one level up.
-DATA_DIR = Path(__file__).parent.parent / "data"
+# The code is elsewhere, in a release folder under Program Files.
+DATA_DIR = Path(r"C:\ProgramData\Enoughy\data")
 SHARED_DIR = Path(r"C:\ProgramData\EnoughyShared")
 CRASH_LOG_FILE = DATA_DIR / "crash.log"  # the monitor's own, so not under any child
 MAX_CRASH_LOG_BYTES = 1024 * 1024  # past this it becomes crash.log.old, replacing the last one

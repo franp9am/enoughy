@@ -1,10 +1,10 @@
-# launcher.ps1 -- the boot task: keeps the monitor running from the newest release
+# launcher.ps1 -- the boot task: keeps the monitor running from the latest release
 # folder, v<version> beside this file, and every ten minutes runs that folder's
 # update.ps1; when that brought a newer folder, it restarts the monitor from it.
 # No release replaces this file. -Every is for the test.
 param([int]$Every = 600)
 
-$python = Join-Path (Split-Path $PSScriptRoot) "EnoughyPython\python.exe"
+$python = "$PSScriptRoot\python\python.exe"
 
 function Get-LatestReleaseFolder {   # the updater renames a folder to its version only once it is whole
     Get-ChildItem $PSScriptRoot -Directory -Filter v* |

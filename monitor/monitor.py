@@ -27,8 +27,6 @@ from config import (
 )
 from settings import WEEKDAY_NAMES, ensure_settings_file, minutes, save_settings, settings_in_force
 
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 
 def load_secret(secret_file: Path) -> bytes:
     """The key redeem codes are signed with; empty when missing or malformed,
@@ -542,6 +540,7 @@ def main():
     """One loop for the machine, each child in turn. The installer sets up one
     child today, but nothing here assumes there is only one."""
     try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)  # here and not at import: the path is the machine's own
         children = load_children(DATA_DIR)
     except Exception:
         log_unexpected_error()  # a failure this early leaves no other trace

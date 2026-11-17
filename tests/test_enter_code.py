@@ -20,10 +20,10 @@ def test_an_account_the_setup_never_saw_gets_no_folder(tmp_path):
     assert not (tmp_path / "parent").exists()
 
 
-def test_the_shortcut_opens_this_dialog_with_the_windowless_python(tmp_path):
+def test_the_shortcut_opens_this_dialog_through_the_starter_with_the_windowless_python(tmp_path):
     shortcut = tmp_path / "Start Menu" / "Extra time.lnk"
     shortcut.parent.mkdir()
     enter_code.make_shortcut(shortcut)
     link = shortcut.read_bytes()
     assert "pythonw.exe".encode("utf-16-le") in link
-    assert "enter_code.py".encode("utf-16-le") in link
+    assert 'run_latest.py" enter_code.py'.encode("utf-16-le") in link

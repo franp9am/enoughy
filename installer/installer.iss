@@ -2,13 +2,15 @@
 ;
 ;   iscc installer\installer.iss   -> installer\dist\enoughy-setup.exe
 ;
-; It asks which account is the child's and for the parent's server, unpacks its
-; own Python (bundled from installer\build\python, which
-; build-python.ps1 makes), copies the launcher into C:\ProgramData\Enoughy and
-; the monitor into a release folder there, v<version>, as update.ps1 makes them,
-; locks that all, the widget and the "Extra time" dialog into the shared folder, with
-; one shortcut to the dialog in the shared Start menu, and for each child
-; registers a widget task at logon, next to the monitor task at boot. Running it
+; It asks which account is the child's and for the parent's server. The code
+; goes to C:\Program Files\enoughy, which everyone reads and only administrators
+; and SYSTEM write: its own Python (bundled from installer\build\python, which
+; build-python.ps1 makes), the launcher, the starter, and in a release folder,
+; v<version>, as update.ps1 makes them, the monitor, the widget and the "Extra
+; time" dialog. The data goes to C:\ProgramData\Enoughy, locked, and each
+; child's own files to the shared folder. One shortcut to the dialog is in the
+; shared Start menu, and each child gets a widget task at logon, next to the
+; monitor task at boot. Running it
 ; again and picking another account adds that child next to the ones there.
 ; It shows up in Apps & Features; that uninstall removes all of it. The wizard
 ; sections below are Inno's own; the [Code] section is Pascal, run by the exe.
@@ -32,24 +34,24 @@
 #define DefaultNightStarts Trim(FileRead(DefaultsHandle))
 #expr FileClose(DefaultsHandle)
 
-#define MonitorDir "{commonappdata}\Enoughy"
-; What a release brings; the launcher runs the highest of these folders.
-#define ReleaseDir "{app}\v" + Version
+; {app}, spelled out for the wizard pages, which run before {app} is set.
+#define AppDir     "{commonpf}\enoughy"
+#define PythonDir  AppDir + "\python"
+; What a release brings; the launcher and the starter run the highest of these folders.
+#define ReleaseDir AppDir + "\v" + Version
+; Locked: the children's data, UPDATE_MODE and FETCHED.
+#define DataDir    "{commonappdata}\Enoughy"
 #define SharedDir  "{commonappdata}\EnoughyShared"
-#define PythonDir  "{commonappdata}\EnoughyPython"
 
 [Setup]
 AppId=enoughy
 AppName=enoughy
 AppVersion={#Version}
 AppPublisher=enoughy.com
-DefaultDirName={#MonitorDir}
+DefaultDirName={#AppDir}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 UsePreviousAppDir=no
-; Not in the locked {app}: Apps & Features starts the uninstaller unelevated,
-; so it must be readable by everyone, and writable only by administrators.
-UninstallFilesDir={commonpf}\enoughy
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -63,6 +65,7 @@ SetupLogging=yes
 
 [Files]
 Source: "..\monitor\launcher.ps1";    DestDir: "{app}"
+Source: "..\monitor\run_latest.py";   DestDir: "{app}"
 Source: "..\monitor\monitor.py";      DestDir: "{#ReleaseDir}"
 Source: "..\monitor\os_tooling.py";   DestDir: "{#ReleaseDir}"
 Source: "..\monitor\remote_sync.py";  DestDir: "{#ReleaseDir}"
@@ -71,8 +74,8 @@ Source: "..\monitor\settings.py";     DestDir: "{#ReleaseDir}"
 Source: "..\monitor\VERSION";         DestDir: "{#ReleaseDir}"
 Source: "..\monitor\update.ps1";      DestDir: "{#ReleaseDir}"
 Source: "..\monitor\release_key.cer"; DestDir: "{#ReleaseDir}"
-Source: "..\widget\remaining_time_widget.py"; DestDir: "{#SharedDir}"
-Source: "..\widget\enter_code.py";            DestDir: "{#SharedDir}"
+Source: "..\widget\remaining_time_widget.py"; DestDir: "{#ReleaseDir}"
+Source: "..\widget\enter_code.py";            DestDir: "{#ReleaseDir}"
 ; Only run at the end of the install, for the QR code of the codes page; never installed.
 Source: "qrcodegen.py"; Flags: dontcopy
 Source: "qr_bmp.py";    Flags: dontcopy
@@ -80,24 +83,26 @@ Source: "qr_bmp.py";    Flags: dontcopy
 Source: "build\python\*"; DestDir: "{#PythonDir}"; Flags: recursesubdirs ignoreversion restartreplace
 
 [Dirs]
-Name: "{app}\data\{code:Child}"
+Name: "{#DataDir}\data\{code:Child}"
 Name: "{#SharedDir}\{code:Child}"
 
 [Icons]
 ; One for the whole machine, found by typing "extra": the dialog goes by the
 ; account that opens it. Nothing on the desktop; few would use it there.
-Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{#SharedDir}\enter_code.py"""; WorkingDir: "{#SharedDir}"
+; Through the starter, so it opens the dialog of the latest release.
+Name: "{commonprograms}\Extra time"; Filename: "{#PythonDir}\pythonw.exe"; Parameters: """{app}\run_latest.py"" enter_code.py"; WorkingDir: "{app}"
 
 [InstallDelete]
 ; The shortcut per child of 0.8, which opened the redeem file itself.
 Type: files; Name: "{commondesktop}\Extra time (*).lnk"
 
 [UninstallDelete]
-; The whole monitor folder: besides data, what came later (UPDATE_MODE, FETCHED,
-; the releases updates brought, one half unpacked, __pycache__). The accounts stay as the install left them.
+; The whole folders: what came later is in them too (the releases updates
+; brought, one half unpacked, __pycache__; the data, UPDATE_MODE, FETCHED).
+; The accounts stay as the install left them.
 Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{#DataDir}"
 Type: filesandordirs; Name: "{#SharedDir}"
-Type: filesandordirs; Name: "{#PythonDir}"
 
 [Code]
 const
@@ -133,8 +138,7 @@ begin
     if IsAdmin[I] and (I <> AccountPage.SelectedValueIndex) then Result := True;
 end;
 
-// Not {app}: the server page reads this folder before the wizard has set {app}.
-function ChildDataDir: String; begin Result := ExpandConstant('{#MonitorDir}\data\') + Child(''); end;
+function ChildDataDir: String; begin Result := ExpandConstant('{#DataDir}\data\') + Child(''); end;
 
 // One row per enabled local account, from WMI; a typed name invites a typo that
 // would leave the monitor watching an account nobody uses. Behind a Microsoft
@@ -573,8 +577,8 @@ begin
   DeleteTask('ScreenTimeWidget');
   DeleteFile(ReadFile(Old + '\data\link_path.txt', ''));
   ForceDirectories(ChildDataDir);
-  FileCopy(Old + '\data\settings.json', ChildDataDir + '\settings.json', True);
-  FileCopy(Old + '\data\child_token.txt', ChildDataDir + '\child_token.txt', True);
+  CopyFile(Old + '\data\settings.json', ChildDataDir + '\settings.json', True);
+  CopyFile(Old + '\data\child_token.txt', ChildDataDir + '\child_token.txt', True);
   DelTree(Old, True, True, True);
   DelTree(Old + 'Shared', True, True, True);
 end;
@@ -587,7 +591,7 @@ var
   N: Integer;
 begin
   N := 0;
-  if FindFirst(ExpandConstant('{app}\data\*'), Found) then
+  if FindFirst(ExpandConstant('{#DataDir}\data\*'), Found) then
     try
       repeat
         if (Found.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0) and (Found.Name <> '.') and (Found.Name <> '..') then begin
@@ -636,9 +640,9 @@ begin
   SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
   // `auto` fetches releases once a day, `manual` stays as installed; the default is
   // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
-  if not FileExists(ExpandConstant('{app}\UPDATE_MODE')) then begin
+  if not FileExists(ExpandConstant('{#DataDir}\UPDATE_MODE')) then begin
     if FileExists(ChildDataDir + '\child_token.txt') then UpdateMode := 'auto' else UpdateMode := 'manual';
-    SaveStringToFile(ExpandConstant('{app}\UPDATE_MODE'), UpdateMode, False);
+    SaveStringToFile(ExpandConstant('{#DataDir}\UPDATE_MODE'), UpdateMode, False);
   end;
 end;
 
@@ -729,20 +733,14 @@ var
   I: Integer;
   Shared: String;
 begin
-  // monitor.py runs as SYSTEM on this interpreter, so the child must not be able to
-  // write into it: SYSTEM and Administrators full, Users read-only.
-  At('locking the Python folder');
-  Run('{sys}\icacls.exe', '"{#PythonDir}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX', 'Locking {#PythonDir}');
-  // The monitor folder: SYSTEM and Administrators only. That lock is what stops
+  // The code, with the Python that monitor.py runs on as SYSTEM, is under Program
+  // Files, where a child reads and cannot write; nothing to set there.
+  // The data folder: SYSTEM and Administrators only. That lock is what stops
   // the child reading secret.txt and forging codes, so it comes before the secret.
-  At('locking the monitor folder');
-  Run('{sys}\icacls.exe', '"{app}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {app}');
+  At('locking the data folder');
+  Run('{sys}\icacls.exe', '"{#DataDir}" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F', 'Locking {#DataDir}');
   At('writing the credentials'); WriteCredentials;
   At('writing the settings'); WriteBasics;
-  // The shared folder: every local account may write. It holds only the widget
-  // and the dialog, nothing trusted; each child's folder in it is locked below.
-  At('opening the shared folder');
-  Run('{sys}\icacls.exe', '"{#SharedDir}" /grant *S-1-5-32-545:(OI)(CI)M', 'Opening {#SharedDir}');
   // Task 1: the launcher as SYSTEM at every boot; it keeps monitor.py running and runs update.ps1.
   At('registering the monitor task');
   RegisterTask('EnoughyMonitor', 8, 'SYSTEM', 5, 1, 'powershell.exe',
@@ -750,7 +748,8 @@ begin
   // Per child: their shared folder, which besides SYSTEM and Administrators
   // only that account may write, so no child touches another's; in it the
   // redeem file, which the "Extra time" dialog writes the code
-  // into; and task 2, the overlay in their session when they log in. Every
+  // into; and task 2, the overlay in their session when they log in, started
+  // through the starter, so it is the widget of the latest release. Every
   // child in data\ gets these again, so a machine set up for one child at a
   // time ends up consistent with data\; that also replaces the single
   // EnoughyWidget task of installs up to 0.7.
@@ -763,7 +762,7 @@ begin
     Run('{sys}\icacls.exe', '"' + Shared + '" /inheritance:r /grant *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F "' + Names[I] + '":(OI)(CI)M', 'Locking ' + Shared);
     if not FileExists(Shared + '\extra_time.txt') then SaveStringToFile(Shared + '\extra_time.txt', '', False);
     RegisterTask(WidgetTask(Names[I]), 9, Names[I], 3, 0, ExpandConstant('{#PythonDir}\pythonw.exe'),
-      ExpandConstant('"{#SharedDir}\remaining_time_widget.py" "') + Shared + '\remaining_time.txt"', ExpandConstant('{#SharedDir}'));
+      ExpandConstant('"{app}\run_latest.py" remaining_time_widget.py "') + Shared + '\remaining_time.txt"', ExpandConstant('{app}'));
   end;
   At('changing the accounts'); ChangeAccounts;
 end;

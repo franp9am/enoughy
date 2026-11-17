@@ -1,7 +1,7 @@
 """
 The "Extra time" dialog: the child pastes the code from the parent, and the
 dialog puts it where the monitor looks, <shared>/<account>/extra_time.txt.
-One copy next to the child folders serves every account of the machine.
+One copy, in the release folder, serves every account of the machine.
 
 Its shortcut is in the Start menu of each child and of nobody else: the widget
 makes it when it starts, which is at the child's logon.
@@ -14,7 +14,8 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-SHARED_DIR = Path(__file__).parent
+SHARED_DIR = Path(r"C:\ProgramData\EnoughyShared")  # the monitor's SHARED_DIR
+STARTER = Path(__file__).resolve().parent.parent / "run_latest.py"  # beside the release folders
 TITLE = "Extra time"
 # Inside the profile and never moved by OneDrive, so the uninstaller finds it too.
 START_MENU_SHORTCUT = Path(os.environ["APPDATA"]) / "Microsoft/Windows/Start Menu/Programs/Extra time.lnk"
@@ -22,13 +23,14 @@ START_MENU_SHORTCUT = Path(os.environ["APPDATA"]) / "Microsoft/Windows/Start Men
 
 def make_shortcut(shortcut: Path):
     """A shortcut to this dialog, written again at every logon, so one that was
-    deleted or points to an older install mends itself. Windows has no simpler
-    way to write one than its scripting object."""
+    deleted or points to an older install mends itself. It goes through the
+    starter, so it opens the dialog of whatever release is the latest then.
+    Windows has no simpler way to write one than its scripting object."""
     pythonw = Path(sys.executable).with_name("pythonw.exe")  # no console window
     script = f"""
         $link = (New-Object -ComObject WScript.Shell).CreateShortcut('{shortcut}')
         $link.TargetPath = '{pythonw}'
-        $link.Arguments = '"{Path(__file__).resolve()}"'
+        $link.Arguments = '"{STARTER}" enter_code.py'
         $link.Save()
     """
     subprocess.run(
