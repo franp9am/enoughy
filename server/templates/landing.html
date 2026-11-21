@@ -1,15 +1,14 @@
 {% extends "base.html" %}
 {% block style %}
 <style>
-  .page { max-width: 42rem; }
+  /* one column as wide as the drawing, so no line of text runs past it */
+  .page { max-width: 34rem; }
   h1 { margin: 0; min-height: 0; }
-  .name { margin: 1rem 0 1.4rem; font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 2.8rem; font-weight: 400; line-height: 1; }
+  .name { margin: 1rem 0 1.4rem; font-family: Georgia, 'Times New Roman', serif; font-size: 2.8rem; font-weight: 400; line-height: 1; }
   .tagline { margin: 0 0 1rem; font-size: 1.35rem; font-weight: 400; line-height: 1.3; color: #333; }
   .hero img { display: block; width: 100%; max-width: 34rem; height: auto; margin: 1.6rem 0; border-radius: 8px; }
   .intro { margin: 0; font-size: 1.05rem; line-height: 1.6; color: #555; }
-  .actions { display: flex; gap: 1.4rem; align-items: center; margin: 1.4rem 0 2.5rem; }
-  .hero .intro { margin-bottom: 2.5rem; }
-  .actions { margin-top: -1.1rem; }
+  .actions { display: flex; gap: 1.4rem; align-items: center; margin: 1.2rem 0 0; }
   .actions a {
     padding: .65rem 1.6rem; border-radius: 6px; text-align: center;
     text-decoration: none; font-size: .95rem;
@@ -18,10 +17,17 @@
   .actions a:hover { background: #1a1a1a; color: #fff; }
   .actions a.quiet { padding: 0; border: none; background: none; color: #555; text-decoration: underline; }
   .actions a.quiet:hover { background: none; color: #1a1a1a; }
-  .lines { margin: 0; padding: 0; list-style: none; font-size: 1.05rem; line-height: 1.6; color: #444; }
-  .lines li { margin: 0 0 .5rem; }
-  .more { margin: 2.5rem 0 0; font-size: .95rem; color: #888; }
-  .more a { color: #555; }
+  /* the same gap above the list with or without the buttons; each point fits one
+     row beside the drawing, and a quiet dash says where each starts */
+  .lines { margin: 1.6rem 0 0; padding: 0 0 0 1.4rem; list-style: "\2013\00a0\00a0"; font-size: 1.05rem; line-height: 1.45; color: #444; }
+  .lines li { margin: 0 0 .6rem; }
+  .lines li::marker { color: #999; }
+  /* the four links as one group, starting where the dashes of the list do */
+  .more {
+    display: flex; flex-wrap: wrap; gap: .4rem 2.2rem;
+    margin: 2rem 0 0; padding-left: .3rem; font-size: 1.05rem;
+  }
+  .more a { color: #333; }
 </style>
 {% endblock %}
 {% block heading %}{% endblock %}
@@ -40,14 +46,14 @@
 </div>
 <ul class="lines">
   <li>A daily limit, a night, carryover, and extra time when you say so.</li>
-  <li>No Microsoft account, no personal data to anyone, works without internet, open source.</li>
+  <li>No Microsoft account, no personal data to anyone, open source.</li>
   <li>Free forever if you register during the beta, which is running now.</li>
   <li>Made for my son, and running in our home every day since.</li>
 </ul>
 <p class="more">
-  <a href="{{ url_for('how') }}">How it works</a> &middot;
-  <a href="{{ url_for('why') }}">Why this one</a> &middot;
-  <a href="{{ url_for('manual') }}">Manual</a> &middot;
-  <a href="https://pfranek.net">Questions</a>
+  <a href="{{ url_for('how') }}">How it works</a>
+  <a href="{{ url_for('why') }}">Why this one</a>
+  <a href="{{ url_for('manual') }}">Manual</a>
+  <a href="https://pfranek.net">Contact</a>
 </p>
 {% endblock %}
