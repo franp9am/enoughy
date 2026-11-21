@@ -321,10 +321,10 @@ def why(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "why.html", {"parent": parent_if_logged_in(request)})
 
 
-@app.get("/setup")
-def setup_page(request: Request) -> HTMLResponse:
-    """The parent's manual: account, child, installer, limit."""
-    return templates.TemplateResponse(request, "setup.html", {"parent": parent_if_logged_in(request)})
+@app.get("/manual")
+def manual(request: Request) -> HTMLResponse:
+    """The parent's manual: the four steps of the setup first, then every part in detail."""
+    return templates.TemplateResponse(request, "manual.html", {"parent": parent_if_logged_in(request)})
 
 
 @app.get("/login")

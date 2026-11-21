@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block style %}
+<style>
+  /* a reading page, not a dialog: prose width, no card around it */
+  .page { max-width: 42rem; }
+  .card.plain { background: none; border: none; border-radius: 0; }
+  .section { padding: 1.5rem 0; }
+  .section:first-child { padding-top: .5rem; }
+  h1 { margin: 0; min-height: 0; }
+  .section h2 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 1.9rem; margin: 0 0 1.2rem; }
+  .section h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 1.45rem; margin: 0 0 1.2rem; color: #1a1a1a; }
+  /* a long read, so a shade darker than the summary pages */
+  .section p, .points, .steps, .legend { font-size: .95rem; line-height: 1.55; color: #555; }
+  .section p { margin: 0 0 1rem; }
+  .section a { color: #1a1a1a; }
+  .contents a { white-space: nowrap; }
+  .points, .steps { margin: 0; padding: 0; list-style: none; }
+  .points li, .steps li { margin: 0 0 1.3rem; }
+  .steps { counter-reset: step; }
+  .steps li { counter-increment: step; }
+  .term { display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 1.15rem; color: #1a1a1a; margin-bottom: .15rem; }
+  .steps .term::before { content: counter(step) ". "; color: #999; }
+  .section > :last-child, .section > :last-child > li:last-child { margin-bottom: 0; }
+  .shot { display: block; max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+  /* a picture with numbers on it: each number sits in the picture's own margin,
+     placed in percent so it keeps its spot when the picture shrinks */
+  .marked { position: relative; display: inline-block; max-width: 100%; margin: 0 0 1rem; }
+  .mark {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 1.25rem; height: 1.25rem; border-radius: 50%;
+    background: #1a1a1a; color: #fff; text-align: center;
+    font-size: .75rem; font-weight: 600; line-height: 1.25rem;
+  }
+  .legend { margin: 0 0 1rem; padding-left: 1.4rem; }
+  .legend li { margin: 0 0 .5rem; padding-left: .2rem; }
+  code { font-size: .9em; color: #1a1a1a; }
+  /* a long address on a line of its own, broken anywhere on a narrow screen */
+  .address { display: block; margin: .5rem 0; overflow-wrap: anywhere; }
+  .back {
+    display: inline-block; margin-bottom: .8rem;
+    font-size: .9rem; color: #666; text-decoration: none;
+  }
+  .back:hover { color: #1a1a1a; }
+</style>
+{% endblock %}
+{% block heading %}{% endblock %}
+{% block content %}
+<a class="back" href="{{ url_for('intro') }}">&larr; Enoughy</a>
+<div class="card plain">
+  <div class="section">
+    <h2>Manual</h2>
+    <p class="contents">
+      <a href="#setup">Setting it up</a> &middot;
+      <a href="#modes">The two modes</a> &middot;
+      <a href="#installer">The installer</a> &middot;
+      <a href="#rules">The rules</a> &middot;
+      <a href="#dashboard">The dashboard</a> &middot;
+      <a href="#settings">Settings</a> &middot;
+      <a href="#extra-time">Extra time</a> &middot;
+      <a href="#child">What the child sees</a> &middot;
+      <a href="#children">Several children</a> &middot;
+      <a href="#lock">A stronger lock</a> &middot;
+      <a href="#updates">Updates and removal</a> &middot;
+      <a href="#account">Your account</a> &middot;
+      <a href="#offline">Offline mode</a> &middot;
+      <a href="#pricing">Pricing</a> &middot;
+      <a href="#problems">Problems and contributing</a>
+    </p>
+  </div>
+
+  <div class="section" id="setup">
+    <h3>Setting it up</h3>
+    <ol class="steps">
+      <li><span class="term">Create an account</span><a href="{{ url_for('register_form') }}">Register</a> with a login and a password; this makes your family.</li>
+      <li><span class="term">Add a child</span>On <a href="{{ url_for('parent_page') }}">your page</a>, type the child's name; it shows a setup code.</li>
+      <li><span class="term">Install on the child's computer</span>On the child's PC, open <a href="{{ url_for('install') }}">enoughy.com/install</a>, run the installer and type the setup code. For a second child, run it again with that child's code and pick their account.</li>
+      <li><span class="term">Set the limit</span>Once you <a href="{{ url_for('login_form') }}">log in</a> to enoughy.com, the child appears there after the first sync, and you set the daily limit and the hours.</li>
+    </ol>
+    <p>These steps are for dashboard mode. For <a href="#offline">offline mode</a>, step 3 alone is enough.</p>
+  </div>
+
+  <div class="section" id="modes">
+    <h3>The two modes</h3>
+    <ul class="points">
+      <li><span class="term">Dashboard mode</span>You register an account, the child's computer reports to the server, and you see the time and change the rules on a web page. The server is enoughy.com by default. Power users can set up their own: it is <a href="https://github.com/franp9am/enoughy/blob/main/DEVELOPING.md#the-parents-server">open source</a>, and the installer has a box for its address.</li>
+      <li><span class="term">Offline mode</span>No server and no account. Nothing leaves the child's computer, and you grant extra time with codes. The rules and what the child sees are the same as in dashboard mode; what differs is in the section <a href="#offline">Offline mode</a>.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="installer">
+    <h3>The installer</h3>
+    <p>Enoughy is supported on Windows 10 and 11. The installer runs on the child's computer and needs an administrator.</p>
+    <p>Windows may first show a blue box, "Windows protected your PC". It does that for any program that is new and not yet widely installed. Click "More info", check that the publisher is "Open Source Developer Peter Franek", and then click "Run anyway".</p>
+    <p>The installer asks four things.</p>
+    <ul class="points">
+      <li><span class="term">Which account is the child's</span>The limit is for this one Windows account; the other accounts on the computer stay free. An ordinary local account is enough, no Microsoft account is needed.</li>
+      <li><span class="term">Who is the administrator</span>A child who is an administrator can switch the limit off, so the installer offers to make the child's account a standard user. If it is the only account on the computer, the installer first creates an administrator account named <code>parent</code>, with a password you choose. Write it down: Windows asks for it whenever something needs an administrator.</li>
+      <li><span class="term">The setup code</span>The six digits from <a href="{{ url_for('parent_page') }}">your page</a>, good for an hour.
+        <img class="shot" style="margin-top: .7rem" src="/static/setup-code.png" width="400" height="352" alt="Your page with one child, peter, and the setup code 483920 for his computer."></li>
+      <li><span class="term">The time limits</span>Minutes a day, when the day starts and when the night starts. All of it can be changed later.</li>
+    </ul>
+    <p>Then restart the computer. From then on Enoughy starts with Windows, and the box with the remaining time appears when the child logs in.</p>
+    <p>Running the installer again is safe: it shows the values in force and keeps the child's history.</p>
+  </div>
+
+  <div class="section" id="rules">
+    <h3>The rules</h3>
+    <ul class="points">
+      <li><span class="term">Daily limit</span>How long the child may use the computer each day, anything from nothing to the whole day. Time counts while the child is logged in and the screen is unlocked, also when nobody touches the computer. A locked screen costs nothing, and neither does somebody else's account. A new day starts at midnight.</li>
+      <li><span class="term">Night</span>The computer is usable from the time the day starts to the time the night starts, say 6:00 to 21:00. Five minutes before the night the child gets a message, and at the night the computer shuts down. A child who logs in during the night is shut down again within minutes. You can also have no night at all.</li>
+      <li><span class="term">Carryover</span>Time not used today is added to tomorrow, up to a cap you choose. With a limit of one hour, a child who stays away for three days has four hours on the fourth. The cap can also be zero, for no carryover, or unlimited.</li>
+      <li><span class="term">Weekdays</span>Any weekday can have its own limit, its own hours, or both: a longer Saturday, an earlier night before school.</li>
+    </ul>
+    <p>The rules live on the child's computer, so they hold without internet too.</p>
+  </div>
+
+  <div class="section" id="dashboard">
+    <h3>The dashboard</h3>
+    <p>What you see after you <a href="{{ url_for('login_form') }}">log in</a>. It refreshes itself every minute.</p>
+    <div class="marked">
+      <img class="shot" src="/static/dashboard.png" width="400" height="493" alt="The dashboard, with the numbers 1 to 6 next to its parts.">
+      <span class="mark" style="left: 4.2%; top: 17.9%">1</span>
+      <span class="mark" style="left: 4.2%; top: 32.5%">2</span>
+      <span class="mark" style="left: 4.2%; top: 53.6%">3</span>
+      <span class="mark" style="left: 4.2%; top: 61.5%">4</span>
+      <span class="mark" style="left: 4.2%; top: 86.2%">5</span>
+      <span class="mark" style="left: 95.8%; top: 9.1%">6</span>
+    </div>
+    <ol class="legend">
+      <li>A tab for each child. A child appears here once their computer has reported for the first time.</li>
+      <li><a href="#extra-time">Extra time</a> for today.</li>
+      <li>How much time the child has left today, and when their computer last reported. While the child is using it, that is every minute.</li>
+      <li>The rules in force, as the child's computer itself reports them. "1h/d, 6:00-21:00, carryover &le;5h" is an hour a day, between 6:00 and 21:00, with at most five hours carried over. The word <a href="#settings">Settings</a> opens the page that changes them.</li>
+      <li>Screen time on each of the last seven days, today in black. Never what it was spent on.</li>
+      <li>Your login. It opens your page: the children, their setup codes and "Log off".</li>
+    </ol>
+    <p>Below the week, "Export" downloads all extra time and all screen time of the child as CSV files.</p>
+  </div>
+
+  <div class="section" id="settings">
+    <h3>Settings</h3>
+    <p>One page per child, behind the word "Settings" on the dashboard, with a box for each of <a href="#rules">the rules</a>. The weekday exceptions fold open; a box left empty there means the general value.</p>
+    <p>"Save" sends the change to the child's computer at its next report. If the child is using it, the dashboard shows the new rules in force after a minute or two; otherwise when the computer is next turned on. Until then it says "new ones waiting". What it shows as in force is always what the computer itself reports.</p>
+    <p>The computer may also reject a change, for example a night that starts less than an hour after the day. The dashboard then says that the PC refused it, and the old rules stay.</p>
+  </div>
+
+  <div class="section" id="extra-time">
+    <h3>Extra time</h3>
+    <p>On the dashboard, type the minutes and press "Apply". The child's computer picks them up within a minute and tells the child. If the computer is off, the minutes wait under "Waiting for the next sync" and count for the day it is next turned on.</p>
+    <ul class="points">
+      <li><span class="term">Taking time away</span>Negative minutes, say -30, take time away. At most what is left of that day; nothing reaches into tomorrow.</li>
+      <li><span class="term">A longer evening</span>Extra minutes do not move the night. For a late evening, set a later night in <a href="#settings">Settings</a>.</li>
+      <li><span class="term">When the time is already up</span>The computer waits three minutes before it shuts down. Extra time that arrives in those minutes calls the shutdown off.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="child">
+    <h3>What the child sees</h3>
+    <ul class="points">
+      <li><span class="term">The box in the top right corner</span>The time left today, like "1h 32m" or "45 min". Green, orange under fifteen minutes, red under five. At night it shows a moon. Clicks go through it to whatever is underneath, and Ctrl+Alt+H hides it and brings it back.
+        <img class="shot" style="margin-top: .7rem" src="/static/widget.png" width="288" height="96" alt="The top right corner of a Windows desktop, with a small dark box that says 1h 32m in green."></li>
+      <li><span class="term">Messages</span>A small Windows message, in signs any child can read: "5 min" with a moon five minutes before the night, "+60 min" when extra time arrives, "0 min" when the time is up, and "Night time". There is no message before the time runs out; the box turning orange and red is the warning.</li>
+      <li><span class="term">Shutdown</span>Three minutes after "0 min" or "Night time", the computer closes everything and shuts down. Work that is not saved is lost, so teach the child to save when the box turns red.</li>
+    </ul>
+    <p>The box is only a display. A child who hides or closes it still has the same limit.</p>
+  </div>
+
+  <div class="section" id="children">
+    <h3>Several children</h3>
+    <ul class="points">
+      <li><span class="term">Several children in a family</span>Add each on <a href="{{ url_for('parent_page') }}">your page</a>. Each has their own setup code, rules and tab on the dashboard.</li>
+      <li><span class="term">Several children on one computer</span>Each needs their own Windows account. Run the installer once per child, with that child's code, and pick their account.</li>
+      <li><span class="term">One child on several computers</span>Not shared yet: every computer keeps its own limit. Add the child once per computer, under two names, say "Tom" and "Tom laptop".</li>
+    </ul>
+  </div>
+
+  <div class="section" id="lock">
+    <h3>A stronger lock</h3>
+    <p>Enoughy holds as long as the child is a standard user, uses only their own account and does not know an administrator's password. Time on any other account is not counted, so every other account on the computer needs a password the child does not know.</p>
+    <p>For a child who knows computers, two more steps on the machine itself make it hard to get around:</p>
+    <ul class="points">
+      <li><span class="term">A BIOS password</span>So the computer cannot be started from another disk.</li>
+      <li><span class="term">BitLocker</span>Disk encryption, so the disk cannot be read or changed in another computer. It also keeps the child out of Safe Mode, which starts Windows without most of its programs: with BitLocker on, Safe Mode asks for the recovery key. Keep that key from the child.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="updates">
+    <h3>Updates and removal</h3>
+    <ul class="points">
+      <li><span class="term">Updates</span>The child's computer looks for a new version once a day and installs it by itself. For power users: an administrator can turn this off and on by writing <code>manual</code> or <code>auto</code> into this file:
+        <code class="address">C:\ProgramData\Enoughy\UPDATE_MODE</code></li>
+      <li><span class="term">Removing it from the computer</span>Uninstall enoughy in the Windows settings, under installed apps. That removes the program and the usage history on the computer, for every child on it. The Windows accounts stay as they are.</li>
+      <li><span class="term">Removing a child from the server</span>"Remove" on <a href="{{ url_for('parent_page') }}">your page</a> deletes the child and their usage history from enoughy.com.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="account">
+    <h3>Your account</h3>
+    <ul class="points">
+      <li><span class="term">Login and password</span>There is no email, so there is no password recovery. Write the password down. If it is lost all the same, <a href="https://pfranek.net">write to me</a>.</li>
+      <li><span class="term">Staying logged in</span>A browser stays logged in for 90 days, or until "Log off" on your page.</li>
+      <li><span class="term">Two parents</span>For now both use the same login.</li>
+      <li><span class="term">What the server knows</span>For each child and day: the time used and the time left, the extra time and codes, the rules in force, and when the computer shut down for the limit or the night. Nothing about what the child did with the time.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="offline">
+    <h3>Offline mode</h3>
+    <p>In the installer, tick "No server" instead of typing a setup code. Enoughy then needs no account: there is no dashboard, and the child's computer talks to nobody. The rules are the ones you type into the installer.</p>
+    <ul class="points">
+      <li><span class="term">The codes page</span>At its end the installer shows a QR code and an address. That is the page that makes extra-time codes for this child. The address ends with the child's name and a long key, like this one:
+        <code class="address">https://enoughy.com/extra-time-codes#peter=5b1e9c04a7d263f80c4e1a9b7d3052c6</code>
+        Scan it with your phone and bookmark it; the other parent can have the same bookmark. The page works inside your browser and sends nothing anywhere.
+        <img class="shot" style="margin-top: .7rem" src="/static/codes.png" width="400" height="461" alt="The codes page for one child: buttons for 15 minutes to 2 hours, a box for the minutes, and the code 60:fc95 it made."></li>
+      <li><span class="term">Keep the address secret</span>The long key in the address is what makes the codes valid. A child who sees the address, the QR code or the bookmark on your phone can make codes for themselves, so scan it when the child is not watching and never send it to them.</li>
+      <li><span class="term">Extra time</span>Pick the minutes and the page shows a code, <code>60:fc95</code> in the picture. It works once, on the day it was made. The same minutes on the same day give the same code, so for a second one that day change the minutes.</li>
+      <li><span class="term">No night</span>The other kind of code keeps the computer up until midnight on that one day. The daily limit still counts.</li>
+      <li><span class="term">Using a code</span>The child opens "Extra time" from the Start menu, typing "extra" finds it, and enters the code. Within a minute a message confirms it.
+        <img class="shot" style="margin-top: .7rem" src="/static/extra-time.png" width="268" height="141" alt="The Extra time window on the child's computer: Paste the code from your parent, with 60:fc95 typed in and an OK button."></li>
+      <li><span class="term">Changing the rules</span>Run the installer again for the limit and the hours. For power users: to change the rules without a reinstall, or to add weekday exceptions and carryover, edit this file as an administrator:
+        <code class="address">C:\ProgramData\Enoughy\data\&lt;child&gt;\settings.json</code>
+        The <a href="https://github.com/franp9am/enoughy#settings">README</a> describes it, and a change counts within a minute.</li>
+      <li><span class="term">Updates</span>The computer stays as installed; to update, run a newer installer. Power users can turn the daily update on with the file under <a href="#updates">Updates</a>. The computer then downloads new versions from GitHub once a day, and still sends nothing about the child.</li>
+    </ul>
+    <p>To move to dashboard mode later, go through <a href="#setup">the four steps</a>: the installer runs again, this time with a setup code.</p>
+  </div>
+
+  <div class="section" id="pricing">
+    <h3>Pricing</h3>
+    <ul class="points">
+      <li><span class="term">Offline mode</span>Free forever.</li>
+      <li><span class="term">Dashboard mode on enoughy.com</span>Free forever for everyone who registers during the beta. The beta is running now.</li>
+      <li><span class="term">Dashboard mode on your own server</span>Free forever; the server is open source.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="problems">
+    <h3>Problems and contributing</h3>
+    <ul class="points">
+      <li><span class="term">Something does not work</span><a href="https://pfranek.net">Write to me</a>. Say what you did, what you expected and what happened. Enoughy is made by one person in spare time, so an answer can take a few days.</li>
+      <li><span class="term">Ideas and wishes</span>The same way. I read all of them and promise none.</li>
+      <li><span class="term">For programmers</span>The code is on <a href="https://github.com/franp9am/enoughy">GitHub</a>. Bugs can also go to the <a href="https://github.com/franp9am/enoughy/issues">issues</a> there, and pull requests are welcome; for a bigger change, write first.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

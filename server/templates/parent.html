@@ -43,7 +43,7 @@
   {% for child in children %}
   <div class="section child">
     <h2>{{ child.name }}</h2>
-    <p class="setup">
+    <div class="setup">
       {% if child.code %}
       Setup code for {{ child.name }}'s computer: <code>{{ child.code }}</code>,
       good until {{ child.good_until }}.
@@ -55,7 +55,7 @@
       </form>
       for {{ child.name }}'s computer, good for {{ lifetime_hours }} hour{{ 's' if lifetime_hours != 1 }}.
       {% endif %}
-    </p>
+    </div>
     <form class="remove" method="post" action="{{ url_for('delete_child') }}"
           onsubmit="return confirm('Remove {{ child.name }} and their usage history from the server?')">
       <input type="hidden" name="child_id" value="{{ child.id }}">
@@ -68,7 +68,7 @@
       <input type="text" name="name" placeholder="{% if children %}Another child's name{% else %}The child's name{% endif %}" required>
       <button type="submit">Add</button>
     </form>
-    <p class="help">Lost? <a href="{{ url_for('setup_page') }}">The four steps</a></p>
+    <p class="help">Lost? <a href="{{ url_for('manual') }}#setup">The four steps</a></p>
   </div>
 </div>
 {% endblock %}
