@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% block title %}Manual &middot; Enoughy{% endblock %}
+{% block description %}The Enoughy manual: setting it up, the installer, the rules, the dashboard, extra time and offline mode.{% endblock %}
 {% block style %}
 <style>
   /* a reading page, not a dialog: prose width, no card around it */
@@ -126,13 +128,14 @@
     <h3>The dashboard</h3>
     <p>What you see after you <a href="{{ url_for('login_form') }}">log in</a>. It refreshes itself every minute.</p>
     <div class="marked">
-      <img class="shot" src="/static/dashboard.png" width="400" height="493" alt="The dashboard, with the numbers 1 to 6 next to its parts.">
-      <span class="mark" style="left: 4.2%; top: 17.9%">1</span>
-      <span class="mark" style="left: 4.2%; top: 32.5%">2</span>
-      <span class="mark" style="left: 4.2%; top: 53.6%">3</span>
-      <span class="mark" style="left: 4.2%; top: 61.5%">4</span>
-      <span class="mark" style="left: 4.2%; top: 86.2%">5</span>
-      <span class="mark" style="left: 95.8%; top: 9.1%">6</span>
+      <img class="shot" src="/static/dashboard-full.png" width="400" height="616" alt="The dashboard, with the numbers 1 to 7 next to its parts.">
+      <span class="mark" style="left: 4.2%; top: 14.3%">1</span>
+      <span class="mark" style="left: 4.2%; top: 26%">2</span>
+      <span class="mark" style="left: 4.2%; top: 42.9%">3</span>
+      <span class="mark" style="left: 4.2%; top: 49.2%">4</span>
+      <span class="mark" style="left: 4.2%; top: 69%">5</span>
+      <span class="mark" style="left: 4.2%; top: 89.8%">6</span>
+      <span class="mark" style="left: 95.8%; top: 7.3%">7</span>
     </div>
     <ol class="legend">
       <li>A tab for each child. A child appears here once their computer has reported for the first time.</li>
@@ -140,9 +143,9 @@
       <li>How much time the child has left today, and when their computer last reported. While the child is using it, that is every minute.</li>
       <li>The rules in force, as the child's computer itself reports them. "1h/d, 6:00-21:00, carryover &le;5h" is an hour a day, between 6:00 and 21:00, with at most five hours carried over. The word <a href="#settings">Settings</a> opens the page that changes them.</li>
       <li>Screen time on each of the last seven days, today in black. Never what it was spent on.</li>
+      <li>"Export" downloads all extra time and all screen time of the child as CSV files.</li>
       <li>Your login. It opens your page: the children, their setup codes and "Log off".</li>
     </ol>
-    <p>Below the week, "Export" downloads all extra time and all screen time of the child as CSV files.</p>
   </div>
 
   <div class="section" id="settings">
