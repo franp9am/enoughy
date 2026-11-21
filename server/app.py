@@ -398,7 +398,8 @@ async def register(request: Request) -> Response:
         return templates.TemplateResponse(
             request,
             "register.html",
-            {"error": str(error).capitalize() + ".", "invitation": invitation},
+            # the first letter only: capitalize() would lower a second sentence's
+            {"error": str(error)[:1].upper() + str(error)[1:] + ".", "invitation": invitation},
             status_code=400,
         )
     except sqlite3.IntegrityError:

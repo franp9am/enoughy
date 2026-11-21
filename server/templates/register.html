@@ -14,7 +14,8 @@
     border: 1px solid #1a1a1a; cursor: pointer;
     background: #1a1a1a; color: #fff; font-size: .95rem; font-family: inherit;
   }
-  .error { margin: 0; color: #b00020; font-size: .9rem; }
+  /* pre-line: a message of two sentences comes with a line break between them */
+  .error { margin: 0; color: #b00020; font-size: .95rem; font-weight: 600; white-space: pre-line; }
   .note { margin: 0; font-size: .9rem; color: #888; }
   .aside { margin: 1rem 0 0; font-size: .9rem; color: #888; }
   .aside a { color: #555; }
@@ -28,11 +29,12 @@
     {% else %}
     <form class="login-form" method="post" action="{{ url_for('register') }}">
       <input type="hidden" name="invitation" value="{{ invitation }}">
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
       <input type="text" name="login" placeholder="Login" autocomplete="username" autofocus required>
       <input type="password" name="password" placeholder="Password, 8 characters or more" autocomplete="new-password" minlength="8" required>
       <input type="password" name="password_again" placeholder="Password again" autocomplete="new-password" required>
-      <p class="note">We ask for no email, so there is no password recovery. Write it down.</p>
-      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <p class="note">Choose a password that is hard to guess. A common word, a name or a year will be refused.</p>
+      <p class="note">We ask for no email, so there is no password recovery. Use a password manager or write it down.</p>
       <button type="submit">Register</button>
     </form>
     {% endif %}

@@ -11,7 +11,7 @@ import sys
 import bcrypt
 
 import db
-from add_parent import MIN_PASSWORD_CHARS
+from add_parent import password_fault
 
 
 def main() -> None:
@@ -19,8 +19,9 @@ def main() -> None:
         sys.exit("usage: python set_password.py <login>")
     login = sys.argv[1]
     password = getpass.getpass(f"new password for {login}: ")
-    if len(password) < MIN_PASSWORD_CHARS:
-        sys.exit(f"the password needs at least {MIN_PASSWORD_CHARS} characters")
+    fault = password_fault(password, login)
+    if fault:
+        sys.exit(fault)
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=10)).decode()
     connection = db.connect()
     with connection:

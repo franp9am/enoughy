@@ -9,6 +9,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "tzdata",  # Windows has no time zone database of its own
     "uvicorn",
+    "zxcvbn>=4.5.0",
 ]
 
 [dependency-groups]
@@ -21,5 +22,5 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 include = [
     "app.py", "views.py", "children.py", "auth.py", "db.py",
-    "add_child.py", "add_parent.py", "set_password.py", "templates",
+    "add_child.py", "add_parent.py", "set_password.py", "remove_family.py", "czech_words.txt", "templates",
 ]

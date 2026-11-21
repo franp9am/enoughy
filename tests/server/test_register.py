@@ -24,7 +24,7 @@ def test_registering_logs_the_parent_in(client, register):
 
 def test_a_taken_login_shows_the_form_again(client, register):
     add_parent.add_parent(db.connect(), "anna", password="correct horse")
-    answer = register("anna", "another one")
+    answer = register("anna", "battery staple")
     assert answer.status_code == 400
     assert "anna is taken" in answer.text
     assert "session" not in client.cookies
@@ -35,6 +35,30 @@ def test_a_short_password_shows_the_form_again(client, register):
     assert answer.status_code == 400
     assert "at least 8 characters" in answer.text
     assert "session" not in client.cookies
+
+
+@pytest.mark.parametrize("password", [
+    "12345678", "aaaaaaaa", "qwertyuiop",  # a run, a repeat, a row of the keyboard
+    "password1", "summer2024",  # English words with a number
+    "anna1985", "annaanna1",  # her own login
+    "heslo123", "maminka1", "pejsek2015", "honzik2012",  # the same in Czech, which zxcvbn alone lets through
+])
+def test_a_guessable_password_shows_the_form_again(client, register, password):
+    answer = register("anna", password)
+    assert answer.status_code == 400
+    assert "Password too simple, robots would guess it.\nPlease try another one." in answer.text
+    assert "session" not in client.cookies
+
+
+@pytest.mark.parametrize("password", ["correct horse", "zelena kocka", "vlak do brna 8", "Tr0ub4dor&3", "xK9#mQ2v"])
+def test_a_few_words_or_eight_random_characters_are_enough(register, password):
+    assert register("anna", password).url.path == "/parent"
+
+
+def test_a_password_longer_than_bcrypt_hashes_is_refused(client, register):
+    answer = register("anna", "seven green apples " * 4)
+    assert answer.status_code == 400
+    assert "at most 72 characters" in answer.text
 
 
 def test_two_different_passwords_show_the_form_again(client, register):

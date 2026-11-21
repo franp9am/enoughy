@@ -66,6 +66,12 @@ reverse proxy in front only forwards.
 A parent removes their whole family at the bottom of their page, after typing the
 password again; `remove_family.py <login>` does the same for the maintainer.
 
+A password has to take at least ten million guesses by the estimate of zxcvbn, at
+`/register` and in `set_password.py` alike; no rules about its characters. zxcvbn
+knows English words only, so `czech_words.txt` gives it the Czech ones: some 560
+picked by hand, then the 10 000 most frequent in the public-domain sentences of
+Mozilla Common Voice.
+
 Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
 older marwin.pfranek.cz, which also answers as www, one certificate for all six: the clone in `~/enoughy`, the
 database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
