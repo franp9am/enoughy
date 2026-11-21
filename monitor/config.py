@@ -25,4 +25,4 @@ NETWORK_WARMUP_SECONDS = 20
 
 SIGNATURE_CHARS = 4  # changing it invalidates codes already handed out
 MAX_REDEEM_FILE_BYTES = 128
-UNSENT_EVENTS_KEPT = 100  # a machine without a server, or long offline, drops the oldest
+UNSENT_EVENTS_KEPT = 100  # a machine in offline mode, or long without a connection, drops the oldest

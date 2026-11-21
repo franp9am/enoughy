@@ -51,7 +51,7 @@ class SyncAnswer:
 
 
 def load_server_url(server_url_file: Path) -> str:
-    """The parent's server; empty means run offline."""
+    """The parent's server; empty means offline mode."""
     try:
         with open(server_url_file, "r", encoding="utf-8") as f:
             return f.read().strip().rstrip("/")

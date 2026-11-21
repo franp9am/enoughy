@@ -112,8 +112,8 @@ const
 var
   AccountPage: TInputOptionWizardPage;
   ParentPage, ServerPage, SettingsPage: TInputQueryWizardPage;
-  NoSync: TNewCheckBox;   // on the server page: no account, the server is never contacted
-  CodesPage: TWizardPage;   // after the install without a server: where the extra-time codes come from
+  NoSync: TNewCheckBox;   // on the server page: offline mode, no server is ever contacted
+  CodesPage: TWizardPage;   // after an install in offline mode: where the extra-time codes come from
   CodesText, CodesHint: TNewStaticText;   // the hint: what the child does with a code
   CodesAddress: TNewEdit;
   CodesImage: TBitmapImage;
@@ -236,7 +236,7 @@ begin
   SettingsPage.Add('Day starts (H:MM):', False);
   SettingsPage.Add('Night starts (H:MM; leave both times empty for no night):', False);
 
-  // After the install, without a server: the address of the codes page with the
+  // After the install, in offline mode: the address of the codes page with the
   // child's key, and its QR code. ShowCodesPage fills and lays it out.
   CodesPage := CreateCustomPage(wpInfoAfter, 'Extra time codes', '');
   CodesText := TNewStaticText.Create(CodesPage);
@@ -418,7 +418,7 @@ var
 begin
   if CurPageID = ServerPage.ID then begin
     ServerPage.Values[1] := ReadFile(ChildDataDir + '\server_url.txt', DefaultServerUrl);
-    // A reinstall of an install without an account starts with the box ticked.
+    // A reinstall of an install in offline mode starts with the box ticked.
     NoSync.Checked := FileExists(ChildDataDir + '\secret.txt') and not FileExists(ChildDataDir + '\child_token.txt');
     NoSyncClick(NoSync);
   end;
@@ -639,7 +639,7 @@ begin
   if NoSync.Checked then DeleteFile(ChildDataDir + '\child_token.txt');   // a reinstall that gives up its account
   SaveStringToFile(ChildDataDir + '\server_url.txt', Trim(ServerPage.Values[1]), False);
   // `auto` fetches releases once a day, `manual` stays as installed; the default is
-  // auto with a token and manual offline. Edit the file to change it; a reinstall keeps it.
+  // auto in dashboard mode and manual in offline mode. Edit the file to change it; a reinstall keeps it.
   if not FileExists(ExpandConstant('{#DataDir}\UPDATE_MODE')) then begin
     if FileExists(ChildDataDir + '\child_token.txt') then UpdateMode := 'auto' else UpdateMode := 'manual';
     SaveStringToFile(ExpandConstant('{#DataDir}\UPDATE_MODE'), UpdateMode, False);

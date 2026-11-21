@@ -41,7 +41,7 @@
   Windows zone name changes, log an event for the parent's page.
 * server: `/children` shows a QR code with the `/extra-time-codes` address for
   every child whose setup code was used, one scan for the parent's phone, as
-  the installer shows it for a family without an account. Behind a button: a
+  the installer shows it in offline mode. Behind a button: a
   key on the screen is the risk. `/codes` stays for the account parent whose
   child's computer is offline right now; the first manual does not mention it.
 * server and monitor: a "No night today" button on the dashboard, sent through
@@ -56,6 +56,10 @@
   nothing. To see on the VM: after a reinstall without a reboot the old
   launcher starts the monitor that setup closed, maybe while setup still
   copies. Later, in the monitor: its own fatal error into crash.log.
+* installer: take one child off a machine that has several; the uninstaller
+  is all or nothing. By hand, untested: delete `data\<child>` and the task
+  `EnoughyWidget-<child>`, then reboot. Once tried on the VM, into the
+  manual as a power-user line.
 
 ## Someday / maybe
 

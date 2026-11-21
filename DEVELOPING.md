@@ -10,9 +10,9 @@ For whoever changes the code, runs the server or makes a release.
 * `widget/` -- the "time left" box, cosmetic: the child may hide or kill it. Next to it
   `enter_code.py`, the dialog behind the "Extra time" shortcut.
 * `parent/` -- `extra_time.html`, the page that makes the offline codes. The server
-  serves it at `/extra-time-codes`, without login; a copy is also at
-  https://pfranek.cz/enoughy-extra-time.html. Its `SIGNATURE_CHARS` must match `config.py`.
-* `server/` -- the optional web page for the parent.
+  serves it at `/extra-time-codes`, without login. Its `SIGNATURE_CHARS` must match `config.py`.
+* `server/` -- the parent's server, with the dashboard that gives dashboard mode its
+  name. An install in offline mode never contacts one.
 * `installer/` -- the Inno Setup script and `build-python.ps1`, which fetches the Python
   the setup bundles. `qrcodegen.py` is Project Nayuki's QR encoder, v1.8.0, vendored as it
   is; `qr_bmp.py` draws the codes page's QR with it on that Python, at the end of an install.
@@ -85,7 +85,7 @@ old report and sends back only what that version understands.
 ## Updates and old installs
 
 `UPDATE_MODE` in `C:\ProgramData\Enoughy` is `auto`, which fetches releases once a day and
-is the default with a server token, or `manual`, the default offline. A reinstall keeps
+is the default in dashboard mode, or `manual`, the default in offline mode. A reinstall keeps
 it.
 
 Copying files over is no upgrade: the monitor refuses to start without a child folder

@@ -1,6 +1,6 @@
 """The QR code of a text as a black-and-white BMP, the one image format the
 setup wizard shows. The bundled Python runs this at the end of an install
-without a server, for the page that carries the address of the codes page:
+in offline mode, for the page that carries the address of the codes page:
     python qr_bmp.py <file with the text> <out.bmp>
 qrcodegen.py next to it is Project Nayuki's encoder, vendored as it is."""
 

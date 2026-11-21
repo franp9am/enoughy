@@ -1,7 +1,8 @@
 # Screen time limit for a child's Windows PC
 
 A daily screen-time limit, a range of allowed hours, and a way to grant extra time.
-No cloud account, remote control is optional, can be fully offline.
+No cloud account. Two modes: dashboard mode, with a web page for the parent, or
+offline mode, where nothing leaves the child's machine.
 
 Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveillance.
 
@@ -9,9 +10,9 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 
 1. Download `enoughy-setup.exe` from the latest release,
    https://github.com/franp9am/enoughy/releases/latest, and run it. It asks for
-   administrator rights, which local account is the child's, optionally for the setup
-   code the parent's server shows after you add the child there, and for the daily
-   limit and the night time;
+   administrator rights, which local account is the child's, for the setup code of
+   dashboard mode, which the parent's server shows after you add the child there, or
+   for offline mode without one, and for the daily limit and the night time;
    a reinstall shows the values in force. The child's account must not be an
    administrator: when it is, the installer offers to make it a standard user, and on
    a machine where it is the only account it first creates an administrator account
@@ -20,7 +21,7 @@ Simpler to set up than Microsoft Family Safety, simple rules -- no kid surveilla
 2. Reboot. The monitor runs from boot, the widget with the time left appears when the
    child logs in.
 
-An install without a setup code prints the address of the offline codes page at the
+An install in offline mode prints the address of the codes page at the
 end, see Extra time. A reinstall keeps the secret behind it.
 
 To remove everything, uninstall enoughy in Apps & Features. That removes the tasks,
@@ -61,27 +62,27 @@ is carried over to the next day, but never more than five hours of it.
 * Five minutes before the night the child sees a message; before the time runs out
   there is none, the widget turns red instead.
 
-The setup asks for the first and the third. Edit that file for the rest, or let the
-parent's server set the values. A value that is missing or
+The setup asks for the first and the third. Edit that file for the rest, or in
+dashboard mode set the values on the parent's page. A value that is missing or
 out of range falls back to its default, so a mangled file cannot leave the machine
 unrestricted.
 
 ## Extra time
 
-If you use the parent's server, grant the time there and ignore the offline codes
-altogether. Without a server, the offline codes are how the child gets more time.
+In dashboard mode, grant the time on the parent's page and ignore the codes
+altogether. In offline mode, the codes are how the child gets more time.
 
-### With the server
+### Dashboard mode
 
 The parent enters minutes on the web page and the monitor picks them up within about a
 minute, or when the machine is next turned on. Negative minutes take time away, and
 never outlive the day. For a longer evening, set a later night in the settings there.
 
-### Offline codes
+### Offline mode
 
 The parent makes a code on their own machine and the child types it in.
 
-Once: open the address the install printed, https://pfranek.cz/enoughy-extra-time.html
+Once: open the address the install printed, https://enoughy.com/extra-time-codes
 with the child and the secret after `#`, on the parent's phone or machine and bookmark
 it. The page makes the codes in the browser and sends nothing anywhere; a second
 parent gets the same bookmark, and `+` adds a child with the secret from its install.
