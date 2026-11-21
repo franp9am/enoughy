@@ -1,15 +1,33 @@
-"""For the maintainer: a family and every trace of it, named by one of its parents.
+"""A family and every trace of it. A parent removes their own on their page;
+the maintainer removes one named by one of its parents:
 
     uv run python remove_family.py <login>
 
-Shows what is about to go and asks for the family name back before deleting:
-the children with their status, grants, settings changes and setup codes,
-then every parent of the family with their sessions, then the family. A
-monitor still installed is refused at its next sync and goes on offline.
+which shows what is about to go and asks for the family name back before
+deleting. A monitor still installed is refused at its next sync and goes on
+offline.
 """
+import sqlite3
 import sys
 
 import db
+
+
+def remove_family(connection: sqlite3.Connection, family_id: int) -> None:
+    """The children with their status, grants, settings changes and setup codes,
+    then every parent of the family with their sessions, then the family."""
+    of_family = "(SELECT id FROM {} WHERE family_id = ?)"
+    with connection:
+        for table in ("status", "grants", "settings_changes", "setup_codes"):
+            connection.execute(
+                f"DELETE FROM {table} WHERE child_id IN {of_family.format('children')}", (family_id,)
+            )
+        connection.execute("DELETE FROM children WHERE family_id = ?", (family_id,))
+        connection.execute(
+            f"DELETE FROM sessions WHERE parent_id IN {of_family.format('parents')}", (family_id,)
+        )
+        connection.execute("DELETE FROM parents WHERE family_id = ?", (family_id,))
+        connection.execute("DELETE FROM families WHERE id = ?", (family_id,))
 
 
 def main() -> None:
@@ -34,17 +52,7 @@ def main() -> None:
           f" children {', '.join(child['name'] for child in children) or 'none'}")
     if input("type the family name to delete all of it: ") != family["name"]:
         sys.exit("nothing deleted")
-    with connection:
-        for child in children:
-            for table in ("status", "grants", "settings_changes", "setup_codes"):
-                connection.execute(f"DELETE FROM {table} WHERE child_id = ?", (child["id"],))
-        connection.execute("DELETE FROM children WHERE family_id = ?", (family["id"],))
-        connection.execute(
-            "DELETE FROM sessions WHERE parent_id IN (SELECT id FROM parents WHERE family_id = ?)",
-            (family["id"],),
-        )
-        connection.execute("DELETE FROM parents WHERE family_id = ?", (family["id"],))
-        connection.execute("DELETE FROM families WHERE id = ?", (family["id"],))
+    remove_family(connection, family["id"])
     connection.close()
     print(f"family {family['name']!r} removed")
 

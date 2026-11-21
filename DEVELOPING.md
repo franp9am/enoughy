@@ -63,6 +63,9 @@ a row in `sessions` and a `session` cookie keep them logged in for 90 days or un
 browsers make an exception for `127.0.0.1`, which is how the server runs locally. The
 reverse proxy in front only forwards.
 
+A parent removes their whole family at the bottom of their page, after typing the
+password again; `remove_family.py <login>` does the same for the maintainer.
+
 Live it is https://enoughy.com, also answering as enoughy.cz, www of both and the
 older marwin.pfranek.cz, which also answers as www, one certificate for all six: the clone in `~/enoughy`, the
 database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to

@@ -18,10 +18,8 @@
 * server: a second parent joins the family by an invite link from the first
   parent's page; a name typed at registration cannot tell them from a
   stranger.
-* server: a parent deletes their account. Removing the children already
-  takes every trace of a child; what stays is a login and a hash, deleted
-  by hand on request. Waits for the second parent, which decides whether a
-  parent leaves a family or takes it down.
+* server: one parent leaves a family that has another. Taking the whole
+  family down is on their page; leaving it alone waits for the second parent.
 * server: a parent changes their own password on the page; until then
   `set_password.py` by the maintainer, after proof by a child's token.
 * installer, admin accounts, left: an account named `parent` already there

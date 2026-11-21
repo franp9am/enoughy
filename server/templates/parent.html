@@ -35,6 +35,24 @@
   .help a { color: #555; }
   .whoami.logoff { color: #b00; }
   .whoami.logoff:hover { border-color: #b00; background: #fff5f5; }
+  .remove.family { margin-top: 1rem; }
+  /* the popup that removes the family: what goes, the password, two buttons */
+  dialog { width: 22rem; max-width: calc(100vw - 2rem); padding: 1.25rem; border: 1px solid #ddd; border-radius: 10px; }
+  dialog::backdrop { background: rgba(0, 0, 0, .3); }
+  dialog p { margin: 0 0 .8rem; font-size: .9rem; line-height: 1.5; color: #333; }
+  dialog input {
+    width: 100%; padding: .55rem .6rem; border-radius: 6px;
+    border: 1px solid #ccc; background: #fff; color: #1a1a1a;
+    font-size: 1rem; font-family: inherit;
+  }
+  dialog input:focus { outline: none; border-color: #888; }
+  dialog .error { margin: .6rem 0 0; color: #b00020; }
+  dialog .buttons { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+  dialog .buttons button {
+    padding: .55rem 1.2rem; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;
+    background: #fff; color: #444; font-size: .95rem; font-family: inherit;
+  }
+  dialog .buttons .danger { border-color: #b00; background: #b00; color: #fff; }
 </style>
 {% endblock %}
 {% block content %}
@@ -71,4 +89,31 @@
     <p class="help">Lost? <a href="{{ url_for('manual') }}#setup">The four steps</a></p>
   </div>
 </div>
+<p class="remove family">
+  <button type="button" onclick="document.getElementById('remove-family').showModal()">Remove family from server</button>
+</p>
+<dialog id="remove-family">
+  <form method="post" action="{{ url_for('delete_family') }}">
+    <p>The family <strong>{{ family }}</strong>, with all its parents and children, will be gone
+      and its data removed from the server. This cannot be undone.</p>
+    {% if children %}
+    <p>On the children's computers the limits stay until Enoughy is uninstalled there.</p>
+    {% endif %}
+    <p>To confirm, type your password.</p>
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
+    {% if wrong_password %}<p class="error">That is not your password. Nothing was removed.</p>{% endif %}
+    <div class="buttons">
+      <button type="button" onclick="this.closest('dialog').close()">Cancel</button>
+      <button type="submit" class="danger">Remove family</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+{% block script %}
+{% if wrong_password %}
+<script>
+  // a wrong password brings the page back with the popup open again
+  document.getElementById("remove-family").showModal();
+</script>
+{% endif %}
 {% endblock %}

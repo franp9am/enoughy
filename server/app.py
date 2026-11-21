@@ -17,6 +17,7 @@ from pydantic import BaseModel
 import add_child
 import add_parent
 import db
+import remove_family
 from auth import (
     NotLoggedIn, Parent, authenticated_child_id, current_parent, end_session, local_path,
     parent_from_credentials, start_session,
@@ -423,17 +424,45 @@ def logout(request: Request) -> RedirectResponse:
 
 
 @app.get("/parent")
-def parent_page(request: Request) -> HTMLResponse:
-    """The parent's own page: the children and what is done to them, and the way out."""
+def parent_page(request: Request, wrong_password: bool = False) -> HTMLResponse:
+    """The parent's own page: the children and what is done to them, and the way out.
+    `wrong_password` is how a refused "Remove family" comes back, its popup open."""
     parent = current_parent(request)
     connection = db.connect()
     children = children_in_family(connection, parent.family_id, datetime.now(timezone.utc))
+    family = connection.execute(
+        "SELECT name FROM families WHERE id = ?", (parent.family_id,)
+    ).fetchone()["name"]
     connection.close()
     return templates.TemplateResponse(
         request,
         "parent.html",
-        {"parent": parent, "children": children, "lifetime_hours": SETUP_CODE_LIFETIME // timedelta(hours=1)},
+        {
+            "parent": parent,
+            "children": children,
+            "lifetime_hours": SETUP_CODE_LIFETIME // timedelta(hours=1),
+            "family": family,
+            "wrong_password": wrong_password,
+        },
     )
+
+
+@app.post("/family/delete")
+async def delete_family(request: Request) -> Response:
+    """The whole family off the server, for good. The password is asked again:
+    a browser stays logged in for months, and this cannot be taken back. The
+    monitors still installed are refused at their next sync and go on offline."""
+    parent = current_parent(request)
+    form = await request.form()
+    connection = db.connect()
+    try:
+        if parent_from_credentials(connection, parent.login, form.get("password", "")) is None:
+            return RedirectResponse("/parent?wrong_password=1", status_code=303)
+        remove_family.remove_family(connection, parent.family_id)
+        log.info(f"family {parent.family_id} removed by parent {parent.id}")
+        return end_session(connection, request)  # to the front page, without the cookie
+    finally:
+        connection.close()
 
 
 @app.post("/children")
