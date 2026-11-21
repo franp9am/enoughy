@@ -198,9 +198,9 @@
   <div class="section" id="updates">
     <h3>Updates and removal</h3>
     <ul class="points">
-      <li><span class="term">Updates</span>The child's computer looks for a new version once a day and installs it by itself. For power users: an administrator can turn this off and on by writing <code>manual</code> or <code>auto</code> into this file:
+      <li><span class="term">Updates</span>In dashboard mode they are automatic: the child's computer looks for a new version once a day and installs it by itself. In offline mode they are off: the computer stays as installed until you run a newer installer. For power users: in either mode an administrator can change this by writing <code>auto</code> or <code>manual</code> into this file:
         <code class="address">C:\ProgramData\Enoughy\UPDATE_MODE</code></li>
-      <li><span class="term">Removing it from the computer</span>Uninstall enoughy in the Windows settings, under installed apps. That removes the program and the usage history on the computer, for every child on it. The Windows accounts stay as they are.</li>
+      <li><span class="term">Removing it from the computer</span>As an administrator, open the Windows Settings, then Apps, then Installed apps (on Windows 10: Apps &amp; features), find enoughy and choose Uninstall. That removes the program and the usage history on the computer, for every child on it. The Windows accounts stay as they are.</li>
       <li><span class="term">Removing a child from the server</span>"Remove" on <a href="{{ url_for('parent_page') }}">your page</a> deletes the child and their usage history from enoughy.com.</li>
     </ul>
   </div>
@@ -231,7 +231,7 @@
       <li><span class="term">Changing the rules</span>Run the installer again for the limit and the hours. For power users: to change the rules without a reinstall, or to add weekday exceptions and carryover, edit this file as an administrator:
         <code class="address">C:\ProgramData\Enoughy\data\&lt;child&gt;\settings.json</code>
         The <a href="https://github.com/franp9am/enoughy#settings">README</a> describes it, and a change counts within a minute.</li>
-      <li><span class="term">Updates</span>The computer stays as installed; to update, run a newer installer. Power users can turn the daily update on with the file under <a href="#updates">Updates</a>. The computer then downloads new versions from GitHub once a day, and still sends nothing about the child.</li>
+      <li><span class="term">Updates</span>Automatic updates are off in offline mode: the computer stays as installed, and to update you run a newer installer. Power users can turn them on with the file under <a href="#updates">Updates</a>. The computer then downloads new versions from GitHub once a day, and still sends nothing about the child.</li>
     </ul>
     <p>To move to dashboard mode later, go through <a href="#setup">the four steps</a>: the installer runs again, this time with a setup code.</p>
   </div>
@@ -240,7 +240,7 @@
     <h3>Pricing</h3>
     <ul class="points">
       <li><span class="term">Offline mode</span>Free forever.</li>
-      <li><span class="term">Dashboard mode on enoughy.com</span>Free forever for everyone who registers during the beta. The beta is running now.</li>
+      <li><span class="term">Dashboard mode on enoughy.com</span>Free forever (or as long as enoughy.com runs) for everyone who registers during the beta. The beta is running now.</li>
       <li><span class="term">Dashboard mode on your own server</span>Free forever; the server is open source.</li>
     </ul>
   </div>
