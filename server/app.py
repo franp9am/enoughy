@@ -346,7 +346,7 @@ def index(request: Request, child_id: int | None = None) -> Response:
 
 @app.get("/intro")
 def intro(request: Request) -> HTMLResponse:
-    """The front page: a drawing, five lines and the links to the three pages behind it."""
+    """The front page: a drawing, six lines and the links to the three pages behind it."""
     return templates.TemplateResponse(request, "landing.html", {"parent": parent_if_logged_in(request)})
 
 
