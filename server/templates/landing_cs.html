@@ -1,0 +1,56 @@
+{#- The front page in Czech, at /cs, where enoughy.cz leads. The layout and
+    styles are the English page's; only the words differ. The pages behind it
+    are English for now, and it says so. -#}
+{% extends "landing.html" %}
+{% block lang %}cs{% endblock %}
+{% block title %}Enoughy: denní časový limit na dětském počítači s Windows{% endblock %}
+{% block description %}Denní časový limit, noční klid a čas navíc na dětském počítači s Windows. Alternativa k Microsoft Family Safety: bez účtu Microsoft, nikdo nic nesleduje, open source.{% endblock %}
+{% block canonical %}https://enoughy.com/cs{% endblock %}
+{% block style %}
+{{ super() }}
+<style>
+  /* the manual's four setup steps, in Czech, since the manual is not */
+  /* heading and text as the manual's sections have them */
+  .start { margin: 2.2rem 0 1rem; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 1.45rem; color: #1a1a1a; }
+  .steps { margin: 0; padding: 0 0 0 1.4rem; font-size: .95rem; line-height: 1.55; color: #555; }
+  .steps li { margin: 0 0 .8rem; }
+  .steps li::marker { color: #999; }
+  .steps a { color: #1a1a1a; }
+  /* the note takes the gap above the links, and the links follow it closely */
+  .english { margin: 2rem 0 0; padding-left: .3rem; font-size: .9rem; color: #777; }
+  .english + .more { margin-top: .5rem; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="hero">
+  <p class="name">Enoughy</p>
+  <p class="tagline">Časový limit na PC vašeho dítěte.</p>
+  <img src="/static/hero.jpg" alt="Kluk se mračí u počítače, na kterém svítí Enoughy a který se vypíná, a rodič ho s hrnkem pozoruje ze dveří.">
+  <p class="intro">Limit nastavíte vy, počítač ho dodrží, nikdo nic nesleduje.</p>
+  {% if not parent %}
+  <div class="actions">
+    <a href="{{ url_for('register_form') }}">Registrovat</a>
+    <a class="quiet" href="{{ url_for('login_form') }}">Přihlásit se</a>
+  </div>
+  {% endif %}
+</div>
+<ul class="lines">
+  <li>Denní limit, noční klid a přidání času rodičem.</li>
+  <li>Není třeba Microsoft účty, open source, zdarma.</li>
+  <li>Vzniklo pro mého syna a od té doby nám to běží každý den.</li>
+</ul>
+<h2 class="start">Návod v kostce</h2>
+<ol class="steps">
+  <li><a href="{{ url_for('register_form') }}">Zaregistrujte se</a> jménem a heslem.</li>
+  <li>Přidejte dítě, dostanete instalační kód.</li>
+  <li>Na počítači dítěte otevřete <a href="{{ url_for('install') }}">enoughy.com/install</a>, spusťte instalátor a zadejte kód. Pokud Windows ukáže „Systém Windows ochránil váš počítač“, klikněte na „Další informace“ a „Přesto spustit“.</li>
+  <li>Po první synchronizaci uvidíte dítě na <a href="{{ url_for('index') }}">enoughy.com</a> a nastavíte mu denní limit a hodiny.</li>
+</ol>
+<p class="english">Další stránky jsou zatím jen anglicky.</p>
+<p class="more">
+  <a href="{{ url_for('how') }}">Jak to funguje</a>
+  <a href="{{ url_for('why') }}">Proč právě tohle</a>
+  <a href="{{ url_for('manual') }}">Manuál</a>
+  <a href="https://pfranek.net">Kontakt</a>
+</p>
+{% endblock %}

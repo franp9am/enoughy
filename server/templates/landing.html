@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Enoughy: a daily screen-time limit for a child's Windows PC{% endblock %}
 {% block head %}<meta name="google-site-verification" content="BrKRfBEe5cCgsBj3c5QC_p_7GhMCPCuJuOmWIj3cGak">
-<link rel="canonical" href="https://enoughy.com/">{% endblock %}
+<link rel="canonical" href="{% block canonical %}https://enoughy.com/{% endblock %}">
+{# The same front page in two languages: search engines show each to its own readers. #}
+<link rel="alternate" hreflang="en" href="https://enoughy.com/">
+<link rel="alternate" hreflang="cs" href="https://enoughy.com/cs">
+<link rel="alternate" hreflang="x-default" href="https://enoughy.com/">{% endblock %}
 {% block style %}
 <style>
   /* one column as wide as the drawing, so no line of text runs past it */
@@ -49,8 +53,7 @@
 </div>
 <ul class="lines">
   <li>A daily limit, a night, carryover, and extra time when you say so.</li>
-  <li>No Microsoft account, no personal data to anyone, open source.</li>
-  <li>Free forever if you register during the beta, which is running now.</li>
+  <li>No Microsoft account, no personal data to anyone, open source and free.</li>
   <li>Made for my son, and running in our home every day since.</li>
 </ul>
 <p class="more">

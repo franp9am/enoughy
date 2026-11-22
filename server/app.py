@@ -39,9 +39,11 @@ INSTALLER_URL = "https://github.com/franp9am/enoughy/releases/latest/download/en
 
 # The public pages, the ones worth finding by a search. The front page is
 # listed as /, where a stranger meets it; /intro is the same page for a parent.
+# /cs is the front page in Czech.
 SITEMAP = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://enoughy.com/</loc></url>
+  <url><loc>https://enoughy.com/cs</loc></url>
   <url><loc>https://enoughy.com/how</loc></url>
   <url><loc>https://enoughy.com/why</loc></url>
   <url><loc>https://enoughy.com/manual</loc></url>
@@ -344,8 +346,14 @@ def index(request: Request, child_id: int | None = None) -> Response:
 
 @app.get("/intro")
 def intro(request: Request) -> HTMLResponse:
-    """The front page: a drawing, six lines and the links to the three pages behind it."""
+    """The front page: a drawing, five lines and the links to the three pages behind it."""
     return templates.TemplateResponse(request, "landing.html", {"parent": parent_if_logged_in(request)})
+
+
+@app.get("/cs")
+def intro_cs(request: Request) -> HTMLResponse:
+    """The front page in Czech, where enoughy.cz leads; the pages behind it are English."""
+    return templates.TemplateResponse(request, "landing_cs.html", {"parent": parent_if_logged_in(request)})
 
 
 @app.get("/how")
