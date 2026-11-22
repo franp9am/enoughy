@@ -65,13 +65,15 @@ def anna(client):
 
 
 def test_without_login_the_front_page_is_about_enoughy(client, anna):
+    # Shown at / itself, not redirected, so / is the address a search engine indexes.
     answer = client.get("/", follow_redirects=False)
-    assert answer.status_code == 303
-    assert answer.headers["location"] == "/intro"
-    answer = client.get("/intro")
     assert answer.status_code == 200
     assert 'href="https://testserver/register"' in answer.text
+    assert '<link rel="canonical" href="https://enoughy.com/">' in answer.text
     assert "Tom" not in answer.text
+    answer = client.get("/intro")  # the same page, for a parent who is logged in
+    assert answer.status_code == 200
+    assert '<link rel="canonical" href="https://enoughy.com/">' in answer.text
 
 
 def test_without_login_the_old_address_shows_the_form(client, anna):

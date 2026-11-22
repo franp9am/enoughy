@@ -29,7 +29,7 @@ def test_the_right_password_removes_every_trace_and_logs_out(anna_logged_in):
     assert anna_logged_in.post("/api/sync", json=REPORT, headers=monitor).status_code == 200
     anna_logged_in.post("/grants", data={"child_id": 1, "minutes": 10})
     answer = anna_logged_in.post("/family/delete", data={"password": "correct horse"})
-    assert answer.url.path == "/intro"  # logged out, so the front page
+    assert 'href="https://testserver/register"' in answer.text  # logged out, so the front page
     for table in TABLES:
         assert rows(table) == 0, table
     assert anna_logged_in.post("/api/sync", json=REPORT, headers=monitor).status_code == 401

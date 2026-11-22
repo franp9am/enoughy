@@ -37,6 +37,27 @@ from views import (
 # address, since it is typed on the child's computer, not clicked.
 INSTALLER_URL = "https://github.com/franp9am/enoughy/releases/latest/download/enoughy-setup.exe"
 
+# The public pages, the ones worth finding by a search. The front page is
+# listed as /, where a stranger meets it; /intro is the same page for a parent.
+SITEMAP = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://enoughy.com/</loc></url>
+  <url><loc>https://enoughy.com/how</loc></url>
+  <url><loc>https://enoughy.com/why</loc></url>
+  <url><loc>https://enoughy.com/manual</loc></url>
+</urlset>
+"""
+
+# For every crawler: the pages are open, the device API is not worth fetching,
+# and the sitemap says which pages are. Nothing else is shut, not even on
+# marwin.pfranek.cz: nginx marks that address noindex, and a crawler only sees
+# that header on a page it is allowed to fetch.
+ROBOTS = """User-agent: *
+Disallow: /api/
+
+Sitemap: https://enoughy.com/sitemap.xml
+"""
+
 # The offline code page, the one file in parent/; the same repo checkout serves it.
 EXTRA_TIME_PAGE = Path(__file__).parent.parent / "parent" / "extra_time.html"
 
@@ -252,6 +273,18 @@ def extra_time_codes() -> FileResponse:
     return FileResponse(EXTRA_TIME_PAGE)
 
 
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap() -> Response:
+    """The public pages, for search engines."""
+    return Response(SITEMAP, media_type="application/xml")
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots() -> Response:
+    """What crawlers may fetch, and where the sitemap is."""
+    return Response(ROBOTS, media_type="text/plain")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     connection = db.connect()
@@ -270,11 +303,16 @@ def parent_if_logged_in(request: Request) -> Parent | None:
 
 @app.get("/")
 def index(request: Request, child_id: int | None = None) -> Response:
-    """The dashboard for a parent; anyone else is sent to what enoughy is."""
+    """The dashboard for a parent; anyone else sees what enoughy is, right here.
+
+    Shown in place, not redirected to /intro, so the address people link to
+    is itself the front page a search engine indexes.
+    """
     parent = parent_if_logged_in(request)
     if parent is None:
-        target = "/login" if request.url.hostname == LOGIN_FIRST_HOST else "/intro"
-        return RedirectResponse(target, status_code=303)
+        if request.url.hostname == LOGIN_FIRST_HOST:
+            return RedirectResponse("/login", status_code=303)
+        return templates.TemplateResponse(request, "landing.html", {"parent": None})
     connection = db.connect()
     children = synced_children(connection, parent.family_id)
     selected_child = next(
