@@ -8,6 +8,9 @@
   }
   .back:hover { color: #1a1a1a; }
   .in-force { margin: 0; font-size: .9rem; color: #333; }
+  /* the monitor's version beside the heading, quieter than it */
+  .version { margin-left: .4rem; font-size: .8rem; font-weight: 400; color: #999; text-decoration: none; }
+  .version:hover { color: #555; text-decoration: underline; }
   .note { margin: .6rem 0 0; font-size: .85rem; color: #a3170c; }
   .muted { margin: 0; color: #888; font-size: .9rem; }
   .settings-form {
@@ -65,7 +68,10 @@
 
     <div class="card plain">
       <div class="section">
-        <h2>In force on {{ child.name }}'s PC</h2>
+        <h2>In force on {{ child.name }}'s PC
+          {%- if settings and settings.version %}
+          <a class="version" href="https://github.com/franp9am/enoughy/releases/tag/v{{ settings.version }}">(v{{ settings.version }})</a>
+          {%- endif %}</h2>
         {% if settings %}
         <p class="in-force">{{ settings.in_force }}</p>
         {% if settings.waiting_since %}

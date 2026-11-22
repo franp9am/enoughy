@@ -50,6 +50,16 @@ def test_every_widget_s_name_is_a_setting_the_monitor_has():
     assert set(views.WIDGETS) <= set(SETTINGS)
 
 
+def test_the_monitor_s_version_beside_the_heading_links_its_release(anna_logged_in):
+    child_id = tom_reporting(anna_logged_in, default_settings())
+    assert "/releases/tag/" not in anna_logged_in.get("/settings", params={"child_id": child_id}).text
+    token = db.connect().execute("SELECT token FROM children").fetchone()["token"]
+    anna_logged_in.post("/api/sync", json={**REPORT, "settings": default_settings(), "monitor_version": "1.6.0"},
+                        headers={"Authorization": f"Bearer {token}"})
+    page = anna_logged_in.get("/settings", params={"child_id": child_id}).text
+    assert 'href="https://github.com/franp9am/enoughy/releases/tag/v1.6.0">(v1.6.0)</a>' in page
+
+
 def test_the_limit_is_a_box_in_minutes(anna_logged_in):
     child_id = tom_reporting(anna_logged_in, {**default_settings(), "DAILY_LIMIT_SECONDS": 3600})
     page = anna_logged_in.get("/settings", params={"child_id": child_id}).text

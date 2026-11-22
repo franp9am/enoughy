@@ -38,6 +38,7 @@ class SettingsView:
     in_force: str
     waiting_since: str | None  # when a parent asked for something the child has yet to answer
     refused: str | None  # the change the child answered with a refusal, in words
+    version: str | None  # the monitor's, as its last sync gave it; None from one too old to say
 
 
 # One widget per setting name, in the page's order: how the value shows as boxes
@@ -337,7 +338,7 @@ def settings_in_words(settings: dict) -> str:
 
 def settings_view(connection: sqlite3.Connection, child_id: int) -> SettingsView | None:
     row = connection.execute(
-        """SELECT reported_settings FROM status
+        """SELECT reported_settings, monitor_version FROM status
            WHERE child_id = :child_id
            ORDER BY date DESC
            LIMIT 1""",
@@ -347,7 +348,8 @@ def settings_view(connection: sqlite3.Connection, child_id: int) -> SettingsView
         return None
     if row["reported_settings"] is None:
         return SettingsView(
-            in_force="not reported by this monitor", waiting_since=None, refused=None
+            in_force="not reported by this monitor", waiting_since=None, refused=None,
+            version=row["monitor_version"],
         )
     # What is in force is what the child reports, always. The change row says
     # only how the last question was answered -- nothing here infers the child's
@@ -360,6 +362,7 @@ def settings_view(connection: sqlite3.Connection, child_id: int) -> SettingsView
         in_force=settings_in_words(json.loads(row["reported_settings"])),
         waiting_since=formatted_local_time(wanted["created_at"]) if unanswered else None,
         refused=settings_as_sent(json.loads(wanted["settings"])) if refused else None,
+        version=row["monitor_version"],
     )
 
 
