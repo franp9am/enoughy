@@ -43,6 +43,8 @@ def parent_from_credentials(
     ).fetchone()
     if row is None or not row["password_hash"]:
         return None  # a parent without a password yet cannot log in
+    if len(password.encode()) > 72:
+        return None  # more than bcrypt hashes, so nobody's password; checkpw would raise
     if not bcrypt.checkpw(password.encode(), row["password_hash"].encode()):
         return None
     return Parent(id=row["id"], login=row["login"], family_id=row["family_id"])

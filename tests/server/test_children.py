@@ -80,3 +80,19 @@ def test_removing_another_family_s_child_is_refused(anna_logged_in, client):
     client.post("/register", data={"login": "bob", "password": "correct horse", "password_again": "correct horse"})
     assert client.post("/children/delete", data={"child_id": 1}).status_code == 404
     assert db.connect().execute("SELECT count(*) FROM children").fetchone()[0] == 1
+
+
+def test_a_family_has_sixteen_children_at_most(anna_logged_in):
+    for number in range(16):
+        assert anna_logged_in.post("/children", data={"name": f"Tom {number}"}).status_code == 200
+    answer = anna_logged_in.post("/children", data={"name": "Tom 16"})
+    assert answer.status_code == 400
+    assert "family can have 16 children max" in answer.text
+    assert db.connect().execute("SELECT COUNT(*) FROM children").fetchone()[0] == 16
+
+
+def test_a_childs_name_has_32_characters_at_most(anna_logged_in):
+    answer = anna_logged_in.post("/children", data={"name": "T" * 33})
+    assert answer.status_code == 400
+    assert "name too long, at most 32 characters" in answer.text
+    assert anna_logged_in.post("/children", data={"name": "T" * 32}).status_code == 200

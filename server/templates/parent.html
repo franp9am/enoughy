@@ -83,7 +83,7 @@
   {% endfor %}
   <div class="section">
     <form class="add-child" method="post" action="{{ url_for('create_child') }}">
-      <input type="text" name="name" placeholder="{% if children %}Another child's name{% else %}The child's name{% endif %}" required>
+      <input type="text" name="name" placeholder="{% if children %}Another child's name{% else %}The child's name{% endif %}" maxlength="32" required>
       <button type="submit">Add</button>
     </form>
     <p class="help">Lost? <a href="{{ url_for('manual') }}#setup">The four steps</a></p>

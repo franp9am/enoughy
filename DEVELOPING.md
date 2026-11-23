@@ -54,6 +54,10 @@ A parent registers at `/register` and adds children on the page, which shows the
 for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
 With `ENOUGHY_INVITE` set in the service's environment, `/register` opens only from a
 link that carries it, `/register?invitation=<value>`; unset, registration is open.
+The login names the parent and their new family, so one that is already a parent's or
+a family's is taken; only `add_parent.py <login> <family>` puts a parent into a family
+that exists. A login and a password have 64 characters at most, a family 16 children, a
+child's name 32 characters.
 Past 1000 new parents within a day the form closes until the oldest of them is a day
 old: a breaker against a flood from many addresses, counted in memory, so a restart
 opens the form again.

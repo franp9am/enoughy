@@ -24,7 +24,8 @@ MIN_PASSWORD_CHARS = 8
 # It is a floor and not an estimate: characters it finds no pattern in count as
 # ten possibilities each, so eight random ones are 10^8 where the truth is 10^15.
 MIN_PASSWORD_GUESSES = 10 ** 7
-MAX_PASSWORD_CHARS = 72  # what bcrypt hashes and zxcvbn accepts
+MAX_PASSWORD_CHARS = 64  # bcrypt hashes 72 bytes and zxcvbn accepts 72 characters; this is under both
+MAX_LOGIN_CHARS = 64  # it is stored and shown as typed, so it has an end
 
 
 def without_diacritics(word: str) -> str:
@@ -46,7 +47,9 @@ def password_fault(password: str, login: str) -> str | None:
     if len(password) < MIN_PASSWORD_CHARS:
         return f"the password needs at least {MIN_PASSWORD_CHARS} characters"
     if len(password) > MAX_PASSWORD_CHARS:
-        return f"the password can have at most {MAX_PASSWORD_CHARS} characters"
+        return f"password too long, at most {MAX_PASSWORD_CHARS} characters"
+    if len(password.encode()) > 72:  # bcrypt's own end, and it would raise past it
+        return "password too long, a letter with a diacritic counts as two"
     if zxcvbn(password, user_inputs=[login, "enoughy"] + CZECH_WORDS)["guesses"] < MIN_PASSWORD_GUESSES:
         return "password too simple, robots would guess it.\nPlease try another one"
     return None
@@ -55,22 +58,29 @@ def password_fault(password: str, login: str) -> str | None:
 def add_parent(
     connection: sqlite3.Connection, login: str, password: str, family_name: str | None = None
 ) -> int:
-    """A parent who registers gets a family of their own, named after them.
+    """A parent who registers gets a family of their own, named after them:
+    a new one, so a login that is some family's name is as taken as one that
+    is a parent's, and raises IntegrityError the same. Only the maintainer,
+    who names the family, puts a parent into one that exists.
     Returns the new parent's id."""
     if not login:
         raise ValueError("a login is needed")
+    if len(login) > MAX_LOGIN_CHARS:
+        raise ValueError(f"login too long, at most {MAX_LOGIN_CHARS} characters")
     fault = password_fault(password, login)
     if fault:
         raise ValueError(fault)
-    if family_name is None:
-        family_name = login
     # Work factor 10 is about 100 ms per check: slow enough that a stolen
     # database does not give the passwords up, fast enough for a login form.
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=10))
-    with connection:
+    with connection:  # one transaction: a taken login leaves no family behind
+        if family_name is None:
+            family = connection.execute("INSERT INTO families (name) VALUES (?)", (login,)).lastrowid
+        else:
+            family = family_id(connection, family_name)
         inserted = connection.execute(
             "INSERT INTO parents (login, family_id, password_hash) VALUES (?, ?, ?)",
-            (login, family_id(connection, family_name), password_hash.decode()),
+            (login, family, password_hash.decode()),
         )
     return inserted.lastrowid
 

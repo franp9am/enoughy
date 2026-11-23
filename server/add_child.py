@@ -6,6 +6,8 @@ import db
 
 
 MIN_TOKEN_CHARS = 16
+MAX_NAME_CHARS = 32
+MAX_CHILDREN = 16  # in one family; more than any has, and an end to what one account can store
 
 
 def add_child(
@@ -15,11 +17,18 @@ def add_child(
     returns the token its monitor will sync with."""
     if not name:
         raise ValueError("a name is needed")
+    if len(name) > MAX_NAME_CHARS:
+        raise ValueError(f"name too long, at most {MAX_NAME_CHARS} characters")
     if token is None:
         token = secrets.token_hex(16)
     if len(token) < MIN_TOKEN_CHARS:
         raise ValueError(f"the token needs at least {MIN_TOKEN_CHARS} characters")
     with connection:
+        children = connection.execute(
+            "SELECT COUNT(*) FROM children WHERE family_id = ?", (family_id,)
+        ).fetchone()[0]
+        if children >= MAX_CHILDREN:
+            raise ValueError(f"family can have {MAX_CHILDREN} children max")
         connection.execute(
             "INSERT INTO children (family_id, name, token, secret) VALUES (?, ?, ?, ?)",
             (family_id, name, token, secrets.token_hex(16)),

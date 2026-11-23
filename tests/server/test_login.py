@@ -169,3 +169,10 @@ def test_a_login_is_a_line_in_the_journal_and_a_wrong_one_a_warning(client, anna
     assert synced.status_code == 200
     lines = [(record.levelname, record.getMessage()) for record in caplog.records if record.name == "app"]
     assert lines == [("INFO", "parent 1 logged in"), ("WARNING", "failed login as 'anna'")]
+
+
+def test_a_password_longer_than_bcrypt_hashes_is_a_wrong_one(client):
+    add_parent.add_parent(db.connect(), "anna", password="correct horse")
+    answer = client.post("/login", data={"login": "anna", "password": "x" * 100})
+    assert answer.status_code == 401
+    assert "Wrong login or password" in answer.text

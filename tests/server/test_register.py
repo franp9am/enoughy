@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 
+import add_child
 import add_parent
 import app
 import db
@@ -61,7 +62,41 @@ def test_a_few_words_or_eight_random_characters_are_enough(register, password):
 def test_a_password_longer_than_bcrypt_hashes_is_refused(client, register):
     answer = register("anna", "seven green apples " * 4)
     assert answer.status_code == 400
-    assert "at most 72 characters" in answer.text
+    assert "Password too long, at most 64 characters." in answer.text
+
+
+def test_a_password_of_too_many_bytes_is_refused_in_plain_words(client, register):
+    answer = register("anna", "žluťoučký kůň úpěl ďábelské ódy " * 2)  # 64 characters, 90 bytes
+    assert answer.status_code == 400
+    assert "Password too long, a letter with a diacritic counts as two." in answer.text
+
+
+def test_a_login_of_64_characters_is_the_longest(client, register):
+    answer = register("a" * 65, "correct horse")
+    assert answer.status_code == 400
+    assert "Login too long, at most 64 characters." in answer.text
+    assert "session" not in client.cookies
+    assert register("a" * 64, "correct horse").url.path == "/parent"
+
+
+def test_a_login_that_is_a_familys_name_is_taken(client, register):
+    """Or a stranger would walk into the family and find its children."""
+    connection = db.connect()
+    add_parent.add_parent(connection, "petr", password="correct horse", family_name="novakovi")
+    family = connection.execute("SELECT id FROM families WHERE name = 'novakovi'").fetchone()["id"]
+    add_child.add_child(connection, family, "Honzik")
+    answer = register("novakovi", "battery staple")
+    assert answer.status_code == 400
+    assert "novakovi is taken" in answer.text
+    assert "session" not in client.cookies
+    assert connection.execute("SELECT COUNT(*) FROM parents").fetchone()[0] == 1
+
+
+def test_a_taken_login_leaves_no_family_behind(client, register):
+    connection = db.connect()
+    add_parent.add_parent(connection, "anna", password="correct horse", family_name="novakovi")
+    assert register("anna", "battery staple").status_code == 400
+    assert [row["name"] for row in connection.execute("SELECT name FROM families")] == ["novakovi"]
 
 
 def test_two_different_passwords_show_the_form_again(client, register):
