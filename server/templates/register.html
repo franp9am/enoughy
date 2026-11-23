@@ -26,6 +26,8 @@
   <div class="section">
     {% if closed %}
     <p class="note">Registration is by invitation. Write to the maintainer for a link.</p>
+    {% elif full %}
+    <p class="note">Registration is paused after an unusual number of new accounts today. Please come back tomorrow.</p>
     {% else %}
     <form class="login-form" method="post" action="{{ url_for('register') }}">
       <input type="hidden" name="invitation" value="{{ invitation }}">

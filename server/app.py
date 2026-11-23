@@ -1,9 +1,11 @@
+import asyncio
 import hmac
 import json
 import logging
 import os
 import secrets
 import sqlite3
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
@@ -66,6 +68,13 @@ EXTRA_TIME_PAGE = Path(__file__).parent.parent / "parent" / "extra_time.html"
 # The first family's address from before enoughy.com. It is their private door,
 # not a front page, so a stranger there meets the login form, not the intro.
 LOGIN_FIRST_HOST = "marwin.pfranek.cz"
+
+# A breaker, not a filter: nginx limits one address, and one attacker can have
+# many. Past this many new parents in a day the form closes until the oldest
+# is a day old, so a flood fills neither the disk nor the nightly copies. The
+# times are kept in memory; a restart forgets them, which only opens the form.
+REGISTRATIONS_PER_DAY = 1000
+registered_at: deque[datetime] = deque()
 
 # What the server prints goes to the journal under systemd, read with
 # `journalctl -u enoughy`; the journal adds the time. Only what is rare and
@@ -382,13 +391,21 @@ def login_form(request: Request) -> HTMLResponse:
     )
 
 
+def parent_logging_in(login: str, password: str) -> Parent | None:
+    """With a connection of its own, since it runs in a thread."""
+    connection = db.connect()
+    try:
+        return parent_from_credentials(connection, login, password)
+    finally:
+        connection.close()
+
+
 @app.post("/login")
 async def login(request: Request) -> Response:
     form = await request.form()
-    connection = db.connect()
-    parent = parent_from_credentials(connection, form.get("login", ""), form.get("password", ""))
+    # in a thread: bcrypt takes ~100 ms, and the devices' syncs must not wait for it
+    parent = await asyncio.to_thread(parent_logging_in, form.get("login", ""), form.get("password", ""))
     if parent is None:
-        connection.close()
         log.warning(f"failed login as {form.get('login', '')!r}")
         return templates.TemplateResponse(
             request,
@@ -397,6 +414,7 @@ async def login(request: Request) -> Response:
             status_code=401,
         )
     log.info(f"parent {parent.id} logged in")
+    connection = db.connect()
     response = start_session(connection, parent.id, form.get("next", "/"))
     connection.close()
     return response
@@ -406,6 +424,8 @@ async def login(request: Request) -> Response:
 def register_form(request: Request, invitation: str = "") -> HTMLResponse:
     if not invited(invitation):
         return by_invitation_only(request)
+    if registration_full():
+        return paused_for_today(request)
     return templates.TemplateResponse(
         request, "register.html", {"error": None, "invitation": invitation}
     )
@@ -422,12 +442,34 @@ def by_invitation_only(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "register.html", {"closed": True}, status_code=403)
 
 
+def registration_full() -> bool:
+    day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+    while registered_at and registered_at[0] < day_ago:
+        registered_at.popleft()
+    return len(registered_at) >= REGISTRATIONS_PER_DAY
+
+
+def paused_for_today(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "register.html", {"full": True}, status_code=503)
+
+
+def new_parent(login: str, password: str) -> int:
+    """With a connection of its own, since it runs in a thread."""
+    connection = db.connect()
+    try:
+        return add_parent.add_parent(connection, login, password)
+    finally:
+        connection.close()
+
+
 @app.post("/register")
 async def register(request: Request) -> Response:
     form = await request.form()
     invitation = form.get("invitation", "")
     if not invited(invitation):
         return by_invitation_only(request)
+    if registration_full():
+        return paused_for_today(request)
     login = form.get("login", "").strip()
     if form.get("password", "") != form.get("password_again", ""):
         return templates.TemplateResponse(
@@ -436,11 +478,10 @@ async def register(request: Request) -> Response:
             {"error": "The two passwords differ.", "invitation": invitation},
             status_code=400,
         )
-    connection = db.connect()
     try:
-        parent_id = add_parent.add_parent(connection, login, form.get("password", ""))
+        # in a thread, as the login is: the password is weighed and hashed here
+        parent_id = await asyncio.to_thread(new_parent, login, form.get("password", ""))
     except ValueError as error:
-        connection.close()
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -449,7 +490,6 @@ async def register(request: Request) -> Response:
             status_code=400,
         )
     except sqlite3.IntegrityError:
-        connection.close()
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -457,6 +497,10 @@ async def register(request: Request) -> Response:
             status_code=400,
         )
     log.info(f"parent {parent_id} registered as {login!r}")
+    registered_at.append(datetime.now(timezone.utc))
+    if registration_full():
+        log.warning(f"{REGISTRATIONS_PER_DAY} parents registered within a day, registration paused")
+    connection = db.connect()
     response = start_session(connection, parent_id, next_path="/parent")
     connection.close()
     return response

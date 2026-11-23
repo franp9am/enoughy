@@ -1,7 +1,10 @@
 """A stranger registers and is logged in, without the maintainer touching anything."""
+from datetime import timedelta
+
 import pytest
 
 import add_parent
+import app
 import db
 
 
@@ -96,3 +99,29 @@ def test_with_an_invite_set_registering_needs_it_too(client, register, monkeypat
     accepted = register("anna", "correct horse", invitation="friends-only")
     assert accepted.status_code == 200
     assert "session" in client.cookies
+
+
+def test_past_the_days_count_the_form_closes_until_a_day_has_passed(client, register, monkeypatch):
+    monkeypatch.setattr(app, "REGISTRATIONS_PER_DAY", 2)
+    assert register("anna", "correct horse").url.path == "/parent"
+    assert register("bara", "battery staple").url.path == "/parent"
+    client.cookies.clear()
+    closed = client.get("/register")
+    assert closed.status_code == 503
+    assert "paused" in closed.text
+    assert 'name="login"' not in closed.text
+    refused = register("cyril", "zelena kocka")
+    assert refused.status_code == 503
+    assert "session" not in client.cookies
+    assert client.post("/login", data={"login": "anna", "password": "correct horse"}).status_code == 200  # only the form is shut
+    client.cookies.clear()
+    app.registered_at[0] -= timedelta(days=1, seconds=1)  # anna's registration is a day old now
+    assert client.get("/register").status_code == 200
+    assert register("cyril", "zelena kocka").url.path == "/parent"
+
+
+def test_a_refused_registration_does_not_count(client, register, monkeypatch):
+    monkeypatch.setattr(app, "REGISTRATIONS_PER_DAY", 1)
+    assert register("anna", "short").status_code == 400
+    assert register("anna", "correct horse", again="correct house").status_code == 400
+    assert register("anna", "correct horse").url.path == "/parent"

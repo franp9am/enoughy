@@ -54,6 +54,9 @@ A parent registers at `/register` and adds children on the page, which shows the
 for the setup; `add_parent.py` and `add_child.py` do the same from the command line.
 With `ENOUGHY_INVITE` set in the service's environment, `/register` opens only from a
 link that carries it, `/register?invitation=<value>`; unset, registration is open.
+Past 1000 new parents within a day the form closes until the oldest of them is a day
+old: a breaker against a flood from many addresses, counted in memory, so a restart
+opens the form again.
 No email is collected, so there is no password recovery: a parent who lost theirs
 writes to the maintainer and proves the family with a child's token, the only thing
 both they and the server know, and `set_password.py <login>` sets a new one. A parent logs in at `/login` with the
@@ -76,7 +79,9 @@ Live it is https://enoughy.com, also answering as enoughy.cz, www of both and th
 older marwin.pfranek.cz, which also answers as www, one certificate for all six: the clone in `~/enoughy`, the
 database `server/data/enoughy.sqlite`, the systemd unit `enoughy`, nginx proxying to
 port 8000 with rate limits, which are also all that stands between a guesser and
-`/login` or `/api/setup`. A cookie belongs to one host name, so each name is its own
+`/login` or `/api/setup`. On top of the limits for every page, one address may post
+`/login` six times in a row and then once in ten seconds, `/register` five times and
+then once a minute; showing either form is not counted. A cookie belongs to one host name, so each name is its own
 login. A deploy is `git pull` and `sudo systemctl restart enoughy`; the unit runs
 `uv run`, which installs a new dependency by itself. A new column goes into the live
 database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF NOT
