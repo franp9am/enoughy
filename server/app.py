@@ -6,15 +6,16 @@ import os
 import secrets
 import sqlite3
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 import add_child
 import add_parent
@@ -92,21 +93,55 @@ class SettingsChangeOutcome(BaseModel):
     taken: bool
 
 
+def today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+# Whoever registers holds a child's token, so a sync is a stranger's word and
+# every part of it that is kept has an end. A monitor sends the date of its
+# own clock, a day off the server's at most; one further off is refused, or a
+# token could write a row for every date there is. The event log is not kept
+# here, only printed, and is taken whole, since a monitor sends what it has
+# until the server answers; but only so much of it is printed. A megabyte of
+# empty entries was five seconds of printing, on the one core there is.
+MAX_EVENTS_PRINTED = 1000
+MAX_EVENT_CHARS = 4000  # a crash with its traceback fits
+SYNC_DAYS_FROM_TODAY = 2
+MAX_REPORTED_SETTINGS_CHARS = 4096  # as JSON; a monitor's are under 200
+Seconds = Annotated[int, Field(ge=-10**9, le=10**9)]  # thirty years either way
+GrantId = Annotated[int, Field(ge=0, lt=2**63)]  # what SQLite holds
+
+
 class SyncRequest(BaseModel):
     date: str
-    time_spent_sec: int
-    carryover_sec: int
-    granted_sec: int
-    remaining_sec: int
-    last_tick: str | None
-    applied_grant_ids: list[int]
+    time_spent_sec: Seconds
+    carryover_sec: Seconds
+    granted_sec: Seconds
+    remaining_sec: Seconds
+    last_tick: Annotated[str, Field(max_length=40)] | None
+    applied_grant_ids: Annotated[list[GrantId], Field(max_length=10_000)]
     # the settings in force on the child; None from a client too old to say
     settings: dict | None = None
     # of the last change delivered to the child; None before any
     settings_change_outcome: SettingsChangeOutcome | None = None
-    monitor_version: str | None = None
+    monitor_version: Annotated[str, Field(max_length=40)] | None = None
     # the child's event log entries since the last sync; none from an old monitor
     event_log: list[str] = []
+
+    @field_validator("date")
+    @classmethod
+    def a_day_near_today(cls, value: str) -> str:
+        day = date.fromisoformat(value)  # ValueError for anything else
+        if abs((day - today()).days) > SYNC_DAYS_FROM_TODAY:
+            raise ValueError("the date is too far from today")
+        return day.isoformat()  # one spelling of a day, so one row
+
+    @field_validator("settings")
+    @classmethod
+    def settings_of_a_monitors_size(cls, value: dict | None) -> dict | None:
+        if value is not None and len(json.dumps(value)) > MAX_REPORTED_SETTINGS_CHARS:
+            raise ValueError("the settings are too long")
+        return value
 
 
 class SetupRequest(BaseModel):
@@ -230,8 +265,13 @@ def sync(http_request: Request, sync_request: SyncRequest) -> SyncResponse:
     # The event log has no acknowledgement field: this answer is it. The monitor
     # drops the entries only when the answer arrives, and sends them again
     # after any error.
-    for entry in sync_request.event_log:
+    for entry in sync_request.event_log[:MAX_EVENTS_PRINTED]:
+        # a line break inside an entry is marked, so no entry passes for a line of the server's own
+        entry = entry[:MAX_EVENT_CHARS].replace("\r", "").replace("\n", "\n    | ")
         log.info(f"child {child_id} event: {entry}")
+    unprinted = len(sync_request.event_log) - MAX_EVENTS_PRINTED
+    if unprinted > 0:
+        log.warning(f"child {child_id} sent {unprinted} more events, not printed")
     return SyncResponse(
         pending_grants=[PendingGrant(id=row["id"], seconds=row["seconds"]) for row in pending],
         settings_change=change_to_send,

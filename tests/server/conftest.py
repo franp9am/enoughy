@@ -2,6 +2,7 @@
 fresh database for every test."""
 import os
 import tempfile
+from datetime import date
 
 # db.py reads this when it is imported and app.py creates the schema there at
 # once; sending that to a temp folder keeps the import away from server/data.
@@ -22,6 +23,7 @@ def client(tmp_path, monkeypatch):
     Every test gets a new file in its own folder; no test deletes anything."""
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.sqlite")
     db.create_schema()
+    monkeypatch.setattr(app, "today", lambda: date(2026, 10, 12))  # the day the tests' monitors report
     app.registered_at.clear()  # the day's count of new parents is the server's, not the database's
     # https, or the client would drop the session cookie, which is marked Secure
     return TestClient(app.app, base_url="https://testserver")

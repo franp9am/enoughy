@@ -65,10 +65,10 @@ def test_a_password_longer_than_bcrypt_hashes_is_refused(client, register):
     assert "Password too long, at most 64 characters." in answer.text
 
 
-def test_a_password_of_too_many_bytes_is_refused_in_plain_words(client, register):
+def test_a_password_of_too_many_bytes_is_too_long(client, register):
     answer = register("anna", "žluťoučký kůň úpěl ďábelské ódy " * 2)  # 64 characters, 90 bytes
     assert answer.status_code == 400
-    assert "Password too long, a letter with a diacritic counts as two." in answer.text
+    assert "Password too long." in answer.text
 
 
 def test_a_login_of_64_characters_is_the_longest(client, register):

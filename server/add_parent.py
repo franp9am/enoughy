@@ -49,7 +49,7 @@ def password_fault(password: str, login: str) -> str | None:
     if len(password) > MAX_PASSWORD_CHARS:
         return f"password too long, at most {MAX_PASSWORD_CHARS} characters"
     if len(password.encode()) > 72:  # bcrypt's own end, and it would raise past it
-        return "password too long, a letter with a diacritic counts as two"
+        return "password too long"
     if zxcvbn(password, user_inputs=[login, "enoughy"] + CZECH_WORDS)["guesses"] < MIN_PASSWORD_GUESSES:
         return "password too simple, robots would guess it.\nPlease try another one"
     return None

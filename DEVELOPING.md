@@ -58,6 +58,10 @@ The login names the parent and their new family, so one that is already a parent
 a family's is taken; only `add_parent.py <login> <family>` puts a parent into a family
 that exists. A login and a password have 64 characters at most, a family 16 children, a
 child's name 32 characters.
+A sync is as much a stranger's word as the form, since whoever registers holds a
+child's token: its date has to be within two days of the server's, the settings it
+reports under 4096 characters, its numbers and texts of a sane size, or it is refused
+with 422. A machine whose clock is further off than that does not sync until it is set.
 Past 1000 new parents within a day the form closes until the oldest of them is a day
 old: a breaker against a flood from many addresses, counted in memory, so a restart
 opens the form again.
