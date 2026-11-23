@@ -80,7 +80,46 @@ port 8000 with rate limits, which are also all that stands between a guesser and
 login. A deploy is `git pull` and `sudo systemctl restart enoughy`; the unit runs
 `uv run`, which installs a new dependency by itself. A new column goes into the live
 database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF NOT
-EXISTS` never touches an existing table.
+EXISTS` never touches an existing table; `uv run python backup.py` first, so the
+state before it can be put back.
+
+`backup.py` copies the database into `server/data/backups` and keeps the newest
+seven. The copies are against the maintainer's own mistakes and never leave the
+machine, so a lost machine loses them too. Removing a family deletes them all and
+takes a new one without it. Live, a systemd timer runs it every night, two files in
+`/etc/systemd/system` with `User`, `WorkingDirectory` and the path of `uv` as
+`systemctl cat enoughy` shows them:
+
+```
+# enoughy-backup.service
+[Unit]
+Description=A copy of the enoughy database
+
+[Service]
+Type=oneshot
+User=<as in enoughy.service>
+WorkingDirectory=<the clone>/server
+ExecStart=<path of uv> run python backup.py
+```
+
+```
+# enoughy-backup.timer
+[Unit]
+Description=A copy of the enoughy database every night
+
+[Timer]
+OnCalendar=*-*-* 03:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+then `sudo systemctl daemon-reload` and `sudo systemctl enable --now
+enoughy-backup.timer`; `systemctl list-timers enoughy-backup` shows the next run and
+`journalctl -u enoughy-backup` the past ones. Putting a copy back is `sudo systemctl
+stop enoughy`, copying the file over `server/data/enoughy.sqlite` and starting it
+again.
 
 The dashboard lists the children whose machine has synced at least once. `/codes`
 makes offline extra-time codes with the same signing as `parent/extra_time.html`, under

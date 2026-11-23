@@ -5,17 +5,20 @@ the maintainer removes one named by one of its parents:
 
 which shows what is about to go and asks for the family name back before
 deleting. A monitor still installed is refused at its next sync and goes on
-offline.
+offline. The backups made before are deleted too, since each still holds
+the family, and a new one is taken without it.
 """
 import sqlite3
 import sys
 
+import backup
 import db
 
 
 def remove_family(connection: sqlite3.Connection, family_id: int) -> None:
     """The children with their status, grants, settings changes and setup codes,
-    then every parent of the family with their sessions, then the family."""
+    then every parent of the family with their sessions, then the family, and
+    last the backups that still hold any of it."""
     of_family = "(SELECT id FROM {} WHERE family_id = ?)"
     with connection:
         for table in ("status", "grants", "settings_changes", "setup_codes"):
@@ -28,6 +31,7 @@ def remove_family(connection: sqlite3.Connection, family_id: int) -> None:
         )
         connection.execute("DELETE FROM parents WHERE family_id = ?", (family_id,))
         connection.execute("DELETE FROM families WHERE id = ?", (family_id,))
+    backup.forget(connection)
 
 
 def main() -> None:
