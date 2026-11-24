@@ -724,6 +724,8 @@ async def create_grant(request: Request) -> RedirectResponse:
         seconds = int(form["minutes"]) * 60
     except (KeyError, ValueError):
         raise HTTPException(status_code=400, detail="child_id and minutes must be whole numbers")
+    if abs(seconds) > 10**9:  # as a sync's seconds; past what SQLite holds it would be an error, not an answer
+        raise HTTPException(status_code=400, detail="that is too many minutes")
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     connection = db.connect()
     try:
@@ -791,6 +793,11 @@ async def change_settings(request: Request) -> RedirectResponse:
                 status_code=400,
                 detail="every setting needs a value: a number of minutes, or JSON like 3600 or true",
             )
+        # A setting without a widget is whatever JSON the form sends, and the
+        # names are the child's own report, so the whole change has the end
+        # that a report has.
+        if len(json.dumps(new_settings)) > MAX_REPORTED_SETTINGS_CHARS:
+            raise HTTPException(status_code=400, detail="these settings are too long")
         # Any value goes through: the widgets convert shape, minutes to seconds,
         # and hold no opinion on ranges. The monitor's ranges and types are its
         # own, and the server talks to monitors of several versions at once. A

@@ -193,3 +193,20 @@ def test_a_report_missing_a_known_name_is_a_question_mark_and_an_error_not_a_500
     errors = [record.getMessage() for record in caplog.records if record.levelname == "ERROR"]
     assert errors[:2] == ["window_in_words cannot read the report {'DAILY_LIMIT_SECONDS': 3600}",
                           "carryover_in_words cannot read the report {'DAILY_LIMIT_SECONDS': 3600}"]
+
+
+def test_a_change_longer_than_a_monitors_settings_is_refused(anna_logged_in):
+    """A setting without a widget is any JSON the form sends, so the whole change has an end."""
+    tom = tom_reporting(anna_logged_in, {"NEW_SETTING": 1})
+    answer = anna_logged_in.post("/settings", data={"child_id": tom, "NEW_SETTING": json.dumps("x" * 500_000)})
+    assert answer.status_code == 400
+    assert db.connect().execute("SELECT COUNT(*) FROM settings_changes").fetchone()[0] == 0
+    assert anna_logged_in.post("/settings", data={"child_id": tom, "NEW_SETTING": "2"}).status_code == 200
+    assert db.connect().execute("SELECT settings FROM settings_changes").fetchone()[0] == '{"NEW_SETTING": 2}'
+
+
+def test_a_grant_too_big_to_store_is_refused(anna_logged_in):
+    tom = tom_reporting(anna_logged_in, {"NEW_SETTING": 1})
+    answer = anna_logged_in.post("/grants", data={"child_id": tom, "minutes": "9" * 30})
+    assert answer.status_code == 400
+    assert db.connect().execute("SELECT COUNT(*) FROM grants").fetchone()[0] == 0
