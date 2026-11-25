@@ -17,6 +17,7 @@
   /* pre-line: a message of two sentences comes with a line break between them */
   .error { margin: 0; color: #b00020; font-size: .95rem; font-weight: 600; white-space: pre-line; }
   .note { margin: 0; font-size: .9rem; color: #888; }
+  .note a { color: #555; }
   .aside { margin: 1rem 0 0; font-size: .9rem; color: #888; }
   .aside a { color: #555; }
 </style>
@@ -37,6 +38,7 @@
       <input type="password" name="password_again" placeholder="Password again" autocomplete="new-password" required>
       <p class="note">Choose a password that is hard to guess. A common word, a name or a year will be refused.</p>
       <p class="note">We ask for no email, so there is no password recovery. Use a password manager or write it down.</p>
+      <p class="note">What the server keeps, and for how long: <a href="{{ url_for('manual') }}#data">Your data</a>.</p>
       <button type="submit">Register</button>
     </form>
     {% endif %}

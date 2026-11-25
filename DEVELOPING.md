@@ -96,6 +96,13 @@ database by hand with `ALTER TABLE` before the restart, since `CREATE TABLE IF N
 EXISTS` never touches an existing table; `uv run python backup.py` first, so the
 state before it can be put back.
 
+The manual's section "Your data" promises that logs live three weeks at most, and the
+server keeps that promise by settings outside this repo: `MaxRetentionSec=3week` in
+`/etc/systemd/journald.conf`, nginx's logrotate at daily with 14 kept, and rsyslog
+disabled, so the journal is not copied into `/var/log/syslog`. A new server needs
+the same before it is opened. The three weeks also cover the nightly copies: a removed
+child is in them for a week at most, a removed family in none.
+
 `backup.py` copies the database into `server/data/backups` and keeps the newest
 seven. The copies are against the maintainer's own mistakes and never leave the
 machine, so a lost machine loses them too. Removing a family deletes them all and

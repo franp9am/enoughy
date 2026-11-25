@@ -73,6 +73,7 @@
         <li><a href="#lock">A stronger lock</a></li>
         <li><a href="#updates">Updates and removal</a></li>
         <li><a href="#account">Your account</a></li>
+        <li><a href="#data">Your data</a></li>
         <li><a href="#offline">Offline mode</a></li>
         <li><a href="#pricing">Pricing</a></li>
         <li><a href="#problems">Problems and contributing</a></li>
@@ -214,7 +215,17 @@
       <li><span class="term">Login and password</span>There is no email, so there is no password recovery. Use a password manager or write the password down. If it is lost all the same, <a href="https://pfranek.net">write to me</a>.</li>
       <li><span class="term">Staying logged in</span>A browser stays logged in for 90 days, or until "Log off" on your page.</li>
       <li><span class="term">Two parents</span>For now both use the same login.</li>
-      <li><span class="term">What the server knows</span>For each child and day: the time used and the time left, the extra time and codes, the rules in force, and when the computer shut down for the limit or the night. Nothing about what the child did with the time.</li>
+    </ul>
+  </div>
+
+  <div class="section" id="data">
+    <h3>Your data</h3>
+    <p>This applies to dashboard mode. In <a href="#offline">offline mode</a> the server has none of your data.</p>
+    <ul class="points">
+      <li><span class="term">What the server keeps</span>Your login, your password as a hash (the password itself is never stored), the children's names, and for each child and day the time they used, the extra time you gave and the rules.</li>
+      <li><span class="term">What it never gets</span>No email, and nothing about what the child did with the time.</li>
+      <li><span class="term">The log</span>For three weeks at most, the server keeps a log for finding faults: events such as a PC shutdown or a parent logging in to enoughy.com, and the time and internet address of each request.</li>
+      <li><span class="term">Removal</span>Removing a child or the family deletes their data at once. What remains in backups and logs is gone within three weeks.</li>
     </ul>
   </div>
 
