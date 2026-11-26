@@ -96,7 +96,7 @@
     <h3>The two modes</h3>
     <ul class="points">
       <li><span class="term">Dashboard mode</span>You register an account, the child's computer reports to the server, and you see the time and change the rules on a web page. The server is enoughy.com by default. Power users can set up their own: it is <a href="https://github.com/franp9am/enoughy/blob/main/DEVELOPING.md#the-parents-server">open source</a>, and the installer has a box for its address.</li>
-      <li><span class="term">Offline mode</span>No server and no account. Nothing leaves the child's computer, and you grant extra time with codes. The rules and what the child sees are the same as in dashboard mode; what differs is in the section <a href="#offline">Offline mode</a>.</li>
+      <li><span class="term">Offline mode</span>No server and no account. The computer can be online as usual; it is only the Enoughy app that sends nothing to enoughy.com. You grant extra time with codes. The rules and what the child sees are the same as in dashboard mode; what differs is in the section <a href="#offline">Offline mode</a>.</li>
     </ul>
   </div>
 
@@ -231,7 +231,7 @@
 
   <div class="section" id="offline">
     <h3>Offline mode</h3>
-    <p>In the installer, tick "No server" instead of typing a setup code. Enoughy then needs no account: there is no dashboard, and the child's computer talks to nobody. The rules are the ones you type into the installer.</p>
+    <p>In the installer, tick "No server" instead of typing a setup code. Enoughy then needs no account: there is no dashboard, and Enoughy sends nothing to enoughy.com. The rules are the ones you type into the installer.</p>
     <ul class="points">
       <li><span class="term">The codes page</span>At its end the installer shows a QR code and an address. That is the page that makes extra-time codes for this child. The address ends with the child's name and a long key, like this one:
         <code class="address">https://enoughy.com/extra-time-codes#peter=5b1e9c04a7d263f80c4e1a9b7d3052c6</code>
