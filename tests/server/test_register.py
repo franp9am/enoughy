@@ -160,3 +160,14 @@ def test_a_refused_registration_does_not_count(client, register, monkeypatch):
     assert register("anna", "short").status_code == 400
     assert register("anna", "correct horse", again="correct house").status_code == 400
     assert register("anna", "correct horse").url.path == "/parent"
+
+
+def test_a_robot_that_fills_the_hidden_field_is_refused(client, register, monkeypatch):
+    monkeypatch.setattr(app, "REGISTRATIONS_PER_DAY", 1)
+    assert 'name="website"' in client.get("/register").text
+    answer = register("anna", "correct horse", website="https://example.com")
+    assert answer.status_code == 400
+    assert "did not go through" in answer.text
+    assert "session" not in client.cookies
+    assert db.connect().execute("SELECT COUNT(*) FROM parents").fetchone()[0] == 0
+    assert register("anna", "correct horse", website="").url.path == "/parent"  # and it did not count

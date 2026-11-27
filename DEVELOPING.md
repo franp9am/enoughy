@@ -65,6 +65,8 @@ with 422. A machine whose clock is further off than that does not sync until it 
 Past 1000 new parents within a day the form closes until the oldest of them is a day
 old: a breaker against a flood from many addresses, counted in memory, so a restart
 opens the form again.
+The form also carries a field named `website` that no person sees; a post that fills
+it is a robot's and is refused, uncounted, with a warning in the journal.
 No email is collected, so there is no password recovery: a parent who lost theirs
 writes to the maintainer and proves the family with a child's token, the only thing
 both they and the server know, and `set_password.py <login>` sets a new one. A parent logs in at `/login` with the

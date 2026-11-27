@@ -510,6 +510,16 @@ async def register(request: Request) -> Response:
         return by_invitation_only(request)
     if registration_full():
         return paused_for_today(request)
+    if form.get("website", ""):
+        # the field no person sees: a robot that fills every field filled it.
+        # The form comes back, in case a browser's autofill did it for a person.
+        log.warning("registration with the hidden field filled, refused")
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {"error": "That did not go through.\nPlease type the fields yourself and try again.", "invitation": invitation},
+            status_code=400,
+        )
     login = form.get("login", "").strip()
     if form.get("password", "") != form.get("password_again", ""):
         return templates.TemplateResponse(

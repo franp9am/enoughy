@@ -20,6 +20,8 @@
   .note a { color: #555; }
   .aside { margin: 1rem 0 0; font-size: .9rem; color: #888; }
   .aside a { color: #555; }
+  /* off the page, not display: none, which a robot may know to skip */
+  .trap { position: absolute; left: -9999px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -33,6 +35,8 @@
     <form class="login-form" method="post" action="{{ url_for('register') }}">
       <input type="hidden" name="invitation" value="{{ invitation }}">
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      {# for robots only: a person neither sees it nor tabs into it, and whoever fills it is refused #}
+      <p class="trap" aria-hidden="true"><input type="text" name="website" placeholder="Website" tabindex="-1" autocomplete="off"></p>
       <input type="text" name="login" placeholder="Login" autocomplete="username" maxlength="64" autofocus required>
       <input type="password" name="password" placeholder="Password, 8 characters or more" autocomplete="new-password" minlength="8" maxlength="64" required>
       <input type="password" name="password_again" placeholder="Password again" autocomplete="new-password" required>
