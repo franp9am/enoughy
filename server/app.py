@@ -336,6 +336,12 @@ def robots() -> Response:
     return Response(ROBOTS, media_type="text/plain")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> FileResponse:
+    """The icon, for the browsers and crawlers that ask at the root whatever the page says."""
+    return FileResponse(Path(__file__).parent / "static" / "favicon.ico")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     connection = db.connect()
